@@ -2,6 +2,7 @@
 #include "common/AutoPtr.hpp"
 #include "common/Object.hpp"
 #include "engine/base/JSLocation.hpp"
+#include "engine/base/JSUnaryOperatorType.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include <optional>
@@ -44,7 +45,7 @@ public:
 
   bool isNull() const;
 
-  bool isInifity() const;
+  bool isInfinity() const;
 
   bool isNaN() const;
 
@@ -80,5 +81,8 @@ public:
   common::AutoPtr<JSValue> toString(common::AutoPtr<JSContext> ctx);
 
   common::AutoPtr<JSValue> toBoolean(common::AutoPtr<JSContext> ctx);
+
+  common::AutoPtr<JSValue> unary(common::AutoPtr<JSContext> ctx,
+                                 const JSUnaryOperatorType &opt);
 };
 }; // namespace spark::engine

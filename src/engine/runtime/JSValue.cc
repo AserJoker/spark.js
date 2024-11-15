@@ -2,6 +2,7 @@
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
+#include "engine/entity/JSInfinityEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
@@ -74,7 +75,7 @@ bool JSValue::isUndefined() const {
 
 bool JSValue::isNull() const { return getType() == JSValueType::JS_NULL; }
 
-bool JSValue::isInifity() const {
+bool JSValue::isInfinity() const {
   return getType() == JSValueType::JS_INFINITY;
 }
 
@@ -186,11 +187,12 @@ std::wstring JSValue::getTypeName(common::AutoPtr<JSContext> ctx) {
 }
 
 common::AutoPtr<JSValue> JSValue::toNumber(common::AutoPtr<JSContext> ctx) {
-  if (getType() == JSValueType::JS_BIGINT) {
+  if (getType() == JSValueType::JS_INFINITY ||
+      getType() == JSValueType::JS_NAN) {
     return this;
   }
-  if (getType() == JSValueType::JS_INFINITY) {
-    return ctx->Infinity();
+  if (getType() == JSValueType::JS_BIGINT) {
+    // TODO: big int
   }
   auto val = toNumberValue(ctx);
   if (val.has_value()) {
@@ -206,4 +208,65 @@ common::AutoPtr<JSValue> JSValue::toString(common::AutoPtr<JSContext> ctx) {
 
 common::AutoPtr<JSValue> JSValue::toBoolean(common::AutoPtr<JSContext> ctx) {
   return ctx->createBoolean(toBooleanValue(ctx));
+}
+common::AutoPtr<JSValue> JSValue::unary(common::AutoPtr<JSContext> ctx,
+                                        const JSUnaryOperatorType &opt) {
+  auto value = toNumberValue(ctx);
+  switch (opt) {
+  case JSUnaryOperatorType::INC:
+    if (this->isNaN()) {
+      return this;
+    } else if (this->isInfinity()) {
+      return ctx->createInfinity();
+    } else if (this->getType() == JSValueType::JS_BIGINT) {
+      // TODO: big int
+    } else if (value.has_value()) {
+      auto val = value.value() + 1;
+      setNumber(val);
+      return ctx->createNumber(val);
+    }
+  case JSUnaryOperatorType::DEC:
+    if (this->isNaN() || this->isInfinity()) {
+      return this;
+    } else if (this->isInfinity()) {
+      return ctx->createInfinity();
+    } else if (this->getType() == JSValueType::JS_BIGINT) {
+      // TODO: big int
+    } else if (value.has_value()) {
+      auto val = value.value() - 1;
+      setNumber(val);
+      return ctx->createNumber(val);
+    }
+  case JSUnaryOperatorType::BNOT:
+    if (this->getType() == JSValueType::JS_BIGINT) {
+      // TODO: big int
+    } else if (!value.has_value()) {
+      return ctx->createNumber(-1);
+    }
+    return ctx->createNumber(~(int64_t)value.value());
+  case JSUnaryOperatorType::LNOT:
+    return ctx->createBoolean(!toBooleanValue(ctx));
+  case JSUnaryOperatorType::ADD:
+    if (this->isNaN() || this->isInfinity()) {
+      return this;
+    } else if (this->isInfinity()) {
+      return ctx->createInfinity();
+    } else if (this->getType() == JSValueType::JS_BIGINT) {
+      // TODO: big int
+    } else if (value.has_value()) {
+      return ctx->createNumber(value.value());
+    }
+  case JSUnaryOperatorType::NEG:
+    if (this->isNaN()) {
+      return this;
+    } else if (this->isInfinity()) {
+      return ctx->createInfinity(
+          !((JSInfinityEntity *)getEntity())->isNegative());
+    } else if (this->getType() == JSValueType::JS_BIGINT) {
+      // TODO: big int
+    } else if (value.has_value()) {
+      return ctx->createNumber(-value.value());
+    }
+  }
+  return ctx->NaN();
 }

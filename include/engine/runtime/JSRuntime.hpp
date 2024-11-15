@@ -8,7 +8,6 @@ class JSRuntime : public common::Object {
 private:
   JSScope *_root;
 
-  common::AutoPtr<JSValue> _Infinity;
   common::AutoPtr<JSValue> _NaN;
   common::AutoPtr<JSValue> _null;
   common::AutoPtr<JSValue> _undefined;
@@ -33,7 +32,6 @@ public:
 
   JSScope *getRoot();
 
-  common::AutoPtr<JSValue> Infinity();
   common::AutoPtr<JSValue> NaN();
   common::AutoPtr<JSValue> Null();
   common::AutoPtr<JSValue> Undefined();

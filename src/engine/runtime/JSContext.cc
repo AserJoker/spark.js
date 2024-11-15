@@ -4,6 +4,7 @@
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
+#include "engine/entity/JSInfinityEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
@@ -118,6 +119,11 @@ common::AutoPtr<JSValue> JSContext::createBoolean(bool value,
   return _scope->createValue(new JSBooleanEntity(value), name);
 }
 
+common::AutoPtr<JSValue> JSContext::createInfinity(bool negative,
+                                                   const std::wstring &name) {
+  return _scope->createValue(new JSInfinityEntity(negative), name);
+}
+
 common::AutoPtr<JSValue>
 JSContext::createFunction(const std::function<JSFunction> &value,
                           const std::wstring &funcname,
@@ -150,5 +156,3 @@ common::AutoPtr<JSValue> JSContext::Undefined() {
 common::AutoPtr<JSValue> JSContext::Null() { return _runtime->Null(); }
 
 common::AutoPtr<JSValue> JSContext::NaN() { return _runtime->NaN(); }
-
-common::AutoPtr<JSValue> JSContext::Infinity() { return _runtime->Infinity(); }

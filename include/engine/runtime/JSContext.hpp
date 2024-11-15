@@ -69,6 +69,9 @@ public:
   common::AutoPtr<JSValue> createBoolean(bool value = false,
                                          const std::wstring &name = L"");
 
+  common::AutoPtr<JSValue> createInfinity(bool negative = false,
+                                          const std::wstring &name = L"");
+
   common::AutoPtr<JSValue>
   createFunction(const std::function<JSFunction> &value,
                  const std::wstring &funcname = L"",
@@ -89,7 +92,5 @@ public:
   common::AutoPtr<JSValue> Null();
 
   common::AutoPtr<JSValue> NaN();
-
-  common::AutoPtr<JSValue> Infinity();
 };
 } // namespace spark::engine

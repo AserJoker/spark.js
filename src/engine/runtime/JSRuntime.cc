@@ -1,5 +1,4 @@
 #include "engine/runtime/JSRuntime.hpp"
-#include "engine/entity/JSInfinityEntity.hpp"
 #include "engine/entity/JSNaNEntity.hpp"
 #include "engine/entity/JSNullEntity.hpp"
 #include "engine/entity/JSUndefinedEntity.hpp"
@@ -13,7 +12,6 @@ JSRuntime::JSRuntime() {
   _undefined = _root->createValue(new JSUndefinedEntity(), L"undefined");
   _null = _root->createValue(new JSNullEntity(), L"null");
   _NaN = _root->createValue(new JSNaNEntity(), L"NaN");
-  _Infinity = _root->createValue(new JSInfinityEntity(), L"Infinity");
 };
 
 JSRuntime::~JSRuntime() { delete _root; };
@@ -29,7 +27,6 @@ uint32_t JSRuntime::setSourceFilename(const std::wstring &filename) {
 
 JSScope *JSRuntime::getRoot() { return _root; }
 
-common::AutoPtr<JSValue> JSRuntime::Infinity() { return _Infinity; }
 common::AutoPtr<JSValue> JSRuntime::NaN() { return _NaN; }
 common::AutoPtr<JSValue> JSRuntime::Null() { return _null; }
 common::AutoPtr<JSValue> JSRuntime::Undefined() { return _undefined; }
