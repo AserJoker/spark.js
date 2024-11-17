@@ -1,15 +1,426 @@
 #pragma once
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <math.h>
 #include <string>
 #include <vector>
+
 namespace spark::common {
-class BigInt {
+
+template <class T = uint8_t> class BigInt {
 private:
-  bool _sign;
-  std::vector<uint32_t> _data;
+  bool _negative;
+  std::vector<T> _data;
 
 public:
-  BigInt();
-  BigInt(const std::wstring &source);
-  BigInt(const wchar_t *source);
+  BigInt() : _negative(false), _data({0}) {}
+
+  BigInt(const BigInt &another)
+      : _data(another._data), _negative(another._negative) {}
+
+  BigInt(BigInt &&another)
+      : _data(another._data), _negative(another._negative) {}
+
+  BigInt(uint64_t number) : _negative(false) {
+    static uint64_t max = (uint64_t)((T)-1) + 1;
+    while (number > 0) {
+      _data.push_back(number % max);
+      number >>= (sizeof(T) * 8);
+    }
+  }
+
+  BigInt(const std::wstring &source) : _negative(false), _data({0}) {
+    auto chr = source.c_str();
+    if (*chr == L'+') {
+      chr++;
+    } else if (*chr == L'-') {
+      _negative = true;
+      chr++;
+    }
+    while (*chr) {
+      *this *= 10;
+      *this += (uint64_t)(*chr - '0');
+      chr++;
+    }
+    while (*_data.rbegin() == 0) {
+      _data.pop_back();
+    }
+    if (_data.empty()) {
+      _data.push_back(0);
+    }
+  }
+  
+  BigInt(const wchar_t *source) : BigInt(std::wstring(source)) {}
+
+  std::wstring toString() const {
+    if (isInfinity()) {
+      if (_negative) {
+        return L"-Infinity";
+      } else {
+        return L"Infinity";
+      }
+    }
+    std::wstring result;
+    for (auto part : _data) {
+      size_t index = 0;
+      while (index < sizeof(T) * 2) {
+        if (part) {
+          auto tail = part % 16;
+          if (tail >= 10) {
+            result += (wchar_t)(tail - 10 + 'a');
+          } else {
+            result += (wchar_t)(tail + '0');
+          }
+          part >>= 4;
+        } else {
+          result += L'0';
+        }
+        index++;
+      }
+    }
+    result = std::wstring(result.rbegin(), result.rend());
+    auto chr = result.c_str();
+    while (*chr == L'0') {
+      chr++;
+    }
+    if (!*chr) {
+      result = L"0";
+    } else {
+      result = chr;
+      if (_negative) {
+        result = L"-" + result;
+      }
+    }
+    return result;
+  }
+
+  static BigInt Infinity() {
+    BigInt result;
+    result._data.clear();
+    return result;
+  }
+
+  bool isInfinity() const { return _data.empty(); }
+
+  BigInt abs() const {
+    if (isInfinity()) {
+      return Infinity();
+    }
+    BigInt result = *this;
+    result._negative = true;
+    return result;
+  }
+
+  BigInt uadd(const BigInt &another) const {
+    if (isInfinity() || another.isInfinity()) {
+      return BigInt<>::Infinity();
+    }
+    static uint64_t max = (uint64_t)((T)-1) + 1;
+    size_t index = 0;
+    uint64_t next = 0;
+    BigInt result;
+    while (next != 0 || _data.size() > index || another._data.size() > index) {
+      uint64_t val = next;
+      if (index < _data.size()) {
+        val += _data[index];
+      }
+      if (index < another._data.size()) {
+        val += another._data[index];
+      }
+      if (index >= result._data.size()) {
+        result._data.push_back(0);
+      }
+      result._data[index] = val % max;
+      next = val / max;
+      index++;
+    }
+    return result;
+  }
+
+  BigInt usub(const BigInt &another) const {
+    if (isInfinity() && another.isInfinity()) {
+      return BigInt<>((uint64_t)0);
+    }
+    if (isInfinity() && !another.isInfinity()) {
+      return Infinity();
+    }
+    if (!isInfinity() && !another.isInfinity()) {
+      return -Infinity();
+    }
+    BigInt left = abs();
+    BigInt right = another.abs();
+    BigInt *a = &left;
+    BigInt *b = &right;
+    bool neg = false;
+    if (left > right) {
+      a = &right;
+      b = &left;
+      neg = true;
+    }
+    int64_t next = 0;
+    BigInt result;
+    result._data.clear();
+    for (size_t index = 0; index < a->_data.size(); index++) {
+      uint64_t pa = a->_data[index];
+      pa += next;
+      if (index < b->_data.size()) {
+        uint64_t pb = b->_data[index];
+        if (pa <= pb) {
+          pa += 1 << sizeof(T) * 8;
+          next = -1;
+        }
+        result._data.push_back(pa - pb);
+      } else {
+        result._data.push_back(pa);
+      }
+    }
+    while (*result._data.rbegin() == 0) {
+      result._data.pop_back();
+    }
+    if (result._data.empty()) {
+      result._data.push_back(0);
+    }
+    result._negative = neg;
+    return result;
+  }
+
+  BigInt &operator=(const BigInt &another) {
+    if (this == &another) {
+      return *this;
+    }
+    _negative = another._negative;
+    _data = another._data;
+    return *this;
+  }
+
+  BigInt operator+(const BigInt &another) const {
+    if (_negative == another._negative) {
+      BigInt result = uadd(another);
+      result._negative = _negative;
+      return result;
+    } else {
+      return *this - (-another);
+    }
+  }
+
+  BigInt operator*(const BigInt &another) const {
+    if (isInfinity() || another.isInfinity()) {
+      auto inf = Infinity();
+      inf._negative = _negative != another._negative;
+      return inf;
+    }
+    static uint64_t max = (uint64_t)((T)-1) + 1;
+    BigInt result;
+    uint64_t rindex = 0;
+    for (auto &part : another._data) {
+      uint64_t next = 0;
+      for (size_t index = 0; index < _data.size(); index++) {
+        auto &src = _data[index];
+        if (index + rindex >= result._data.size()) {
+          result._data.push_back(0);
+        }
+        auto val = part * src + next;
+        result._data[index + rindex] += val % max;
+        next = val / max;
+      }
+      if (next > 0) {
+        result._data.push_back(next);
+      }
+      rindex++;
+    }
+    result._negative = _negative != another._negative;
+    return result;
+  }
+
+  BigInt operator-(const BigInt &another) const {
+    if (_negative == another._negative) {
+      BigInt result = usub(another);
+      if (_negative) {
+        result._negative = !result._negative;
+      }
+      return result;
+    } else {
+      return *this + (-another);
+    }
+  }
+
+  BigInt operator/(const BigInt &another) const {
+    if (another == 0) {
+      BigInt infinity;
+      infinity._data.clear();
+      infinity._negative = _negative;
+      return infinity;
+    }
+    if (another < *this) {
+      return 0;
+    }
+    size_t len = _data.size() - another._data.size();
+    for (auto index = 0; index < len; index++) {
+      BigInt tmp;
+      tmp._data.clear();
+      for (auto i = 0; i < another._data.size(); i++) {
+        tmp._data.push_back(_data[_data.size() - another._data.size() + i]);
+      }
+    }
+  }
+
+  BigInt operator+() const { return *this; }
+
+  BigInt operator-() const {
+    BigInt result = *this;
+    result._negative = !result._negative;
+    return result;
+  }
+
+  bool operator>(const BigInt &another) const {
+
+    if (!_negative && another._negative) {
+      return true;
+    } else if (_negative && !another._negative) {
+      return false;
+    }
+    if (isInfinity() && !another.isInfinity()) {
+      return !_negative;
+    }
+    if (isInfinity() && another.isInfinity()) {
+      return false;
+    }
+    if (!isInfinity() && another.isInfinity()) {
+      return _negative;
+    }
+    if (_data.size() > another._data.size()) {
+      return !_negative;
+    } else if (another._data.size() > _data.size()) {
+      return _negative;
+    }
+    for (size_t index = 0; index < _data.size(); index++) {
+      if (_data[index] > another._data[index]) {
+        return !_negative;
+      } else if (_data[index] < another._data[index]) {
+        return _negative;
+      }
+    }
+    return false;
+  }
+  bool operator<(const BigInt &another) const {
+    if (!_negative && another._negative) {
+      return false;
+    } else if (_negative && !another._negative) {
+      return true;
+    }
+    if (isInfinity() && !another.isInfinity()) {
+      return _negative;
+    }
+    if (isInfinity() && another.isInfinity()) {
+      return false;
+    }
+    if (!isInfinity() && another.isInfinity()) {
+      return !_negative;
+    }
+    if (_data.size() > another._data.size()) {
+      return _negative;
+    } else if (another._data.size() > _data.size()) {
+      return !_negative;
+    }
+    for (size_t index = 0; index < _data.size(); index++) {
+      if (_data[index] > another._data[index]) {
+        return _negative;
+      } else if (_data[index] < another._data[index]) {
+        return !_negative;
+      }
+    }
+    return false;
+  }
+  bool operator>=(const BigInt &another) const {
+    if (!_negative && another._negative) {
+      return true;
+    } else if (_negative && !another._negative) {
+      return false;
+    }
+    if (isInfinity() && !another.isInfinity()) {
+      return !_negative;
+    }
+    if (isInfinity() && another.isInfinity()) {
+      return true;
+    }
+    if (!isInfinity() && another.isInfinity()) {
+      return _negative;
+    }
+    if (_data.size() > another._data.size()) {
+      return !_negative;
+    } else if (another._data.size() > _data.size()) {
+      return _negative;
+    }
+    for (size_t index = 0; index < _data.size(); index++) {
+      if (_data[index] > another._data[index]) {
+        return !_negative;
+      } else if (_data[index] < another._data[index]) {
+        return _negative;
+      }
+    }
+    return true;
+  }
+  bool operator<=(const BigInt &another) const {
+    if (!_negative && another._negative) {
+      return false;
+    } else if (_negative && !another._negative) {
+      return true;
+    }
+    if (isInfinity() && !another.isInfinity()) {
+      return _negative;
+    }
+    if (isInfinity() && another.isInfinity()) {
+      return false;
+    }
+    if (!isInfinity() && another.isInfinity()) {
+      return !_negative;
+    }
+    if (_data.size() > another._data.size()) {
+      return _negative;
+    } else if (another._data.size() > _data.size()) {
+      return !_negative;
+    }
+    for (size_t index = 0; index < _data.size(); index++) {
+      if (_data[index] > another._data[index]) {
+        return _negative;
+      } else if (_data[index] < another._data[index]) {
+        return !_negative;
+      }
+    }
+    return true;
+  }
+  bool operator==(const BigInt &another) const {
+    if (_negative != another._negative) {
+      return false;
+    }
+    if (_data.size() != another._data.size()) {
+      return false;
+    }
+    for (size_t index = 0; index < _data.size(); index++) {
+      if (_data[index] != another._data[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  bool operator!=(const BigInt &another) const {
+    if (_negative != another._negative) {
+      return true;
+    }
+    if (_data.size() != another._data.size()) {
+      return true;
+    }
+    for (size_t index = 0; index < _data.size(); index++) {
+      if (_data[index] != another._data[index]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  BigInt &operator*=(const BigInt &another) { return *this = *this * another; }
+
+  BigInt &operator+=(const BigInt &another) { return *this = *this + another; }
 };
-}; // namespace spark::common
+} // namespace spark::common

@@ -14,9 +14,11 @@ int main(int argc, char *argv[]) {
   try {
     common::AutoPtr runtime = new engine::JSRuntime();
     common::AutoPtr ctx = new engine::JSContext(runtime);
-    common::BigInt d = L"10241024";
+    common::BigInt d = L"65536";
+    d / 256;
+    fmt::print(L"{}\n", d.toString());
   } catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
+    std::cout << e.what() << std::endl;
   }
   return 0;
 }
