@@ -7,6 +7,7 @@
 #include <exception>
 #include <fmt/xchar.h>
 #include <iostream>
+#include <string>
 
 using namespace spark;
 
@@ -14,8 +15,7 @@ int main(int argc, char *argv[]) {
   try {
     common::AutoPtr runtime = new engine::JSRuntime();
     common::AutoPtr ctx = new engine::JSContext(runtime);
-    common::BigInt d = L"65536";
-    d / 256;
+    common::BigInt d = std::wstring(L"65536");
     fmt::print(L"{}\n", d.toString());
   } catch (std::exception &e) {
     std::cout << e.what() << std::endl;

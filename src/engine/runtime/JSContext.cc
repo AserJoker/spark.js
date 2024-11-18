@@ -1,12 +1,14 @@
 #include "engine/runtime/JSContext.hpp"
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSLocation.hpp"
+#include "engine/entity/JSBigIntEntity.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
+#include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSScope.hpp"
@@ -119,9 +121,18 @@ common::AutoPtr<JSValue> JSContext::createBoolean(bool value,
   return _scope->createValue(new JSBooleanEntity(value), name);
 }
 
+common::AutoPtr<JSValue> JSContext::createBigInt(const common::BigInt<> &value,
+                                                 const std::wstring &name) {
+  return _scope->createValue(new JSBigIntEntity(value), name);
+}
+
 common::AutoPtr<JSValue> JSContext::createInfinity(bool negative,
                                                    const std::wstring &name) {
   return _scope->createValue(new JSInfinityEntity(negative), name);
+}
+common::AutoPtr<JSValue> JSContext::createObject(JSEntity *prototype,
+                                                 const std::wstring &name) {
+  return _scope->createValue(new JSObjectEntity(prototype), name);
 }
 
 common::AutoPtr<JSValue>

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <math.h>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -22,11 +23,17 @@ public:
   BigInt(BigInt &&another)
       : _data(another._data), _negative(another._negative) {}
 
-  BigInt(uint64_t number) : _negative(false) {
+  BigInt(int64_t number) : _negative(number < 0) {
     static uint64_t max = (uint64_t)((T)-1) + 1;
+    if (number < 0) {
+      number = -number;
+    }
     while (number > 0) {
       _data.push_back(number % max);
       number >>= (sizeof(T) * 8);
+    }
+    if (_data.empty()) {
+      _data.push_back(0);
     }
   }
 
@@ -50,8 +57,6 @@ public:
       _data.push_back(0);
     }
   }
-  
-  BigInt(const wchar_t *source) : BigInt(std::wstring(source)) {}
 
   std::wstring toString() const {
     if (isInfinity()) {
@@ -62,37 +67,23 @@ public:
       }
     }
     std::wstring result;
-    for (auto part : _data) {
-      size_t index = 0;
-      while (index < sizeof(T) * 2) {
-        if (part) {
-          auto tail = part % 16;
-          if (tail >= 10) {
-            result += (wchar_t)(tail - 10 + 'a');
-          } else {
-            result += (wchar_t)(tail + '0');
-          }
-          part >>= 4;
-        } else {
-          result += L'0';
-        }
-        index++;
-      }
+    BigInt<> tmp = *this;
+    while (tmp > 0) {
+      result += (tmp % 10)._data[0] + '0';
+      tmp /= 10;
     }
     result = std::wstring(result.rbegin(), result.rend());
-    auto chr = result.c_str();
-    while (*chr == L'0') {
-      chr++;
-    }
-    if (!*chr) {
-      result = L"0";
-    } else {
-      result = chr;
-      if (_negative) {
-        result = L"-" + result;
-      }
+    if (_negative) {
+      result = L"-" + result;
     }
     return result;
+  }
+
+  std::optional<int64_t> toInt64() const {
+    if (_data.size() == 1) {
+      return _data[0];
+    }
+    return std::nullopt;
   }
 
   static BigInt Infinity() {
@@ -145,7 +136,7 @@ public:
     if (isInfinity() && !another.isInfinity()) {
       return Infinity();
     }
-    if (!isInfinity() && !another.isInfinity()) {
+    if (!isInfinity() && another.isInfinity()) {
       return -Infinity();
     }
     BigInt left = abs();
@@ -166,7 +157,7 @@ public:
       pa += next;
       if (index < b->_data.size()) {
         uint64_t pb = b->_data[index];
-        if (pa <= pb) {
+        if (pa < pb) {
           pa += 1 << sizeof(T) * 8;
           next = -1;
         }
@@ -175,11 +166,8 @@ public:
         result._data.push_back(pa);
       }
     }
-    while (*result._data.rbegin() == 0) {
+    while (result._data.size() > 1 && *result._data.rbegin() == 0) {
       result._data.pop_back();
-    }
-    if (result._data.empty()) {
-      result._data.push_back(0);
     }
     result._negative = neg;
     return result;
@@ -229,6 +217,9 @@ public:
       }
       rindex++;
     }
+    while (result._data.size() > 1 && *result._data.rbegin() == 0) {
+      result._data.pop_back();
+    }
     result._negative = _negative != another._negative;
     return result;
   }
@@ -247,22 +238,91 @@ public:
 
   BigInt operator/(const BigInt &another) const {
     if (another == 0) {
-      BigInt infinity;
-      infinity._data.clear();
+      BigInt infinity = Infinity();
       infinity._negative = _negative;
       return infinity;
     }
-    if (another < *this) {
+    if (another > *this) {
       return 0;
     }
+    if (another == *this) {
+      return 1;
+    }
+    if (isInfinity()) {
+      BigInt infinity = Infinity();
+      infinity._negative = _negative;
+      return infinity;
+    }
     size_t len = _data.size() - another._data.size();
-    for (auto index = 0; index < len; index++) {
+    BigInt next;
+    BigInt result;
+    std::vector<T> rdata;
+    for (auto index = 0; index <= len; index++) {
       BigInt tmp;
       tmp._data.clear();
+      std::vector<T> data;
       for (auto i = 0; i < another._data.size(); i++) {
-        tmp._data.push_back(_data[_data.size() - another._data.size() + i]);
+        data.push_back(_data[_data.size() - 1 - index - i]);
       }
+      for (auto it = data.rbegin(); it != data.rend(); it++) {
+        tmp._data.push_back(*it);
+      }
+      tmp += next * pow(2, sizeof(T) * 8);
+      T v = 0;
+      while (tmp >= another) {
+        tmp -= another;
+        v++;
+      }
+      next = tmp;
+      rdata.push_back(v);
     }
+    result._data.clear();
+    while (rdata.size() > 1 && *rdata.begin() == 0) {
+      rdata.erase(rdata.begin());
+    }
+    for (auto it = rdata.rbegin(); it != rdata.rend(); it++) {
+      result._data.push_back(*it);
+    }
+    return result;
+  }
+
+  BigInt operator%(const BigInt &another) const {
+    if (another == 0) {
+      BigInt infinity = Infinity();
+      infinity._negative = _negative;
+      return infinity;
+    }
+    if (another > *this) {
+      return *this;
+    }
+    if (another == *this) {
+      return 0;
+    }
+    if (isInfinity()) {
+      BigInt infinity = Infinity();
+      infinity._negative = _negative;
+      return infinity;
+    }
+    size_t len = _data.size() - another._data.size();
+    BigInt next;
+    for (auto index = 0; index <= len; index++) {
+      BigInt tmp;
+      tmp._data.clear();
+      std::vector<T> data;
+      for (auto i = 0; i < another._data.size(); i++) {
+        data.push_back(_data[_data.size() - 1 - index - i]);
+      }
+      for (auto it = data.rbegin(); it != data.rend(); it++) {
+        tmp._data.push_back(*it);
+      }
+      tmp += next * pow(2, sizeof(T) * 8);
+      while (tmp >= another) {
+        tmp -= another;
+      }
+      next = tmp;
+    }
+    next._negative = _negative;
+    return next;
   }
 
   BigInt operator+() const { return *this; }
@@ -270,6 +330,19 @@ public:
   BigInt operator-() const {
     BigInt result = *this;
     result._negative = !result._negative;
+    return result;
+  }
+
+  BigInt operator~() const {
+    BigInt result;
+    result._data.clear();
+    for (auto &part : _data) {
+      result._data.push_back(~part);
+    }
+    if (*result._data.rbegin() == 0) {
+      result._data.push_back(1);
+    }
+    result._negative = !_negative;
     return result;
   }
 
@@ -291,7 +364,7 @@ public:
     }
     if (_data.size() > another._data.size()) {
       return !_negative;
-    } else if (another._data.size() > _data.size()) {
+    } else if (_data.size() < another._data.size()) {
       return _negative;
     }
     for (size_t index = 0; index < _data.size(); index++) {
@@ -303,6 +376,7 @@ public:
     }
     return false;
   }
+
   bool operator<(const BigInt &another) const {
     if (!_negative && another._negative) {
       return false;
@@ -332,6 +406,7 @@ public:
     }
     return false;
   }
+
   bool operator>=(const BigInt &another) const {
     if (!_negative && another._negative) {
       return true;
@@ -349,7 +424,7 @@ public:
     }
     if (_data.size() > another._data.size()) {
       return !_negative;
-    } else if (another._data.size() > _data.size()) {
+    } else if (_data.size() < another._data.size()) {
       return _negative;
     }
     for (size_t index = 0; index < _data.size(); index++) {
@@ -361,6 +436,7 @@ public:
     }
     return true;
   }
+
   bool operator<=(const BigInt &another) const {
     if (!_negative && another._negative) {
       return false;
@@ -378,7 +454,7 @@ public:
     }
     if (_data.size() > another._data.size()) {
       return _negative;
-    } else if (another._data.size() > _data.size()) {
+    } else if (_data.size() < another._data.size()) {
       return !_negative;
     }
     for (size_t index = 0; index < _data.size(); index++) {
@@ -390,6 +466,7 @@ public:
     }
     return true;
   }
+
   bool operator==(const BigInt &another) const {
     if (_negative != another._negative) {
       return false;
@@ -404,6 +481,7 @@ public:
     }
     return true;
   }
+
   bool operator!=(const BigInt &another) const {
     if (_negative != another._negative) {
       return true;
@@ -422,5 +500,11 @@ public:
   BigInt &operator*=(const BigInt &another) { return *this = *this * another; }
 
   BigInt &operator+=(const BigInt &another) { return *this = *this + another; }
+
+  BigInt &operator-=(const BigInt &another) { return *this = *this - another; }
+
+  BigInt &operator/=(const BigInt &another) { return *this = *this / another; }
+
+  BigInt &operator%=(const BigInt &another) { return *this = *this % another; }
 };
 } // namespace spark::common

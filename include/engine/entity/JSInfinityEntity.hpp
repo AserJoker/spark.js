@@ -1,10 +1,10 @@
 #pragma once
 #include "engine/entity/JSEntity.hpp"
 namespace spark::engine {
-struct JSInfinityData {
-  bool negative;
-};
-class JSInfinityEntity : public JSBaseEntity<JSInfinityData> {
+class JSInfinityEntity : public JSEntity {
+private:
+  bool _negative;
+
 public:
   JSInfinityEntity(bool negative = false);
 

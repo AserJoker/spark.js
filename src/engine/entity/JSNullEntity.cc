@@ -2,7 +2,7 @@
 #include "engine/base/JSValueType.hpp"
 using namespace spark;
 using namespace spark::engine;
-JSNullEntity::JSNullEntity() : JSBaseEntity(JSValueType::JS_NULL) {}
+JSNullEntity::JSNullEntity() : JSEntity(JSValueType::JS_NULL) {}
 
 std::wstring JSNullEntity::toString(common::AutoPtr<JSContext> ctx) const {
   return L"null";
@@ -14,5 +14,5 @@ JSNullEntity::toNumber(common::AutoPtr<JSContext> ctx) const {
 };
 
 std::wstring JSNullEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"null";
+  return L"object";
 };

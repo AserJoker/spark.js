@@ -9,18 +9,17 @@ using namespace spark::engine;
 JSExceptionEntity::JSExceptionEntity(const std::wstring &type,
                                      const std::wstring &message,
                                      const common::Array<JSLocation> &stack)
-    : JSBaseEntity(JSValueType::JS_EXCEPTION, {type, message, stack}) {}
+    : JSEntity(JSValueType::JS_EXCEPTION), _type(type), _message(message),
+      _stack(stack) {}
 
-const std::wstring &JSExceptionEntity::getMessage() const {
-  return getData().message;
-}
+const std::wstring &JSExceptionEntity::getMessage() const { return _message; }
 
 const std::wstring &JSExceptionEntity::getExceptionType() const {
-  return getData().type;
+  return _type;
 }
 
 const common::Array<JSLocation> &JSExceptionEntity::getStack() const {
-  return getData().stack;
+  return _stack;
 }
 
 std::wstring JSExceptionEntity::toString(common::AutoPtr<JSContext> ctx) const {

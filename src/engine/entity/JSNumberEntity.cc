@@ -5,11 +5,11 @@ using namespace spark;
 using namespace spark::engine;
 
 JSNumberEntity::JSNumberEntity(double value)
-    : JSBaseEntity(JSValueType::JS_NUMBER, value){};
+    : JSEntity(JSValueType::JS_NUMBER), _value(value){};
 
-double &JSNumberEntity::getValue() { return getData(); }
+double &JSNumberEntity::getValue() { return _value; }
 
-const double JSNumberEntity::getValue() const { return getData(); }
+const double JSNumberEntity::getValue() const { return _value; }
 
 std::wstring JSNumberEntity::toString(common::AutoPtr<JSContext> ctx) const {
   return fmt::format(L"{:g}", getValue());

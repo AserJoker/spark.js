@@ -8,49 +8,43 @@ using namespace spark::engine;
 JSNativeFunctionEntity::JSNativeFunctionEntity(
     const std::wstring &name, const std::function<JSFunction> &callee,
     const common::Map<std::wstring, JSEntity *> &closure)
-    : JSBaseEntity(JSValueType::JS_NATIVE_FUNCTION,
-                   JSNativeFunctionData{name, callee, nullptr, closure}) {}
+    : JSEntity(JSValueType::JS_NATIVE_FUNCTION), _name(name), _callee(callee),
+      _bind(nullptr), _closure(closure) {}
 
-common::AutoPtr<JSValue>
-JSNativeFunctionEntity::apply(common::AutoPtr<JSContext> ctx,
-                              common::AutoPtr<JSValue> self,
-                              common::Array<common::AutoPtr<JSValue>> args) {
-  auto &[_, callee, bind, closure] = getData();
-  for (auto &[name, entity] : closure) {
-    ctx->createValue(entity, name);
+void JSNativeFunctionEntity::bind(JSEntity *self) {
+  if (_bind == self) {
+    return;
   }
-  return callee(ctx, bind != nullptr ? ctx->createValue(bind) : self, args);
-}
-
-void JSNativeFunctionEntity::bind(common::AutoPtr<JSValue> self) {
-  auto data = getData();
-  if (data.bind == nullptr) {
-    data.bind = self->getEntity();
-    appendChild(data.bind);
+  auto old = _bind;
+  _bind = self;
+  if (_bind != nullptr) {
+    appendChild(_bind);
+  }
+  if (old != nullptr) {
+    removeChild(old);
   }
 }
 
 const std::function<JSFunction> &JSNativeFunctionEntity::getCallee() const {
-  return getData().callee;
+  return _callee;
 };
 
 const common::Map<std::wstring, JSEntity *> &
 JSNativeFunctionEntity::getClosure() const {
-  return getData().closure;
+  return _closure;
 }
 
 const JSEntity *
 JSNativeFunctionEntity::getBind(common::AutoPtr<JSContext> ctx) const {
-  return getData().bind;
+  return _bind;
 }
 
 const std::wstring &JSNativeFunctionEntity::getFunctionName() const {
   static std::wstring anonymous = L"anonymous";
-  auto &name = getData().name;
-  if (name.empty()) {
+  if (_name.empty()) {
     return anonymous;
   }
-  return name;
+  return _name;
 }
 
 std::wstring

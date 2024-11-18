@@ -3,7 +3,10 @@
 #include <string>
 namespace spark::engine {
 
-class JSStringEntity : public JSBaseEntity<std::wstring> {
+class JSStringEntity : public JSEntity {
+private:
+  std::wstring _value;
+
 public:
   JSStringEntity(const std::wstring &value = L"");
 
@@ -14,7 +17,7 @@ public:
   std::wstring toString(common::AutoPtr<JSContext> ctx) const override;
 
   bool toBoolean(common::AutoPtr<JSContext> ctx) const override;
-  
+
   std::wstring getTypeName(common::AutoPtr<JSContext> ctx) const override;
 };
 }; // namespace spark::engine

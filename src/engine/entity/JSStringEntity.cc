@@ -4,11 +4,11 @@
 using namespace spark;
 using namespace spark::engine;
 JSStringEntity::JSStringEntity(const std::wstring &value)
-    : JSBaseEntity(JSValueType::JS_STRING, value) {}
+    : JSEntity(JSValueType::JS_STRING), _value(value) {}
 
-std::wstring &JSStringEntity::getValue() { return getData(); }
+std::wstring &JSStringEntity::getValue() { return _value; }
 
-const std::wstring &JSStringEntity::getValue() const { return getData(); }
+const std::wstring &JSStringEntity::getValue() const { return _value; }
 
 std::wstring JSStringEntity::toString(common::AutoPtr<JSContext> ctx) const {
   return getValue();

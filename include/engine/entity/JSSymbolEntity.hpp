@@ -1,8 +1,13 @@
 #pragma once
+#include "common/AutoPtr.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include <string>
 namespace spark::engine {
-class JSSymbolEntity : public JSBaseEntity<std::wstring> {
+
+class JSSymbolEntity : public JSEntity {
+private:
+  std::wstring _description;
+
 public:
   JSSymbolEntity(const std::wstring &description);
 

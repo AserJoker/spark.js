@@ -4,12 +4,13 @@
 #include "engine/entity/JSEntity.hpp"
 #include <string>
 namespace spark::engine {
-struct JSExceptionData {
-  std::wstring type;
-  std::wstring message;
-  common::Array<JSLocation> stack;
-};
-class JSExceptionEntity : public JSBaseEntity<JSExceptionData> {
+struct JSExceptionData {};
+class JSExceptionEntity : public JSEntity {
+private:
+  std::wstring _type;
+  std::wstring _message;
+  common::Array<JSLocation> _stack;
+
 public:
   JSExceptionEntity(const std::wstring &type, const std::wstring &message,
                     const common::Array<JSLocation> &stack);

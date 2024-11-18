@@ -2,7 +2,6 @@
 #include "common/AutoPtr.hpp"
 #include "common/Object.hpp"
 #include "engine/base/JSLocation.hpp"
-#include "engine/base/JSUnaryOperatorType.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include <optional>
@@ -82,7 +81,16 @@ public:
 
   common::AutoPtr<JSValue> toBoolean(common::AutoPtr<JSContext> ctx);
 
-  common::AutoPtr<JSValue> unary(common::AutoPtr<JSContext> ctx,
-                                 const JSUnaryOperatorType &opt);
+  common::AutoPtr<JSValue> unaryPlus(common::AutoPtr<JSContext> ctx); // +a
+
+  common::AutoPtr<JSValue> unaryNetation(common::AutoPtr<JSContext> ctx); // -a
+
+  common::AutoPtr<JSValue> increment(common::AutoPtr<JSContext> ctx); // ++a
+
+  common::AutoPtr<JSValue> decrement(common::AutoPtr<JSContext> ctx); // --a
+
+  common::AutoPtr<JSValue> logicalNot(common::AutoPtr<JSContext> ctx); // !a
+
+  common::AutoPtr<JSValue> bitwiseNot(common::AutoPtr<JSContext> ctx); // ~a
 };
 }; // namespace spark::engine

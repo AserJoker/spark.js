@@ -46,23 +46,4 @@ public:
   virtual std::wstring getTypeName(common::AutoPtr<JSContext> ctx) const;
 };
 
-template <class T> class JSBaseEntity : public JSEntity {
-
-private:
-  T _data;
-
-public:
-  JSBaseEntity(const JSValueType &type) : JSEntity(type){};
-
-  JSBaseEntity(const JSValueType &type, T &&value)
-      : JSEntity(type), _data(std::forward<T>(value)) {}
-
-  JSBaseEntity(const JSValueType &type, const T &value)
-      : JSEntity(type), _data(value) {}
-
-protected:
-  T &getData() { return _data; }
-
-  const T &getData() const { return _data; }
-};
 } // namespace spark::engine

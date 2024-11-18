@@ -1,5 +1,6 @@
 #pragma once
 #include "common/AutoPtr.hpp"
+#include "common/BigInt.hpp"
 #include "common/Map.hpp"
 #include "common/Object.hpp"
 #include "engine/base/JSLocation.hpp"
@@ -69,8 +70,14 @@ public:
   common::AutoPtr<JSValue> createBoolean(bool value = false,
                                          const std::wstring &name = L"");
 
+  common::AutoPtr<JSValue> createBigInt(const common::BigInt<> &value = {},
+                                        const std::wstring &name = L"");
+
   common::AutoPtr<JSValue> createInfinity(bool negative = false,
                                           const std::wstring &name = L"");
+
+  common::AutoPtr<JSValue> createObject(JSEntity *prototype,
+                                        const std::wstring &name = L"");
 
   common::AutoPtr<JSValue>
   createFunction(const std::function<JSFunction> &value,

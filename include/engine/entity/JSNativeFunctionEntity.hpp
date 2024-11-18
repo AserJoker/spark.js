@@ -7,24 +7,21 @@
 #include <string>
 namespace spark::engine {
 
-struct JSNativeFunctionData {
-  std::wstring name;
-  std::function<JSFunction> callee;
-  JSEntity *bind;
-  common::Map<std::wstring, JSEntity *> closure;
-};
+struct JSNativeFunction {};
 
-class JSNativeFunctionEntity : public JSBaseEntity<JSNativeFunctionData> {
+class JSNativeFunctionEntity : public JSEntity {
+private:
+  std::wstring _name;
+  std::function<JSFunction> _callee;
+  JSEntity *_bind;
+  common::Map<std::wstring, JSEntity *> _closure;
+
 public:
   JSNativeFunctionEntity(const std::wstring &name,
                          const std::function<JSFunction> &callee,
                          const common::Map<std::wstring, JSEntity *> &closure);
 
-  common::AutoPtr<JSValue> apply(common::AutoPtr<JSContext> ctx,
-                                 common::AutoPtr<JSValue> self,
-                                 common::Array<common::AutoPtr<JSValue>> args);
-
-  void bind(common::AutoPtr<JSValue> self);
+  void bind(JSEntity *self);
 
   const std::function<JSFunction> &getCallee() const;
 

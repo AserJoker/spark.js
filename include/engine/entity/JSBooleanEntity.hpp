@@ -1,10 +1,10 @@
 #pragma once
 #include "engine/entity/JSEntity.hpp"
 namespace spark::engine {
-struct JSBooleanData {
-  bool value;
-};
-class JSBooleanEntity : public JSBaseEntity<JSBooleanData> {
+class JSBooleanEntity : public JSEntity {
+private:
+  bool _value;
+
 public:
   JSBooleanEntity(bool value = false);
 

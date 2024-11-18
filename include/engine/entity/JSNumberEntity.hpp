@@ -2,7 +2,10 @@
 #include "engine/entity/JSEntity.hpp"
 namespace spark::engine {
 
-class JSNumberEntity : public JSBaseEntity<double> {
+class JSNumberEntity : public JSEntity {
+private:
+  double _value;
+
 public:
   JSNumberEntity(double value = .0f);
 
@@ -15,7 +18,7 @@ public:
   std::optional<double> toNumber(common::AutoPtr<JSContext> ctx) const override;
 
   bool toBoolean(common::AutoPtr<JSContext> ctx) const override;
-  
+
   std::wstring getTypeName(common::AutoPtr<JSContext> ctx) const override;
 };
 }; // namespace spark::engine
