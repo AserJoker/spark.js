@@ -1,5 +1,6 @@
 #include "engine/entity/JSEntity.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/runtime/JSContext.hpp"
 using namespace spark;
 using namespace spark::engine;
 JSEntity::JSEntity(const JSValueType &type) : _type(type) {}
@@ -7,18 +8,24 @@ JSEntity::JSEntity(const JSValueType &type) : _type(type) {}
 JSEntity::~JSEntity() {}
 
 void JSEntity::appendChild(JSEntity *entity) {
-  entity->_parents.pushBack(this);
-  _children.pushBack(entity);
+  entity->_parents.push_back(this);
+  _children.push_back(entity);
 }
 
 void JSEntity::removeChild(JSEntity *entity) {
-  entity->_parents.erase(this);
-  _children.erase(entity);
+  auto it = std::find(entity->_parents.begin(), entity->_parents.end(), this);
+  if (it != entity->_parents.end()) {
+    entity->_parents.erase(it);
+  }
+  it = std::find(_children.begin(), _children.end(), entity);
+  if (it != _children.end()) {
+    _children.erase(it);
+  }
 }
 
-common::Array<JSEntity *> &JSEntity::getParent() { return _parents; }
+std::vector<JSEntity *> &JSEntity::getParent() { return _parents; }
 
-common::Array<JSEntity *> &JSEntity::getChildren() { return _children; }
+std::vector<JSEntity *> &JSEntity::getChildren() { return _children; }
 
 const JSValueType &JSEntity::getType() const { return _type; }
 

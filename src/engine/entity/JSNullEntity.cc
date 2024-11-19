@@ -1,4 +1,5 @@
 #include "engine/entity/JSNullEntity.hpp"
+#include "engine/runtime/JSContext.hpp"
 #include "engine/base/JSValueType.hpp"
 using namespace spark;
 using namespace spark::engine;

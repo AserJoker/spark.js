@@ -1,4 +1,5 @@
 #include "engine/entity/JSBooleanEntity.hpp"
+#include "engine/runtime/JSContext.hpp"
 using namespace spark;
 using namespace spark::engine;
 

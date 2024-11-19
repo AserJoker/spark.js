@@ -1,5 +1,6 @@
 #include "engine/entity/JSNaNEntity.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/runtime/JSContext.hpp"
 #include "engine/entity/JSEntity.hpp"
 using namespace spark;
 using namespace spark::engine;

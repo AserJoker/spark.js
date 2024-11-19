@@ -159,7 +159,7 @@ public:
     Node(const NodeType &type, int32_t level = 0) : type(type), level(level) {}
   };
 
-  struct NodeArray : public common::Array<common::AutoPtr<Node>> {};
+  struct NodeArray : public std::vector<common::AutoPtr<Node>> {};
 
   struct Program : public Node {
     common::AutoPtr<Node> interpreter;
@@ -213,7 +213,7 @@ public:
   };
   struct TemplateLiteral : public Node {
     std::wstring tag;
-    common::Array<std::wstring> quasis;
+    std::vector<std::wstring> quasis;
     NodeArray expressions;
     TemplateLiteral() : Node(JSParser::NodeType::LITERAL_TEMPLATE, -2) {}
   };

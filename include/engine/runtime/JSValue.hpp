@@ -70,7 +70,7 @@ public:
 
   common::AutoPtr<JSValue>
   apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
-        common::Array<common::AutoPtr<JSValue>> args = {},
+        std::vector<common::AutoPtr<JSValue>> args = {},
         const JSLocation &location = {});
 
   std::wstring convertToString(common::AutoPtr<JSContext> ctx);
@@ -81,6 +81,8 @@ public:
   std::optional<double> convertToNumber(common::AutoPtr<JSContext> ctx);
 
   bool convertToBoolean(common::AutoPtr<JSContext> ctx);
+
+  common::AutoPtr<JSValue> getPrototype(common::AutoPtr<JSContext> ctx);
 
   JSObjectEntity::JSField *
   getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,

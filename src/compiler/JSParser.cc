@@ -1,5 +1,4 @@
 #include "compiler/JSParser.hpp"
-#include "common/Array.hpp"
 #include "common/AutoPtr.hpp"
 #include "error/JSSyntaxError.hpp"
 #include <algorithm>
@@ -8,6 +7,8 @@
 #include <fmt/xchar.h>
 #include <locale>
 #include <string>
+#include <vector>
+
 
 using namespace spark;
 using namespace spark::compiler;
@@ -622,7 +623,7 @@ JSParser::readIdentifierToken(uint32_t filename, const std::wstring &source,
 common::AutoPtr<JSParser::Token>
 JSParser::readSymbolToken(uint32_t filename, const std::wstring &source,
                           Position &position) {
-  static const common::Array<std::wstring> operators = {
+  static const std::vector<std::wstring> operators = {
       L">>>=",   L"...", L"<<=", L">>>", L"===", L"!==", L"**=", L">>=", L"&&=",
       LR"(??=)", L"**",  L"==",  L"!=",  L"<<",  L">>",  L"<=",  L">=",  L"&&",
       L"||",     L"??",  L"++",  L"--",  L"+=",  L"-=",  L"*=",  L"/=",  L"%=",
@@ -873,7 +874,7 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
   skipInvisible(filename, source, current);
   auto directive = readDirective(filename, source, current);
   while (directive != nullptr) {
-    program->directives.pushBack(directive);
+    program->directives.push_back(directive);
     skipInvisible(filename, source, current);
     directive = readDirective(filename, source, current);
   }
@@ -883,7 +884,7 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
     if (!statement) {
       break;
     }
-    program->body.pushBack(statement);
+    program->body.push_back(statement);
     skipNewLine(filename, source, current);
   }
   skipNewLine(filename, source, current);
@@ -1006,7 +1007,7 @@ JSParser::NodeArray JSParser::readStatements(uint32_t filename,
   skipNewLine(filename, source, position);
   auto statement = readStatement(filename, source, position);
   while (statement != nullptr) {
-    result.pushBack(statement);
+    result.push_back(statement);
     statement = readStatement(filename, source, position);
     skipNewLine(filename, source, position);
   }
@@ -1558,7 +1559,7 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
     }
     auto case_ = readSwitchCaseStatement(filename, source, current);
     while (case_ != nullptr) {
-      node->cases.pushBack(case_);
+      node->cases.push_back(case_);
       case_ = readSwitchCaseStatement(filename, source, current);
     }
     skipInvisible(filename, source, current);
@@ -1610,7 +1611,7 @@ JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
       skipNewLine(filename, source, current);
       auto statement = readStatement(filename, source, current);
       while (statement != nullptr) {
-        node->statements.pushBack(statement);
+        node->statements.push_back(statement);
         skipNewLine(filename, source, current);
         backup = current;
         auto token = readKeywordToken(filename, source, current);
@@ -1936,13 +1937,13 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
     // skipNewLine(filename, source, current);
     // auto directive = readDirective(filename, source, current);
     // while (directive != nullptr) {
-    //   node->directives.pushBack(directive);
+    //   node->directives.push_back(directive);
     //   directive = readDirective(filename, source, current);
     // }
     skipNewLine(filename, source, current);
     auto statement = readStatement(filename, source, current);
     while (statement != nullptr) {
-      node->body.pushBack(statement);
+      node->body.push_back(statement);
       skipNewLine(filename, source, current);
       statement = readStatement(filename, source, current);
     }
@@ -2038,7 +2039,7 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
     auto src = source.substr(temp->location.start.offset,
                              temp->location.end.offset -
                                  temp->location.start.offset + 1);
-    node->quasis.pushBack(src.substr(1, src.length() - 2));
+    node->quasis.push_back(src.substr(1, src.length() - 2));
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2046,7 +2047,7 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
   temp = readTemplateStartToken(filename, source, current);
   if (temp != nullptr) {
     auto src = temp->location.getSource(source);
-    node->quasis.pushBack(src.substr(1, src.length() - 3));
+    node->quasis.push_back(src.substr(1, src.length() - 3));
     for (;;) {
       auto exp = readExpressions(filename, source, current);
       if (!exp) {
@@ -2054,11 +2055,11 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->expressions.pushBack(exp);
+      node->expressions.push_back(exp);
       auto part = readTemplatePatternToken(filename, source, current);
       if (part != nullptr) {
         auto src = part->location.getSource(source);
-        node->quasis.pushBack(src.substr(1, src.length() - 3));
+        node->quasis.push_back(src.substr(1, src.length() - 3));
       } else {
         part = readTemplateEndToken(filename, source, current);
         if (!part) {
@@ -2067,7 +2068,7 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
               {filename, current.line, current.column});
         }
         auto src = part->location.getSource(source);
-        node->quasis.pushBack(src.substr(1, src.length() - 2));
+        node->quasis.push_back(src.substr(1, src.length() - 2));
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -2270,7 +2271,7 @@ JSParser::readPrivateName(uint32_t filename, const std::wstring &source,
 common::AutoPtr<JSParser::Node>
 JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
                                JSParser::Position &position) {
-  const common::Array<common::Array<std::wstring>> operators = {
+  const std::vector<std::vector<std::wstring>> operators = {
       {},
       {},
       {},
@@ -2301,9 +2302,9 @@ JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
       if (token->location.isEqual(source, opt)) {
         common::AutoPtr node = new BinaryExpression;
         node->location = token->location;
-        node->level = level;
+        node->level = (uint32_t)level;
         node->opt = opt;
-        node->right = readRValue(filename, source, current, level);
+        node->right = readRValue(filename, source, current, (uint32_t)level);
         position = current;
         return node;
       }
@@ -2315,7 +2316,7 @@ JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
 common::AutoPtr<JSParser::Node>
 JSParser::readAssigmentExpression(uint32_t filename, const std::wstring &source,
                                   JSParser::Position &position) {
-  const common::Array<std::wstring> operators = {
+  const std::vector<std::wstring> operators = {
       {L"=", L"+=", L"-=", L"**=", L"*=", L"/=", L"%=", L">>>=", L"<<=", L">>=",
        L"&&=", L"||=", L"&=", L"^=", L"|=", LR"(??=)"}};
   auto current = position;
@@ -2409,14 +2410,15 @@ JSParser::readUpdateExpression(uint32_t filename, const std::wstring &source,
 common::AutoPtr<JSParser::Node>
 JSParser::readUnaryExpression(uint32_t filename, const std::wstring &source,
                               Position &position) {
-  static common::Array<std::wstring> unarys = {L"!", L"~",  L"+",
-                                               L"-", L"++", L"--"};
+  static std::vector<std::wstring> unarys = {L"!", L"~",  L"+",
+                                             L"-", L"++", L"--"};
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr) {
     auto src = token->location.getSource(source);
-    if (unarys.contains(src)) {
+    auto it = std::find(unarys.begin(), unarys.end(), src);
+    if (it != unarys.end()) {
       common::AutoPtr node = new UnaryExpression;
       node->location = token->location;
       node->opt = src;
@@ -2573,7 +2575,7 @@ JSParser::readCallExpression(uint32_t filename, const std::wstring &source,
       arg = readExpression(filename, source, current);
     }
     while (arg != nullptr) {
-      node->arguments.pushBack(arg);
+      node->arguments.push_back(arg);
       auto next = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
@@ -2847,7 +2849,7 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
   if (token != nullptr && token->location.isEqual(source, L"(")) {
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
-      node->arguments.pushBack(param);
+      node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
       token = readSymbolToken(filename, source, current);
@@ -2899,7 +2901,7 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"=>")) {
-      node->arguments.pushBack(param);
+      node->arguments.push_back(param);
       auto next = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
@@ -2959,7 +2961,7 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
     if (token != nullptr && token->location.isEqual(source, L"(")) {
       auto param = readParameter(filename, source, current);
       while (param != nullptr) {
-        node->arguments.pushBack(param);
+        node->arguments.push_back(param);
         skipInvisible(filename, source, current);
         auto next = current;
         token = readSymbolToken(filename, source, current);
@@ -3028,7 +3030,7 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"]")) {
         if (item != nullptr) {
-          node->items.pushBack(item);
+          node->items.push_back(item);
         }
         current = next;
         break;
@@ -3038,7 +3040,7 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->items.pushBack(item);
+      node->items.push_back(item);
       item = readRestExpression(filename, source, current);
       if (item == nullptr) {
         item = readExpression(filename, source, current);
@@ -3082,7 +3084,7 @@ JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"}")) {
         if (item != nullptr) {
-          node->properties.pushBack(item);
+          node->properties.push_back(item);
         }
         current = next;
         break;
@@ -3093,7 +3095,7 @@ JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->properties.pushBack(item);
+      node->properties.push_back(item);
       item = readObjectProperty(filename, source, current);
     }
     skipInvisible(filename, source, current);
@@ -3242,7 +3244,7 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
     node->identifier = identifier;
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
-      node->arguments.pushBack(param);
+      node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
       token = readSymbolToken(filename, source, current);
@@ -3329,7 +3331,7 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
     node->identifier = identifier;
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
-      node->arguments.pushBack(param);
+      node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
       token = readSymbolToken(filename, source, current);
@@ -3381,7 +3383,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassDeclaration;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
-    node->decorators.pushBack(decorator);
+    node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
   auto backup = current;
@@ -3436,14 +3438,14 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
       token = readSymbolToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"}")) {
         if (item != nullptr) {
-          node->properties.pushBack(item);
+          node->properties.push_back(item);
         }
         current = next;
         break;
       } else {
         current = next;
       }
-      node->properties.pushBack(item);
+      node->properties.push_back(item);
       item = readClassProperty(filename, source, current);
     }
     skipNewLine(filename, source, current);
@@ -3491,7 +3493,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassMethod;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
-    node->decorators.pushBack(decorator);
+    node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
   auto backup = current;
@@ -3559,7 +3561,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
       node->identifier = identifier;
       auto param = readParameter(filename, source, current);
       while (param != nullptr) {
-        node->arguments.pushBack(param);
+        node->arguments.push_back(param);
         skipInvisible(filename, source, current);
         auto next = current;
         token = readSymbolToken(filename, source, current);
@@ -3613,7 +3615,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassAccessor;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
-    node->decorators.pushBack(decorator);
+    node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
   skipInvisible(filename, source, current);
@@ -3660,7 +3662,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
         node->identifier = identifier;
         auto param = readParameter(filename, source, current);
         while (param != nullptr) {
-          node->arguments.pushBack(param);
+          node->arguments.push_back(param);
           skipInvisible(filename, source, current);
           auto next = current;
           token = readSymbolToken(filename, source, current);
@@ -3731,7 +3733,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassProperty;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
-    node->decorators.pushBack(decorator);
+    node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
   auto backup = current;
@@ -3847,7 +3849,7 @@ JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     while (declarator != nullptr) {
-      node->declarations.pushBack(declarator);
+      node->declarations.push_back(declarator);
       auto next = current;
       skipInvisible(filename, source, current);
       auto token = readSymbolToken(filename, source, current);
@@ -3989,7 +3991,7 @@ JSParser::readObjectPattern(uint32_t filename, const std::wstring &source,
     common::AutoPtr node = new ObjectPattern;
     auto item = readObjectPatternItem(filename, source, current);
     while (item != nullptr) {
-      node->items.pushBack(item);
+      node->items.push_back(item);
       auto next = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
@@ -4083,7 +4085,7 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"]")) {
         if (item != nullptr) {
-          node->items.pushBack(item);
+          node->items.push_back(item);
         }
         current = next;
         break;
@@ -4091,7 +4093,7 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
       if (!token->location.isEqual(source, L",")) {
         return nullptr;
       }
-      node->items.pushBack(item);
+      node->items.push_back(item);
       item = readArrayPatternItem(filename, source, current);
     }
     skipInvisible(filename, source, current);
@@ -4257,11 +4259,11 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
     } else {
       auto specifier = readImportNamespaceSpecifier(filename, source, current);
       if (specifier != nullptr) {
-        node->items.pushBack(specifier);
+        node->items.push_back(specifier);
       } else {
         specifier = readImportDefaultSpecifier(filename, source, current);
         if (specifier != nullptr) {
-          node->items.pushBack(specifier);
+          node->items.push_back(specifier);
           skipInvisible(filename, source, current);
           token = readSymbolToken(filename, source, current);
           if (token != nullptr && !token->location.isEqual(source, L",")) {
@@ -4291,10 +4293,10 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
                                     current),
                     {filename, current.line, current.column});
               }
-              node->items.pushBack(specifier);
+              node->items.push_back(specifier);
             } else if (token->location.isEqual(source, L"}")) {
               if (specifier != nullptr) {
-                node->items.pushBack(specifier);
+                node->items.push_back(specifier);
               }
               break;
             } else {
@@ -4311,7 +4313,7 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
         }
         specifier = readImportNamespaceSpecifier(filename, source, current);
         if (specifier != nullptr) {
-          node->items.pushBack(specifier);
+          node->items.push_back(specifier);
         }
       }
       skipInvisible(filename, source, current);
@@ -4346,7 +4348,7 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
       }
       auto attribute = readImportAttriabue(filename, source, current);
       while (attribute != nullptr) {
-        node->attributes.pushBack(attribute);
+        node->attributes.push_back(attribute);
         auto backup = current;
         skipInvisible(filename, source, current);
         token = readSymbolToken(filename, source, current);
@@ -4497,11 +4499,11 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
       specifier = readVariableDeclaration(filename, source, current);
     }
     if (specifier != nullptr) {
-      node->items.pushBack(specifier);
+      node->items.push_back(specifier);
     } else {
       specifier = readExportAllSpecifier(filename, source, current);
       if (specifier != nullptr) {
-        node->items.pushBack(specifier);
+        node->items.push_back(specifier);
       } else {
         skipInvisible(filename, source, current);
         auto token = readSymbolToken(filename, source, current);
@@ -4526,10 +4528,10 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
                                   current),
                   {filename, current.line, current.column});
             }
-            node->items.pushBack(specifier);
+            node->items.push_back(specifier);
           } else if (token->location.isEqual(source, L"}")) {
             if (specifier != nullptr) {
-              node->items.pushBack(specifier);
+              node->items.push_back(specifier);
             }
             break;
           } else {
@@ -4568,7 +4570,7 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
           }
           auto attribute = readImportAttriabue(filename, source, current);
           while (attribute != nullptr) {
-            node->attributes.pushBack(attribute);
+            node->attributes.push_back(attribute);
             auto backup = current;
             skipInvisible(filename, source, current);
             token = readSymbolToken(filename, source, current);

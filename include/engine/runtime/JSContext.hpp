@@ -53,7 +53,7 @@ public:
 
   JSFrame *getCallStack();
 
-  common::Array<JSLocation> trace(const JSLocation &location);
+  std::vector<JSLocation> trace(const JSLocation &location);
 
   common::AutoPtr<JSValue> createValue(JSEntity *entity,
                                        const std::wstring &name = L"");

@@ -1,19 +1,21 @@
 #pragma once
-#include "common/Array.hpp"
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSValueType.hpp"
 #include <optional>
 #include <string>
+#include <vector>
+
 
 namespace spark::engine {
 class JSContext;
 class JSValue;
 class JSEntity {
 private:
-  common::Array<JSEntity *> _parents;
+  std::vector<JSEntity *> _parents;
 
-  common::Array<JSEntity *> _children;
+  std::vector<JSEntity *> _children;
 
+protected:
   JSValueType _type;
 
 public:
@@ -27,9 +29,9 @@ public:
 
   const JSValueType &getType() const;
 
-  common::Array<JSEntity *> &getParent();
+  std::vector<JSEntity *> &getParent();
 
-  common::Array<JSEntity *> &getChildren();
+  std::vector<JSEntity *> &getChildren();
 
   virtual std::wstring toString(common::AutoPtr<JSContext> ctx) const;
 

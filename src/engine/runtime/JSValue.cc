@@ -5,8 +5,8 @@
 #include "engine/entity/JSBigIntEntity.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
+#include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
-#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
@@ -138,10 +138,10 @@ void JSValue::setNaN() {
 
 common::AutoPtr<JSValue>
 JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
-               common::Array<common::AutoPtr<JSValue>> args,
+               std::vector<common::AutoPtr<JSValue>> args,
                const JSLocation &location) {
   if (getType() == JSValueType::JS_FUNCTION) {
-    auto entity = (JSNativeFunctionEntity *)_entity;
+    auto entity = (JSFunctionEntity *)_entity;
     ctx->pushCallStack(entity->getFunctionName(), location);
     auto scope = ctx->pushScope();
     JSEntity *result = nullptr;
@@ -391,6 +391,10 @@ bool JSValue::convertToBoolean(common::AutoPtr<JSContext> ctx) {
   return false;
 }
 
+common::AutoPtr<JSValue> JSValue::getPrototype(common::AutoPtr<JSContext> ctx) {
+  return ctx->createValue(getEntity<JSObjectEntity>()->getPrototype());
+}
+
 std::wstring JSValue::getTypeName() {
   switch (getType()) {
   case JSValueType::JS_UNDEFINED:
@@ -399,6 +403,7 @@ std::wstring JSValue::getTypeName() {
   case JSValueType::JS_EXCEPTION:
   case JSValueType::JS_OBJECT:
   case JSValueType::JS_NULL:
+  case JSValueType::JS_ARRAY:
     return L"object";
   case JSValueType::JS_NAN:
   case JSValueType::JS_INFINITY:

@@ -1,4 +1,6 @@
 #pragma once
+#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS 1
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
 #include "engine/base/JSLocation.hpp"
 #include <codecvt>
 #include <fmt/format.h>

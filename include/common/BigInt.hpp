@@ -30,7 +30,7 @@ public:
       number = -number;
     }
     while (number > 0) {
-      _data.push_back(number % max);
+      _data.push_back((T)(number % max));
       number >>= (sizeof(T) * 8);
     }
     if (_data.empty()) {
@@ -105,7 +105,7 @@ public:
       if (index >= result._data.size()) {
         result._data.push_back(0);
       }
-      result._data[index] = val % max;
+      result._data[index] = (T)(val % max);
       next = val / max;
       index++;
     }
@@ -135,9 +135,9 @@ public:
           pa += 1 << sizeof(T) * 8;
           next = -1;
         }
-        result._data.push_back(pa - pb);
+        result._data.push_back((T)(pa - pb));
       } else {
-        result._data.push_back(pa);
+        result._data.push_back((T)pa);
       }
     }
     while (result._data.size() > 1 && *result._data.rbegin() == 0) {
@@ -179,11 +179,11 @@ public:
           result._data.push_back(0);
         }
         auto val = part * src + next;
-        result._data[index + rindex] += val % max;
+        result._data[index + rindex] += (T)(val % max);
         next = val / max;
       }
       if (next > 0) {
-        result._data.push_back(next);
+        result._data.push_back((T)(next));
       }
       rindex++;
     }
@@ -230,7 +230,7 @@ public:
       for (auto it = data.rbegin(); it != data.rend(); it++) {
         tmp._data.push_back(*it);
       }
-      tmp += next * pow(2, sizeof(T) * 8);
+      tmp += next * (int64_t)pow(2, sizeof(T) * 8);
       T v = 0;
       while (tmp >= another) {
         tmp -= another;
@@ -271,7 +271,7 @@ public:
       for (auto it = data.rbegin(); it != data.rend(); it++) {
         tmp._data.push_back(*it);
       }
-      tmp += next * pow(2, sizeof(T) * 8);
+      tmp += next * (int64_t)(pow(2, sizeof(T) * 8));
       while (tmp >= another) {
         tmp -= another;
       }

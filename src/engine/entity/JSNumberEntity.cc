@@ -1,4 +1,5 @@
 #include "engine/entity/JSNumberEntity.hpp"
+#include "engine/runtime/JSContext.hpp"
 #include "engine/base/JSValueType.hpp"
 #include <fmt/xchar.h>
 using namespace spark;

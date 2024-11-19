@@ -9,17 +9,17 @@ class JSExceptionEntity : public JSEntity {
 private:
   std::wstring _type;
   std::wstring _message;
-  common::Array<JSLocation> _stack;
+  std::vector<JSLocation> _stack;
 
 public:
   JSExceptionEntity(const std::wstring &type, const std::wstring &message,
-                    const common::Array<JSLocation> &stack);
+                    const std::vector<JSLocation> &stack);
 
   const std::wstring &getMessage() const;
 
   const std::wstring &getExceptionType() const;
 
-  const common::Array<JSLocation> &getStack() const;
+  const std::vector<JSLocation> &getStack() const;
 
   std::wstring toString(common::AutoPtr<JSContext> ctx) const override;
 

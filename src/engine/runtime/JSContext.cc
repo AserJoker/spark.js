@@ -5,8 +5,8 @@
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
+#include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
-#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
@@ -22,7 +22,12 @@ JSContext::JSContext(const common::AutoPtr<JSRuntime> &runtime)
   _scope = new JSScope(_runtime->getRoot());
   _callStack = new JSFrame();
 }
-JSContext::~JSContext() {}
+JSContext::~JSContext() {
+  while (_callStack) {
+    popCallStack();
+  }
+  delete _scope;
+}
 
 common::AutoPtr<JSRuntime> &JSContext::getRuntime() { return _runtime; }
 
@@ -63,14 +68,14 @@ void JSContext::popCallStack() {
 
 JSContext::JSFrame *JSContext::getCallStack() { return _callStack; }
 
-common::Array<JSLocation> JSContext::trace(const JSLocation &location) {
-  common::Array<JSLocation> stack;
+std::vector<JSLocation> JSContext::trace(const JSLocation &location) {
+  std::vector<JSLocation> stack;
   auto frame = _callStack;
   auto funcname = frame->location.funcname;
   if (funcname.empty()) {
     funcname = L"anonymous";
   }
-  stack.pushBack({location.filename, location.line, location.column, funcname});
+  stack.push_back({location.filename, location.line, location.column, funcname});
   frame = frame->parent;
   while (frame) {
     auto &[filename, line, column, fname] = frame->location;
@@ -78,7 +83,7 @@ common::Array<JSLocation> JSContext::trace(const JSLocation &location) {
     if (funcname.empty()) {
       funcname = L"anonymous";
     }
-    stack.pushBack({filename, line, column, funcname});
+    stack.push_back({filename, line, column, funcname});
     frame = frame->parent;
   }
   return stack;
@@ -136,8 +141,9 @@ common::AutoPtr<JSValue> JSContext::createInfinity(bool negative,
                                                    const std::wstring &name) {
   return _scope->createValue(new JSInfinityEntity(negative), name);
 }
-common::AutoPtr<JSValue> JSContext::createObject(common::AutoPtr<JSValue> prototype,
-                                                 const std::wstring &name) {
+common::AutoPtr<JSValue>
+JSContext::createObject(common::AutoPtr<JSValue> prototype,
+                        const std::wstring &name) {
   return _scope->createValue(new JSObjectEntity(prototype->getEntity()), name);
 }
 
@@ -145,8 +151,11 @@ common::AutoPtr<JSValue>
 JSContext::createFunction(const std::function<JSFunction> &value,
                           const std::wstring &funcname,
                           const std::wstring &name) {
-  return _scope->createValue(new JSNativeFunctionEntity(funcname, value, {}),
-                             name);
+  return _scope->createValue(
+      new JSFunctionEntity(
+          _runtime->Function()->getEntity<JSObjectEntity>()->getPrototype(),
+          funcname, value, {}),
+      name);
 }
 
 common::AutoPtr<JSValue>
@@ -155,7 +164,10 @@ JSContext::createFunction(const std::function<JSFunction> &value,
                           const std::wstring &funcname,
                           const std::wstring &name) {
   return _scope->createValue(
-      new JSNativeFunctionEntity(funcname, value, closure), name);
+      new JSFunctionEntity(
+          _runtime->Function()->getEntity<JSObjectEntity>()->getPrototype(),
+          funcname, value, closure),
+      name);
 }
 
 common::AutoPtr<JSValue>

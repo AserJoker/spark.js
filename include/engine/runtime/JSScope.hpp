@@ -1,5 +1,4 @@
 #pragma once
-#include "common/Array.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/Map.hpp"
 #include "engine/base/JSValueType.hpp"
@@ -13,9 +12,9 @@ private:
   JSEntity *_root;
   JSScope *_parent;
 
-  common::Array<JSScope *> _children;
+  std::vector<JSScope *> _children;
   common::Map<std::wstring, common::AutoPtr<JSValue>> _values;
-  common::Array<common::AutoPtr<JSValue>> _anonymousValues;
+  std::vector<common::AutoPtr<JSValue>> _anonymousValues;
 
 private:
   bool isEntityAlived(JSEntity *entity, common::Map<JSEntity *, bool> &cache);

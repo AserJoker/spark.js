@@ -2,6 +2,7 @@
 #include "common/BigInt.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
+#include "engine/runtime/JSContext.hpp"
 #include "error/JSTypeError.hpp"
 
 using namespace spark;
