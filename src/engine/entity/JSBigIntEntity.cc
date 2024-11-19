@@ -25,7 +25,3 @@ JSBigIntEntity::toNumber(common::AutoPtr<JSContext> ctx) const {
 bool JSBigIntEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return getValue() != 0;
 }
-
-std::wstring JSBigIntEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"bigint";
-}

@@ -14,8 +14,6 @@ private:
 
   common::Array<JSEntity *> _children;
 
-  JSEntity *_meta;
-
   JSValueType _type;
 
 public:
@@ -26,10 +24,6 @@ public:
   void appendChild(JSEntity *entity);
 
   void removeChild(JSEntity *entity);
-
-  void setMetatable(JSEntity *meta);
-
-  JSEntity *getMetatable();
 
   const JSValueType &getType() const;
 
@@ -42,8 +36,6 @@ public:
   virtual std::optional<double> toNumber(common::AutoPtr<JSContext> ctx) const;
 
   virtual bool toBoolean(common::AutoPtr<JSContext> ctx) const;
-
-  virtual std::wstring getTypeName(common::AutoPtr<JSContext> ctx) const;
 };
 
 } // namespace spark::engine

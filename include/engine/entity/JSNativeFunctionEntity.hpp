@@ -21,7 +21,7 @@ public:
                          const std::function<JSFunction> &callee,
                          const common::Map<std::wstring, JSEntity *> &closure);
 
-  void bind(JSEntity *self);
+  void bind(common::AutoPtr<JSContext> ctx, JSEntity *self);
 
   const std::function<JSFunction> &getCallee() const;
 
@@ -34,7 +34,5 @@ public:
   std::wstring toString(common::AutoPtr<JSContext> ctx) const override;
 
   bool toBoolean(common::AutoPtr<JSContext> ctx) const override;
-
-  std::wstring getTypeName(common::AutoPtr<JSContext> ctx) const override;
 };
 }; // namespace spark::engine

@@ -1,9 +1,11 @@
 #pragma once
 #include "common/AutoPtr.hpp"
+#include "common/BigInt.hpp"
 #include "common/Object.hpp"
 #include "engine/base/JSLocation.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
+#include "engine/entity/JSObjectEntity.hpp"
 #include <optional>
 #include <string>
 
@@ -24,21 +26,23 @@ public:
 
   const JSValueType &getType() const;
 
-  JSEntity *getEntity();
+  std::wstring getName() const;
 
-  const JSEntity *getEntity() const;
+  template <class T = JSEntity> T *getEntity() { return (T *)_entity; }
+
+  template <class T = JSEntity> const T *getEntity() const {
+    return (T *)_entity;
+  }
 
   void setEntity(JSEntity *entity);
-
-  void setMetatable(const common::AutoPtr<JSValue> &meta);
-
-  const common::AutoPtr<JSValue> getMetatable() const;
 
   std::optional<double> getNumber() const;
 
   std::optional<std::wstring> getString() const;
 
   std::optional<bool> getBoolean() const;
+
+  std::optional<common::BigInt<>> getBigInt() const;
 
   bool isUndefined() const;
 
@@ -62,24 +66,43 @@ public:
 
   void setNaN();
 
+  std::wstring getTypeName();
+
   common::AutoPtr<JSValue>
   apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
         common::Array<common::AutoPtr<JSValue>> args = {},
         const JSLocation &location = {});
 
-  std::wstring toStringValue(common::AutoPtr<JSContext> ctx);
+  std::wstring convertToString(common::AutoPtr<JSContext> ctx);
 
-  std::optional<double> toNumberValue(common::AutoPtr<JSContext> ctx);
+  common::AutoPtr<JSValue> toPrimitive(common::AutoPtr<JSContext> ctx,
+                                       const std::wstring &hint = L"default");
 
-  bool toBooleanValue(common::AutoPtr<JSContext> ctx);
+  std::optional<double> convertToNumber(common::AutoPtr<JSContext> ctx);
 
-  std::wstring getTypeName(common::AutoPtr<JSContext> ctx);
+  bool convertToBoolean(common::AutoPtr<JSContext> ctx);
 
-  common::AutoPtr<JSValue> toNumber(common::AutoPtr<JSContext> ctx);
+  JSObjectEntity::JSField *
+  getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                           const std::wstring &name);
 
-  common::AutoPtr<JSValue> toString(common::AutoPtr<JSContext> ctx);
+  JSObjectEntity::JSField *getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                                                 const std::wstring &name);
 
-  common::AutoPtr<JSValue> toBoolean(common::AutoPtr<JSContext> ctx);
+  common::AutoPtr<JSValue>
+  setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                        const std::wstring &name,
+                        const JSObjectEntity::JSField &descriptor);
+
+  common::AutoPtr<JSValue> getProperty(common::AutoPtr<JSContext> ctx,
+                                       const std::wstring &name);
+
+  common::AutoPtr<JSValue> setProperty(common::AutoPtr<JSContext> ctx,
+                                       const std::wstring &name,
+                                       const common::AutoPtr<JSValue> &field);
+
+  common::AutoPtr<JSValue> removeProperty(common::AutoPtr<JSContext> ctx,
+                                          const std::wstring &name);
 
   common::AutoPtr<JSValue> unaryPlus(common::AutoPtr<JSContext> ctx); // +a
 
@@ -92,5 +115,34 @@ public:
   common::AutoPtr<JSValue> logicalNot(common::AutoPtr<JSContext> ctx); // !a
 
   common::AutoPtr<JSValue> bitwiseNot(common::AutoPtr<JSContext> ctx); // ~a
+
+  common::AutoPtr<JSValue> add(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a+b
+
+  common::AutoPtr<JSValue> sub(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a-b
+
+  common::AutoPtr<JSValue> mul(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a*b
+
+  common::AutoPtr<JSValue> div(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a/b
+
+  common::AutoPtr<JSValue> mod(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a%b
+
+  common::AutoPtr<JSValue> equal(common::AutoPtr<JSContext> ctx,
+                                 common::AutoPtr<JSValue> another); // a==b
+
+  common::AutoPtr<JSValue> notEqual(common::AutoPtr<JSContext> ctx,
+                                    common::AutoPtr<JSValue> another); // a!=b
+
+  common::AutoPtr<JSValue>
+  strictEqual(common::AutoPtr<JSContext> ctx,
+              common::AutoPtr<JSValue> another); // a===b
+
+  common::AutoPtr<JSValue>
+  notStrictEqual(common::AutoPtr<JSContext> ctx,
+                 common::AutoPtr<JSValue> another); // a!==b
 };
 }; // namespace spark::engine

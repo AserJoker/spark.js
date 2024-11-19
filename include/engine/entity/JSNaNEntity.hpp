@@ -7,6 +7,5 @@ public:
 
   std::wstring toString(common::AutoPtr<JSContext> ctx) const override;
 
-  std::wstring getTypeName(common::AutoPtr<JSContext> ctx) const override;
 };
 } // namespace spark::engine

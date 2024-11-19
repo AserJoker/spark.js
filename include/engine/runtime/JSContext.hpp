@@ -76,7 +76,7 @@ public:
   common::AutoPtr<JSValue> createInfinity(bool negative = false,
                                           const std::wstring &name = L"");
 
-  common::AutoPtr<JSValue> createObject(JSEntity *prototype,
+  common::AutoPtr<JSValue> createObject(common::AutoPtr<JSValue> prototype,
                                         const std::wstring &name = L"");
 
   common::AutoPtr<JSValue>

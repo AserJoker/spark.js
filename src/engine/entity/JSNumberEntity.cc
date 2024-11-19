@@ -23,7 +23,3 @@ JSNumberEntity::toNumber(common::AutoPtr<JSContext> ctx) const {
 bool JSNumberEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return getValue() != 0;
 };
-
-std::wstring JSNumberEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"number";
-};

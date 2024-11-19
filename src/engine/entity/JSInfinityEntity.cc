@@ -17,10 +17,6 @@ bool JSInfinityEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return true;
 };
 
-std::wstring
-JSInfinityEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"number";
-}
 bool JSInfinityEntity::isNegative() const { return _negative; }
 
 void JSInfinityEntity::negative() { _negative = !_negative; }

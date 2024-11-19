@@ -21,8 +21,3 @@ JSBooleanEntity::toNumber(common::AutoPtr<JSContext> ctx) const {
 bool JSBooleanEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return getValue();
 };
-
-std::wstring
-JSBooleanEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"boolean";
-};

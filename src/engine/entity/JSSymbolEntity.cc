@@ -26,7 +26,3 @@ JSSymbolEntity::toNumber(common::AutoPtr<JSContext> ctx) const {
 bool JSSymbolEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return true;
 };
-
-std::wstring JSSymbolEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"symbol";
-};

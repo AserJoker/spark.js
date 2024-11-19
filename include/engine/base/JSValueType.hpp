@@ -13,12 +13,11 @@ enum class JSValueType {
   JS_INFINITY,
   JS_STRING,
   JS_BOOLEAN,
+  JS_SYMBOL,
   JS_OBJECT,
-  JS_NATIVE_FUNCTION,
   JS_FUNCTION,
   JS_EXCEPTION,
-  JS_CLASS,
-  JS_SYMBOL
+  JS_CLASS
 };
 class JSValue;
 class JSContext;

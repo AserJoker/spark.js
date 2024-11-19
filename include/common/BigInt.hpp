@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <math.h>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -46,6 +47,9 @@ public:
       chr++;
     }
     while (*chr) {
+      if (*chr < '0' || *chr > '9') {
+        throw std::runtime_error("Cannot convert to a BigInt");
+      }
       *this *= 10;
       *this += (uint64_t)(*chr - '0');
       chr++;
@@ -59,13 +63,6 @@ public:
   }
 
   std::wstring toString() const {
-    if (isInfinity()) {
-      if (_negative) {
-        return L"-Infinity";
-      } else {
-        return L"Infinity";
-      }
-    }
     std::wstring result;
     BigInt<> tmp = *this;
     while (tmp > 0) {
@@ -86,27 +83,13 @@ public:
     return std::nullopt;
   }
 
-  static BigInt Infinity() {
-    BigInt result;
-    result._data.clear();
-    return result;
-  }
-
-  bool isInfinity() const { return _data.empty(); }
-
   BigInt abs() const {
-    if (isInfinity()) {
-      return Infinity();
-    }
     BigInt result = *this;
     result._negative = true;
     return result;
   }
 
   BigInt uadd(const BigInt &another) const {
-    if (isInfinity() || another.isInfinity()) {
-      return BigInt<>::Infinity();
-    }
     static uint64_t max = (uint64_t)((T)-1) + 1;
     size_t index = 0;
     uint64_t next = 0;
@@ -130,15 +113,6 @@ public:
   }
 
   BigInt usub(const BigInt &another) const {
-    if (isInfinity() && another.isInfinity()) {
-      return BigInt<>((uint64_t)0);
-    }
-    if (isInfinity() && !another.isInfinity()) {
-      return Infinity();
-    }
-    if (!isInfinity() && another.isInfinity()) {
-      return -Infinity();
-    }
     BigInt left = abs();
     BigInt right = another.abs();
     BigInt *a = &left;
@@ -193,11 +167,7 @@ public:
   }
 
   BigInt operator*(const BigInt &another) const {
-    if (isInfinity() || another.isInfinity()) {
-      auto inf = Infinity();
-      inf._negative = _negative != another._negative;
-      return inf;
-    }
+
     static uint64_t max = (uint64_t)((T)-1) + 1;
     BigInt result;
     uint64_t rindex = 0;
@@ -238,20 +208,13 @@ public:
 
   BigInt operator/(const BigInt &another) const {
     if (another == 0) {
-      BigInt infinity = Infinity();
-      infinity._negative = _negative;
-      return infinity;
+      throw std::runtime_error("Division by zero");
     }
     if (another > *this) {
       return 0;
     }
     if (another == *this) {
       return 1;
-    }
-    if (isInfinity()) {
-      BigInt infinity = Infinity();
-      infinity._negative = _negative;
-      return infinity;
     }
     size_t len = _data.size() - another._data.size();
     BigInt next;
@@ -288,20 +251,13 @@ public:
 
   BigInt operator%(const BigInt &another) const {
     if (another == 0) {
-      BigInt infinity = Infinity();
-      infinity._negative = _negative;
-      return infinity;
+      throw std::runtime_error("Division by zero");
     }
     if (another > *this) {
       return *this;
     }
     if (another == *this) {
       return 0;
-    }
-    if (isInfinity()) {
-      BigInt infinity = Infinity();
-      infinity._negative = _negative;
-      return infinity;
     }
     size_t len = _data.size() - another._data.size();
     BigInt next;
@@ -353,15 +309,6 @@ public:
     } else if (_negative && !another._negative) {
       return false;
     }
-    if (isInfinity() && !another.isInfinity()) {
-      return !_negative;
-    }
-    if (isInfinity() && another.isInfinity()) {
-      return false;
-    }
-    if (!isInfinity() && another.isInfinity()) {
-      return _negative;
-    }
     if (_data.size() > another._data.size()) {
       return !_negative;
     } else if (_data.size() < another._data.size()) {
@@ -382,15 +329,6 @@ public:
       return false;
     } else if (_negative && !another._negative) {
       return true;
-    }
-    if (isInfinity() && !another.isInfinity()) {
-      return _negative;
-    }
-    if (isInfinity() && another.isInfinity()) {
-      return false;
-    }
-    if (!isInfinity() && another.isInfinity()) {
-      return !_negative;
     }
     if (_data.size() > another._data.size()) {
       return _negative;
@@ -413,15 +351,6 @@ public:
     } else if (_negative && !another._negative) {
       return false;
     }
-    if (isInfinity() && !another.isInfinity()) {
-      return !_negative;
-    }
-    if (isInfinity() && another.isInfinity()) {
-      return true;
-    }
-    if (!isInfinity() && another.isInfinity()) {
-      return _negative;
-    }
     if (_data.size() > another._data.size()) {
       return !_negative;
     } else if (_data.size() < another._data.size()) {
@@ -442,15 +371,6 @@ public:
       return false;
     } else if (_negative && !another._negative) {
       return true;
-    }
-    if (isInfinity() && !another.isInfinity()) {
-      return _negative;
-    }
-    if (isInfinity() && another.isInfinity()) {
-      return false;
-    }
-    if (!isInfinity() && another.isInfinity()) {
-      return !_negative;
     }
     if (_data.size() > another._data.size()) {
       return _negative;

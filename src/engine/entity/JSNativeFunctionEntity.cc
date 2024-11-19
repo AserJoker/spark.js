@@ -8,10 +8,11 @@ using namespace spark::engine;
 JSNativeFunctionEntity::JSNativeFunctionEntity(
     const std::wstring &name, const std::function<JSFunction> &callee,
     const common::Map<std::wstring, JSEntity *> &closure)
-    : JSEntity(JSValueType::JS_NATIVE_FUNCTION), _name(name), _callee(callee),
+    : JSEntity(JSValueType::JS_FUNCTION), _name(name), _callee(callee),
       _bind(nullptr), _closure(closure) {}
 
-void JSNativeFunctionEntity::bind(JSEntity *self) {
+void JSNativeFunctionEntity::bind(common::AutoPtr<JSContext> ctx,
+                                  JSEntity *self) {
   if (_bind == self) {
     return;
   }
@@ -22,6 +23,7 @@ void JSNativeFunctionEntity::bind(JSEntity *self) {
   }
   if (old != nullptr) {
     removeChild(old);
+    ctx->getScope()->getRoot()->appendChild(old);
   }
 }
 
@@ -54,9 +56,4 @@ JSNativeFunctionEntity::toString(common::AutoPtr<JSContext> ctx) const {
 
 bool JSNativeFunctionEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return true;
-};
-
-std::wstring
-JSNativeFunctionEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"function";
 };

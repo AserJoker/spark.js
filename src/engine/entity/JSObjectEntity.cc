@@ -23,18 +23,20 @@ void JSObjectEntity::seal() { _sealed = true; }
 
 void JSObjectEntity::freeze() { _frozen = true; }
 
-const std::unordered_map<JSEntity *, JSEntity *> &
-JSObjectEntity::getSymbolFields() const {
+const std::unordered_map<JSEntity *, JSObjectEntity::JSField> &
+JSObjectEntity::getSymbolProperties() const {
   return _symbolFields;
 }
-const std::unordered_map<std::wstring, JSEntity *> &
-JSObjectEntity::getFields() const {
+const std::unordered_map<std::wstring, JSObjectEntity::JSField> &
+JSObjectEntity::getProperties() const {
   return _fields;
 }
-std::unordered_map<JSEntity *, JSEntity *> &JSObjectEntity::getSymbolFields() {
+std::unordered_map<JSEntity *, JSObjectEntity::JSField> &
+JSObjectEntity::getSymbolProperties() {
   return _symbolFields;
 }
-std::unordered_map<std::wstring, JSEntity *> &JSObjectEntity::getFields() {
+std::unordered_map<std::wstring, JSObjectEntity::JSField> &
+JSObjectEntity::getProperties() {
   return _fields;
 }
 
@@ -49,8 +51,4 @@ JSObjectEntity::toNumber(common::AutoPtr<JSContext> ctx) const {
 
 bool JSObjectEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return true;
-}
-
-std::wstring JSObjectEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"object";
 }

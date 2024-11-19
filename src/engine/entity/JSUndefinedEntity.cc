@@ -7,8 +7,3 @@ JSUndefinedEntity::JSUndefinedEntity() : JSEntity(JSValueType::JS_UNDEFINED) {}
 std::wstring JSUndefinedEntity::toString(common::AutoPtr<JSContext> ctx) const {
   return L"undefined";
 };
-
-std::wstring
-JSUndefinedEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"undefined";
-};

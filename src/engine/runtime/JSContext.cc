@@ -12,6 +12,7 @@
 #include "engine/entity/JSStringEntity.hpp"
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSScope.hpp"
+#include "engine/runtime/JSValue.hpp"
 #include <string>
 
 using namespace spark;
@@ -100,6 +101,11 @@ common::AutoPtr<JSValue> JSContext::createValue(common::AutoPtr<JSValue> value,
   case JSValueType::JS_BOOLEAN:
     return createBoolean(((JSBooleanEntity *)(value->getEntity()))->getValue(),
                          name);
+  case JSValueType::JS_BIGINT:
+    return createBigInt(value->getEntity<JSBigIntEntity>()->getValue(), name);
+  case JSValueType::JS_INFINITY:
+    return createInfinity(value->getEntity<JSInfinityEntity>()->isNegative(),
+                          name);
   default:
     break;
   }
@@ -130,9 +136,9 @@ common::AutoPtr<JSValue> JSContext::createInfinity(bool negative,
                                                    const std::wstring &name) {
   return _scope->createValue(new JSInfinityEntity(negative), name);
 }
-common::AutoPtr<JSValue> JSContext::createObject(JSEntity *prototype,
+common::AutoPtr<JSValue> JSContext::createObject(common::AutoPtr<JSValue> prototype,
                                                  const std::wstring &name) {
-  return _scope->createValue(new JSObjectEntity(prototype), name);
+  return _scope->createValue(new JSObjectEntity(prototype->getEntity()), name);
 }
 
 common::AutoPtr<JSValue>

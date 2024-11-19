@@ -17,7 +17,3 @@ std::wstring JSStringEntity::toString(common::AutoPtr<JSContext> ctx) const {
 bool JSStringEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return getValue().length() != 0;
 };
-
-std::wstring JSStringEntity::getTypeName(common::AutoPtr<JSContext> ctx) const {
-  return L"string";
-};
