@@ -48,8 +48,8 @@ JSScope::~JSScope() {
   common::Map<JSEntity *, bool> cache;
   std::vector<JSEntity *> destroyed;
   while (!workflow.empty()) {
-    auto entity = *workflow.rbegin();
-    workflow.pop_back();
+    auto entity = *workflow.begin();
+    workflow.erase(workflow.begin());
     if (!cache.contains(entity)) {
       bool isAlived = isEntityAlived(entity, cache);
       if (!isAlived) {

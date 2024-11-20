@@ -14,7 +14,6 @@ class JSFunctionEntity : public JSObjectEntity {
 private:
   std::wstring _name;
   std::function<JSFunction> _callee;
-  JSEntity *_prototype;
   JSEntity *_bind;
   common::Map<std::wstring, JSEntity *> _closure;
 
@@ -27,9 +26,7 @@ public:
 
   const JSEntity *getBind(common::AutoPtr<JSContext> ctx) const;
 
-  void setPrototype(JSEntity *prototype);
-
-  const JSEntity *getPrototype() const;
+  JSEntity *getBind(common::AutoPtr<JSContext> ctx);
 
   const std::function<JSFunction> &getCallee() const;
 

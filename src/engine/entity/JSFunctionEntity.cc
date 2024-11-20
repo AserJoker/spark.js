@@ -11,8 +11,8 @@ JSFunctionEntity::JSFunctionEntity(
     JSEntity *funcProto, const std::wstring &name,
     const std::function<JSFunction> &callee,
     const common::Map<std::wstring, JSEntity *> &closure)
-    : JSObjectEntity(funcProto), _name(name), _callee(callee),
-      _prototype(nullptr), _bind(nullptr), _closure(closure) {
+    : JSObjectEntity(funcProto), _name(name), _callee(callee), _bind(nullptr),
+      _closure(closure) {
   _type = JSValueType::JS_FUNCTION;
 }
 
@@ -32,11 +32,9 @@ JSFunctionEntity::getBind(common::AutoPtr<JSContext> ctx) const {
   return _bind;
 }
 
-void JSFunctionEntity::setPrototype(JSEntity *prototype) {
-  _prototype = prototype;
+JSEntity *JSFunctionEntity::getBind(common::AutoPtr<JSContext> ctx) {
+  return _bind;
 }
-
-const JSEntity *JSFunctionEntity::getPrototype() const { return _prototype; }
 
 const std::wstring &JSFunctionEntity::getFunctionName() const {
   static std::wstring anonymous = L"anonymous";

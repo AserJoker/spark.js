@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-
 using namespace spark;
 using namespace spark::compiler;
 
@@ -2351,8 +2350,8 @@ JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
   }
   if (token->location.isEqual(source, L"?")) {
     auto next = current;
-    auto trusy = readExpression(filename, source, current);
-    if (!trusy) {
+    auto truly = readExpression(filename, source, current);
+    if (!truly) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
@@ -2364,8 +2363,8 @@ JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    auto falsy = readExpression(filename, source, current);
-    if (!falsy) {
+    auto falsely = readExpression(filename, source, current);
+    if (!falsely) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
@@ -2376,8 +2375,8 @@ JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
     vnode->level = -2;
 
     vnode->location = getLocation(source, next, current);
-    vnode->left = trusy;
-    vnode->right = falsy;
+    vnode->left = truly;
+    vnode->right = falsely;
 
     node->right = vnode;
 

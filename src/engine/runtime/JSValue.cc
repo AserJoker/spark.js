@@ -10,6 +10,7 @@
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
+#include "engine/entity/JSSymbolEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "engine/runtime/JSScope.hpp"
 #include "error/JSInternalError.hpp"
@@ -140,32 +141,37 @@ common::AutoPtr<JSValue>
 JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
                std::vector<common::AutoPtr<JSValue>> args,
                const JSLocation &location) {
-  if (getType() == JSValueType::JS_FUNCTION) {
-    auto entity = (JSFunctionEntity *)_entity;
-    ctx->pushCallStack(entity->getFunctionName(), location);
-    auto scope = ctx->pushScope();
-    JSEntity *result = nullptr;
-    try {
-      auto closure = entity->getClosure();
-      auto callee = entity->getCallee();
-      for (auto &[name, entity] : closure) {
-        ctx->createValue(entity, name);
-      }
-      result = callee(ctx, self, args)->getEntity();
-    } catch (error::JSError &e) {
-      result = ctx->createException(e.getType(), e.getMessage())->getEntity();
-    } catch (std::exception &e) {
-      static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-      result = ctx->createException(L"InternalError",
-                                    converter.from_bytes(e.what()), location)
-                   ->getEntity();
-    }
-    scope->getRoot()->appendChild(result);
-    ctx->popScope(scope);
-    ctx->popCallStack();
-    return ctx->createValue(result);
+  common::AutoPtr<JSValue> func = this;
+  if (getType() != JSValueType::JS_FUNCTION) {
+    func = self->toPrimitive(ctx);
   }
-  return ctx->createException(L"TypeError", L"not a function", location);
+  if (func->getType() != JSValueType::JS_FUNCTION) {
+    throw error::JSTypeError(fmt::format(L"{} is not a function", getName()),
+                             location);
+  }
+  auto entity = (JSFunctionEntity *)_entity;
+  ctx->pushCallStack(entity->getFunctionName(), location);
+  auto scope = ctx->pushScope();
+  JSEntity *result = nullptr;
+  try {
+    auto closure = entity->getClosure();
+    auto callee = entity->getCallee();
+    for (auto &[name, entity] : closure) {
+      ctx->createValue(entity, name);
+    }
+    result = callee(ctx, self, args)->getEntity();
+  } catch (error::JSError &e) {
+    result = ctx->createException(e.getType(), e.getMessage())->getEntity();
+  } catch (std::exception &e) {
+    static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    result = ctx->createException(L"InternalError",
+                                  converter.from_bytes(e.what()), location)
+                 ->getEntity();
+  }
+  scope->getRoot()->appendChild(result);
+  ctx->popScope(scope);
+  ctx->popCallStack();
+  return ctx->createValue(result);
 }
 
 common::AutoPtr<JSValue> JSValue::toPrimitive(common::AutoPtr<JSContext> ctx,
@@ -189,6 +195,31 @@ common::AutoPtr<JSValue> JSValue::toPrimitive(common::AutoPtr<JSContext> ctx,
   }
   throw error::JSTypeError(
       fmt::format(L"Cannot convert {} to primitive value", getTypeName()));
+}
+
+common::AutoPtr<JSValue> JSValue::pack(common::AutoPtr<JSContext> ctx) {
+  switch (getType()) {
+  case JSValueType::JS_NUMBER:
+    break;
+  case JSValueType::JS_BIGINT:
+    break;
+  case JSValueType::JS_NAN:
+    break;
+  case JSValueType::JS_INFINITY:
+    break;
+  case JSValueType::JS_STRING:
+    break;
+  case JSValueType::JS_BOOLEAN:
+    break;
+  case JSValueType::JS_SYMBOL: {
+    auto val = ctx->createObject(ctx->Symbol()->getProperty(ctx, L"prototype"));
+    val->setProperty(ctx, ctx->symbolValue(), this);
+    return val;
+  } break;
+  default:
+    break;
+  }
+  return this;
 }
 
 std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
@@ -430,24 +461,18 @@ std::wstring JSValue::getTypeName() {
 JSObjectEntity::JSField *
 JSValue::getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
                                   const std::wstring &name) {
-  switch (getType()) {
-  case JSValueType::JS_UNDEFINED:
+  if (getType() == JSValueType::JS_UNDEFINED) {
     throw error::JSTypeError(fmt::format(
         L"Cannot read properties of undefined (reading '{}')", name));
-  case JSValueType::JS_NULL:
+  }
+  if (getType() == JSValueType::JS_NULL) {
     throw error::JSTypeError(
         fmt::format(L"Cannot read properties of null (reading '{}')", name));
-  case JSValueType::JS_OBJECT:
-  case JSValueType::JS_FUNCTION:
-  case JSValueType::JS_EXCEPTION:
-  case JSValueType::JS_CLASS: {
-    auto &fields = getEntity<JSObjectEntity>()->getProperties();
-    if (fields.contains(name)) {
-      return &fields.at(name);
-    }
   }
-  default:
-    break;
+  auto self = pack(ctx);
+  auto &fields = self->getEntity<JSObjectEntity>()->getProperties();
+  if (fields.contains(name)) {
+    return &fields.at(name);
   }
   return nullptr;
 }
@@ -455,12 +480,21 @@ JSValue::getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
 JSObjectEntity::JSField *
 JSValue::getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
                                const std::wstring &name) {
-  auto entity = getEntity<JSObjectEntity>();
+  if (getType() == JSValueType::JS_UNDEFINED) {
+    throw error::JSTypeError(fmt::format(
+        L"Cannot read properties of undefined (reading '{}')", name));
+  }
+  if (getType() == JSValueType::JS_NULL) {
+    throw error::JSTypeError(
+        fmt::format(L"Cannot read properties of null (reading '{}')", name));
+  }
+  auto entity = pack(ctx)->getEntity();
   while (entity->getType() >= JSValueType::JS_OBJECT) {
-    auto &props = entity->getProperties();
-    if (props.contains(name)) {
-      return &props.at(name);
+    auto &fields = ((JSObjectEntity *)entity)->getProperties();
+    if (fields.contains(name)) {
+      return &fields.at(name);
     }
+    entity = ((JSObjectEntity *)entity)->getPrototype();
   }
   return nullptr;
 }
@@ -474,8 +508,9 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
         fmt::format(L"Invalid property descriptor. Cannot both specify "
                     L"accessors and a value or writable attribute, #<Object>"));
   }
-  auto entity = getEntity<JSObjectEntity>();
-  auto old = getOwnPropertyDescriptor(ctx, name);
+  auto self = pack(ctx);
+  auto entity = self->getEntity<JSObjectEntity>();
+  auto old = self->getOwnPropertyDescriptor(ctx, name);
   if (old != nullptr) {
     if (!old->configurable || entity->isFrozen()) {
       throw error::JSTypeError(
@@ -527,31 +562,33 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
     }
   }
   entity->getProperties()[name] = descriptor;
-  return ctx->createBoolean(true);
+  return ctx->truly();
 }
 
 common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
                                               const std::wstring &name) {
-  auto descriptor = getPropertyDescriptor(ctx, name);
+  auto self = pack(ctx);
+  auto descriptor = self->getPropertyDescriptor(ctx, name);
   if (descriptor != nullptr) {
     if (descriptor->get) {
       auto getter = ctx->createValue(descriptor->get);
-      return getter->apply(ctx, this);
+      return getter->apply(ctx, self);
     }
     if (descriptor->value) {
       return ctx->createValue(descriptor->value);
     }
   }
-  return ctx->Undefined();
+  return ctx->undefined();
 }
 
 common::AutoPtr<JSValue>
 JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
                      const common::AutoPtr<JSValue> &field) {
-  auto entity = getEntity<JSObjectEntity>();
-  auto descriptor = getOwnPropertyDescriptor(ctx, name);
+  auto self = pack(ctx);
+  auto entity = self->getEntity<JSObjectEntity>();
+  auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
   if (descriptor && descriptor->value == field->getEntity()) {
-    return ctx->createBoolean(true);
+    return ctx->truly();
   }
   if (!descriptor) {
     if (entity->isFrozen() || entity->isSealed() || !entity->isExtensible()) {
@@ -586,7 +623,7 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
       }
     } else {
       auto setter = ctx->createValue(descriptor->set);
-      return setter->apply(ctx, this, {ctx->createString(name), field});
+      return setter->apply(ctx, self, {field});
     }
   } else {
     entity->getProperties()[name] = JSObjectEntity::JSField{
@@ -599,15 +636,16 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
     };
     entity->appendChild((JSEntity *)field->getEntity());
   }
-  return ctx->createBoolean(true);
+  return ctx->truly();
 }
 
 common::AutoPtr<JSValue> JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
                                                  const std::wstring &name) {
-  auto entity = getEntity<JSObjectEntity>();
-  auto descriptor = getOwnPropertyDescriptor(ctx, name);
+  auto self = pack(ctx);
+  auto entity = self->getEntity<JSObjectEntity>();
+  auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
   if (!descriptor) {
-    return ctx->createBoolean(true);
+    return ctx->truly();
   }
   if (entity->isSealed() || entity->isFrozen()) {
     throw error::JSTypeError(
@@ -629,7 +667,269 @@ common::AutoPtr<JSValue> JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
     entity->removeChild(descriptor->set);
     ctx->getScope()->getRoot()->appendChild(descriptor->set);
   }
-  return ctx->createBoolean(true);
+  entity->getProperties().erase(name);
+  return ctx->truly();
+}
+
+JSObjectEntity::JSField *
+JSValue::getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                                  common::AutoPtr<JSValue> name) {
+  auto key = name->toPrimitive(ctx);
+  if (key->getType() != JSValueType::JS_SYMBOL) {
+    return getOwnPropertyDescriptor(ctx, key->convertToString(ctx));
+  }
+  if (getType() == JSValueType::JS_UNDEFINED) {
+    throw error::JSTypeError(
+        fmt::format(L"Cannot read properties of undefined (reading '{}')",
+                    key->getEntity<JSSymbolEntity>()->getDescription()));
+  }
+  if (getType() == JSValueType::JS_NULL) {
+    throw error::JSTypeError(
+        fmt::format(L"Cannot read properties of null (reading '{}')",
+                    key->getEntity<JSSymbolEntity>()->getDescription()));
+  }
+  auto &fields = getEntity<JSObjectEntity>()->getSymbolProperties();
+  if (fields.contains(key->getEntity())) {
+    return &fields.at(key->getEntity());
+  }
+  return nullptr;
+}
+
+JSObjectEntity::JSField *
+JSValue::getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> name) {
+  auto key = name->toPrimitive(ctx);
+  if (key->getType() != JSValueType::JS_SYMBOL) {
+    return getPropertyDescriptor(ctx, key->convertToString(ctx));
+  }
+  if (getType() == JSValueType::JS_UNDEFINED) {
+    throw error::JSTypeError(
+        fmt::format(L"Cannot read properties of undefined (reading '{}')",
+                    key->getEntity<JSSymbolEntity>()->getDescription()));
+  }
+  if (getType() == JSValueType::JS_NULL) {
+    throw error::JSTypeError(
+        fmt::format(L"Cannot read properties of null (reading '{}')",
+                    key->getEntity<JSSymbolEntity>()->getDescription()));
+  }
+  auto self = pack(ctx);
+  auto entity = self->getEntity();
+  while (entity->getType() >= JSValueType::JS_OBJECT) {
+    auto &props = ((JSObjectEntity *)entity)->getSymbolProperties();
+    if (props.contains(key->getEntity())) {
+      return &props.at(key->getEntity());
+    }
+    entity = ((JSObjectEntity *)entity)->getPrototype();
+  }
+  return nullptr;
+}
+
+common::AutoPtr<JSValue>
+JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> name,
+                               const JSObjectEntity::JSField &descriptor) {
+  auto key = name->toPrimitive(ctx);
+  if (key->getType() != JSValueType::JS_SYMBOL) {
+    return setPropertyDescriptor(ctx, key->convertToString(ctx), descriptor);
+  }
+  if (getType() == JSValueType::JS_UNDEFINED) {
+    throw error::JSTypeError(fmt::format(
+        L"Cannot read properties of undefined (reading '{}')",
+        name->toPrimitive(ctx)->getEntity<JSSymbolEntity>()->getDescription()));
+  }
+  if (getType() == JSValueType::JS_NULL) {
+    throw error::JSTypeError(fmt::format(
+        L"Cannot read properties of null (reading '{}')",
+        name->toPrimitive(ctx)->getEntity<JSSymbolEntity>()->getDescription()));
+  }
+  if (descriptor.value && (descriptor.get || descriptor.set)) {
+    throw error::JSTypeError(
+        fmt::format(L"Invalid property descriptor. Cannot both specify "
+                    L"accessors and a value or writable attribute, #<Object>"));
+  }
+  auto self = pack(ctx);
+  auto entity = self->getEntity<JSObjectEntity>();
+  auto old = self->getOwnPropertyDescriptor(ctx, name);
+  if (old != nullptr) {
+    if (!old->configurable || entity->isFrozen()) {
+      throw error::JSTypeError(
+          fmt::format(L"Cannot redefine property: 'Symbol({})'",
+                      key->getEntity<JSSymbolEntity>()->getDescription()));
+    }
+  } else {
+    if (entity->isSealed() || !entity->isExtensible() || entity->isFrozen()) {
+      throw error::JSTypeError(fmt::format(
+          L"Cannot define property 'Symbol({})', object is not extensible",
+          key->getEntity<JSSymbolEntity>()->getDescription()));
+    }
+  }
+  if (old != nullptr) {
+    if (old->get != descriptor.get) {
+      if (old->get) {
+        entity->removeChild(old->get);
+        ctx->getScope()->getRoot()->appendChild(old->get);
+      }
+      if (descriptor.get) {
+        entity->appendChild(descriptor.get);
+      }
+    }
+    if (old->set != descriptor.set) {
+      if (old->set) {
+        entity->removeChild(old->set);
+        ctx->getScope()->getRoot()->appendChild(old->set);
+      }
+      if (descriptor.set) {
+        entity->appendChild(descriptor.set);
+      }
+    }
+    if (old->value != descriptor.value) {
+      if (old->value) {
+        entity->removeChild(old->value);
+        ctx->getScope()->getRoot()->appendChild(old->value);
+      }
+      if (descriptor.value) {
+        entity->appendChild(descriptor.value);
+      }
+    }
+  } else {
+    if (descriptor.get) {
+      entity->appendChild(descriptor.get);
+    }
+    if (descriptor.set) {
+      entity->appendChild(descriptor.set);
+    }
+    if (descriptor.value) {
+      entity->appendChild(descriptor.value);
+    }
+  }
+  entity->getSymbolProperties()[key->getEntity()] = descriptor;
+  return ctx->truly();
+}
+
+common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
+                                              common::AutoPtr<JSValue> name) {
+  auto key = name->toPrimitive(ctx);
+  if (key->getType() != JSValueType::JS_SYMBOL) {
+    return getProperty(ctx, key->convertToString(ctx));
+  }
+  auto self = pack(ctx);
+  auto descriptor = self->getPropertyDescriptor(ctx, name);
+  if (descriptor != nullptr) {
+    if (descriptor->get) {
+      auto getter = ctx->createValue(descriptor->get);
+      return getter->apply(ctx, self);
+    }
+    if (descriptor->value) {
+      return ctx->createValue(descriptor->value);
+    }
+  }
+  return ctx->undefined();
+}
+
+common::AutoPtr<JSValue>
+JSValue::setProperty(common::AutoPtr<JSContext> ctx,
+                     common::AutoPtr<JSValue> name,
+                     const common::AutoPtr<JSValue> &field) {
+  auto key = name->toPrimitive(ctx);
+  if (key->getType() != JSValueType::JS_SYMBOL) {
+    return setProperty(ctx, key->convertToString(ctx), field);
+  }
+  auto self = pack(ctx);
+  auto entity = self->getEntity<JSObjectEntity>();
+  auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
+  if (descriptor && descriptor->value == field->getEntity()) {
+    return ctx->truly();
+  }
+  if (!descriptor) {
+    if (entity->isFrozen() || entity->isSealed() || !entity->isExtensible()) {
+      throw error::JSTypeError(fmt::format(
+          L"Cannot define property 'Symbol({})', object is not extensible",
+          key->getEntity<JSSymbolEntity>()->getDescription()));
+    }
+  } else {
+    if (entity->isFrozen()) {
+      throw error::JSTypeError(
+          fmt::format(L"Cannot assign to read only property 'Symbol({})' of "
+                      L"object '#<Object>'",
+                      key->getEntity<JSSymbolEntity>()->getDescription()));
+    }
+    if (descriptor->value != nullptr &&
+        (!descriptor->writable || !descriptor->configurable)) {
+      throw error::JSTypeError(
+          fmt::format(L"Cannot assign to read only property 'Symbol({})' of "
+                      L"object '#<Object>'",
+                      key->getEntity<JSSymbolEntity>()->getDescription()));
+    }
+    if (descriptor->value == nullptr && !descriptor->set) {
+      throw error::JSTypeError(
+          fmt::format(L"Cannot set property 'Symbol({})' of #<Object> which "
+                      L"has only a getter",
+                      key->getEntity<JSSymbolEntity>()->getDescription()));
+    }
+  }
+  if (descriptor) {
+    if (descriptor->value != nullptr) {
+      if (descriptor->value != field->getEntity()) {
+        entity->removeChild(descriptor->value);
+        ctx->getScope()->getRoot()->appendChild(descriptor->value);
+        entity->appendChild((JSEntity *)field->getEntity());
+        descriptor->value = (JSEntity *)(field->getEntity());
+      }
+    } else {
+      auto setter = ctx->createValue(descriptor->set);
+      return setter->apply(ctx, self, {field});
+    }
+  } else {
+    entity->getSymbolProperties()[key->getEntity()] = JSObjectEntity::JSField{
+        .configurable = true,
+        .enumable = true,
+        .value = (JSEntity *)field->getEntity(),
+        .writable = true,
+        .get = nullptr,
+        .set = nullptr,
+    };
+    entity->appendChild((JSEntity *)field->getEntity());
+  }
+  return ctx->truly();
+}
+
+common::AutoPtr<JSValue>
+JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
+                        common::AutoPtr<JSValue> name) {
+  auto key = name->toPrimitive(ctx);
+  if (key->getType() != JSValueType::JS_SYMBOL) {
+    return removeProperty(ctx, key->convertToString(ctx));
+  }
+  auto self = pack(ctx);
+  auto entity = self->getEntity<JSObjectEntity>();
+  auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
+  if (!descriptor) {
+    return ctx->truly();
+  }
+  if (entity->isSealed() || entity->isFrozen()) {
+    throw error::JSTypeError(
+        fmt::format(L"Cannot delete property 'Symbol({})' of #<Object>",
+                    key->getEntity<JSSymbolEntity>()->getDescription()));
+  }
+  if (!descriptor->configurable) {
+    throw error::JSTypeError(
+        fmt::format(L"Cannot delete property 'Symbol({})' of #<Object>",
+                    key->getEntity<JSSymbolEntity>()->getDescription()));
+  }
+  if (descriptor->value) {
+    entity->removeChild(descriptor->value);
+    ctx->getScope()->getRoot()->appendChild(descriptor->value);
+  }
+  if (descriptor->get) {
+    entity->removeChild(descriptor->get);
+    ctx->getScope()->getRoot()->appendChild(descriptor->get);
+  }
+  if (descriptor->set) {
+    entity->removeChild(descriptor->set);
+    ctx->getScope()->getRoot()->appendChild(descriptor->set);
+  }
+  entity->getSymbolProperties().erase(key->getEntity());
+  return ctx->truly();
 }
 
 common::AutoPtr<JSValue> JSValue::unaryPlus(common::AutoPtr<JSContext> ctx) {
@@ -918,7 +1218,7 @@ common::AutoPtr<JSValue> JSValue::equal(common::AutoPtr<JSContext> ctx,
       return ctx->createBoolean(getBigInt().value() ==
                                 another->getBigInt().value());
     case JSValueType::JS_NAN:
-      return ctx->createBoolean(false);
+      return ctx->falsely();
     case JSValueType::JS_STRING:
       return ctx->createBoolean(getString().value() ==
                                 another->getString().value());
@@ -934,14 +1234,14 @@ common::AutoPtr<JSValue> JSValue::equal(common::AutoPtr<JSContext> ctx,
     default:
       break;
     }
-    return ctx->createBoolean(true);
+    return ctx->truly();
   }
   if (isUndefined() || isNull()) {
     return ctx->createBoolean(another->isUndefined() || another->isNull());
   }
   if (getType() >= JSValueType::JS_OBJECT &&
       another->getType() >= JSValueType::JS_OBJECT) {
-    return ctx->createBoolean(false);
+    return ctx->falsely();
   }
   if (getType() >= JSValueType::JS_OBJECT) {
     return toPrimitive(ctx)->equal(ctx, another);
@@ -985,7 +1285,7 @@ common::AutoPtr<JSValue> JSValue::equal(common::AutoPtr<JSContext> ctx,
       return ctx->createBoolean(common::BigInt<>(getString().value()) ==
                                 another->getBigInt());
     } catch (...) {
-      return ctx->createBoolean(false);
+      return ctx->falsely();
     }
   }
   if (getType() == JSValueType::JS_BIGINT &&
@@ -994,10 +1294,10 @@ common::AutoPtr<JSValue> JSValue::equal(common::AutoPtr<JSContext> ctx,
       return ctx->createBoolean(another->getBigInt() ==
                                 common::BigInt<>(getString().value()));
     } catch (...) {
-      return ctx->createBoolean(false);
+      return ctx->falsely();
     }
   }
-  return ctx->createBoolean(false);
+  return ctx->falsely();
 }
 
 common::AutoPtr<JSValue> JSValue::notEqual(common::AutoPtr<JSContext> ctx,
@@ -1017,7 +1317,7 @@ JSValue::strictEqual(common::AutoPtr<JSContext> ctx,
       return ctx->createBoolean(getBigInt().value() ==
                                 another->getBigInt().value());
     case JSValueType::JS_NAN:
-      return ctx->createBoolean(false);
+      return ctx->falsely();
     case JSValueType::JS_STRING:
       return ctx->createBoolean(getString().value() ==
                                 another->getString().value());
@@ -1033,9 +1333,9 @@ JSValue::strictEqual(common::AutoPtr<JSContext> ctx,
     default:
       break;
     }
-    return ctx->createBoolean(true);
+    return ctx->truly();
   }
-  return ctx->createBoolean(false);
+  return ctx->falsely();
 }
 
 common::AutoPtr<JSValue>

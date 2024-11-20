@@ -44,6 +44,18 @@ public:
 
   std::optional<common::BigInt<>> getBigInt() const;
 
+  template <class T> T getOpaque() {
+    return std::any_cast<T>(_entity->getOpaque());
+  }
+
+  template <class T> T getOpaque() const {
+    return std::any_cast<T>(_entity->getOpaque());
+  }
+
+  template <class T> void setOpaque(T &&value) const {
+    _entity->setOpaque(std::forward<T>(value));
+  }
+
   bool isUndefined() const;
 
   bool isNull() const;
@@ -78,6 +90,8 @@ public:
   common::AutoPtr<JSValue> toPrimitive(common::AutoPtr<JSContext> ctx,
                                        const std::wstring &hint = L"default");
 
+  common::AutoPtr<JSValue> pack(common::AutoPtr<JSContext> ctx);
+
   std::optional<double> convertToNumber(common::AutoPtr<JSContext> ctx);
 
   bool convertToBoolean(common::AutoPtr<JSContext> ctx);
@@ -105,6 +119,28 @@ public:
 
   common::AutoPtr<JSValue> removeProperty(common::AutoPtr<JSContext> ctx,
                                           const std::wstring &name);
+
+  JSObjectEntity::JSField *
+  getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                           common::AutoPtr<JSValue> name);
+
+  JSObjectEntity::JSField *getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                                                 common::AutoPtr<JSValue> name);
+
+  common::AutoPtr<JSValue>
+  setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
+                        common::AutoPtr<JSValue> name,
+                        const JSObjectEntity::JSField &descriptor);
+
+  common::AutoPtr<JSValue> getProperty(common::AutoPtr<JSContext> ctx,
+                                       common::AutoPtr<JSValue> name);
+
+  common::AutoPtr<JSValue> setProperty(common::AutoPtr<JSContext> ctx,
+                                       common::AutoPtr<JSValue> name,
+                                       const common::AutoPtr<JSValue> &field);
+
+  common::AutoPtr<JSValue> removeProperty(common::AutoPtr<JSContext> ctx,
+                                          common::AutoPtr<JSValue> name);
 
   common::AutoPtr<JSValue> unaryPlus(common::AutoPtr<JSContext> ctx); // +a
 

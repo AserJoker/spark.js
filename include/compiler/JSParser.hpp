@@ -1,10 +1,10 @@
 #pragma once
-#include "common/Array.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/Object.hpp"
 #include <cstdint>
 #include <fmt/format.h>
 #include <string>
+#include <vector>
 namespace spark::compiler {
 class JSParser : public common::Object {
 public:

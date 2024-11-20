@@ -1,10 +1,10 @@
 #pragma once
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSValueType.hpp"
+#include <any>
 #include <optional>
 #include <string>
 #include <vector>
-
 
 namespace spark::engine {
 class JSContext;
@@ -14,6 +14,8 @@ private:
   std::vector<JSEntity *> _parents;
 
   std::vector<JSEntity *> _children;
+
+  std::any _opaque;
 
 protected:
   JSValueType _type;
@@ -32,6 +34,10 @@ public:
   std::vector<JSEntity *> &getParent();
 
   std::vector<JSEntity *> &getChildren();
+
+  std::any &getOpaque();
+  const std::any &getOpaque() const;
+  void setOpaque(const std::any &value);
 
   virtual std::wstring toString(common::AutoPtr<JSContext> ctx) const;
 

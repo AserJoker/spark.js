@@ -27,7 +27,7 @@ using JSFunction = common::AutoPtr<JSValue>(
     common::AutoPtr<JSContext>, common::AutoPtr<JSValue>,
     std::vector<common::AutoPtr<JSValue>>);
 
-#define JS_FUNCTION(funcname)                                                  \
+#define JS_FUNC(funcname)                                                      \
   common::AutoPtr<JSValue> funcname(                                           \
       common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,           \
       std::vector<common::AutoPtr<JSValue>> args)

@@ -26,7 +26,9 @@ private:
 public:
   JSObjectEntity(JSEntity *prototype);
 
-  JSEntity *getPrototype() const;
+  const JSEntity *getPrototype() const;
+
+  JSEntity *getPrototype();
 
   bool isExtensible() const;
 

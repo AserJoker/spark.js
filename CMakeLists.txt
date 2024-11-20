@@ -7,6 +7,7 @@ aux_source_directory(${PROJECT_SOURCE_DIR}/src/compiler COMPILER_SOURCES)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/engine/base ENGINE_BASE_SOURCES)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/engine/entity ENGINE_ENTITY_SOURCES)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/engine/runtime ENGINE_RUNTIME_SOURCES)
+aux_source_directory(${PROJECT_SOURCE_DIR}/src/engine/lib ENGINE_LIB_SOURCES)
 find_package(fmt CONFIG REQUIRED)
 add_executable(${PROJECT_NAME}
     ${PROJECT_SOURCE_DIR}/src/main.cc
@@ -14,5 +15,6 @@ add_executable(${PROJECT_NAME}
     ${COMPILER_SOURCES}
     ${ENGINE_BASE_SOURCES}
     ${ENGINE_ENTITY_SOURCES}
-    ${ENGINE_RUNTIME_SOURCES})
+    ${ENGINE_RUNTIME_SOURCES}
+    ${ENGINE_LIB_SOURCES})
 target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)

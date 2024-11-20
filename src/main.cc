@@ -24,12 +24,11 @@ int main(int argc, char *argv[]) {
     common::AutoPtr runtime = new engine::JSRuntime();
     common::AutoPtr ctx = new engine::JSContext(runtime);
     auto scope = ctx->pushScope();
-    auto val1 = ctx->createObject(ctx->Null());
-    auto scope2 = ctx->pushScope();
-    val1->setProperty(ctx, L"test",
-                      ctx->createValue(new Test(ctx->Null()->getEntity())));
-    ctx->popScope(scope2);
-    val1->removeProperty(ctx, L"test");
+    auto symbol = ctx->Symbol()->getProperty(ctx, L"iterator");
+    fmt::print(L"{}", symbol->getProperty(ctx, L"toString")
+                          ->apply(ctx, symbol)
+                          ->getString()
+                          .value());
     ctx->popScope(scope);
   } catch (std::exception &e) {
     std::cout << e.what() << std::endl;

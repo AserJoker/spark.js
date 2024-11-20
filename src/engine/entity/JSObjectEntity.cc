@@ -9,7 +9,9 @@ JSObjectEntity::JSObjectEntity(JSEntity *prototype)
       _extensible(true), _sealed(false), _frozen(false) {
   appendChild(prototype);
 }
-JSEntity *JSObjectEntity::getPrototype() const { return _prototype; }
+const JSEntity *JSObjectEntity::getPrototype() const { return _prototype; }
+
+JSEntity *JSObjectEntity::getPrototype() { return _prototype; }
 
 bool JSObjectEntity::isExtensible() const { return _extensible; }
 

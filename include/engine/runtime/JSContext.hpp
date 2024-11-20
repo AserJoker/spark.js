@@ -11,6 +11,7 @@
 #include "engine/runtime/JSValue.hpp"
 #include <functional>
 #include <string>
+#include <unordered_map>
 
 namespace spark::engine {
 class JSContext : public common::Object {
@@ -28,6 +29,50 @@ public:
   };
 
 private:
+  static JS_FUNC(JSObjectConstructor);
+
+  static JS_FUNC(JSFunctionConstructor);
+
+  static JS_FUNC(JSArrayConstructor);
+
+  static JS_FUNC(JSErrorConstructor);
+
+  static JS_FUNC(JSNumberConstructor);
+
+  static JS_FUNC(JSStringConstructor);
+
+  static JS_FUNC(JSBooleanConstructor);
+
+  static JS_FUNC(JSBigIntConstructor);
+
+private:
+  common::AutoPtr<JSValue> _NaN;
+  common::AutoPtr<JSValue> _null;
+  common::AutoPtr<JSValue> _undefined;
+  common::AutoPtr<JSValue> _global;
+
+  common::AutoPtr<JSValue> _Object;
+  common::AutoPtr<JSValue> _Function;
+  common::AutoPtr<JSValue> _Array;
+  common::AutoPtr<JSValue> _Error;
+  common::AutoPtr<JSValue> _Symbol;
+  common::AutoPtr<JSValue> _Number;
+  common::AutoPtr<JSValue> _String;
+  common::AutoPtr<JSValue> _Boolean;
+  common::AutoPtr<JSValue> _BigInt;
+
+  common::AutoPtr<JSValue> _true;
+  common::AutoPtr<JSValue> _false;
+
+  // internal
+  std::unordered_map<std::wstring, JSEntity *> _symbols;
+  common::AutoPtr<JSValue> _symbolValue;
+
+private:
+  void initialize();
+
+private:
+  JSScope *_root;
   JSScope *_scope;
   common::AutoPtr<JSRuntime> _runtime;
   JSFrame *_callStack;
@@ -47,6 +92,8 @@ public:
 
   JSScope *getScope();
 
+  JSScope *getRoot();
+
   void pushCallStack(const std::wstring &funcname, const JSLocation &location);
 
   void popCallStack();
@@ -65,6 +112,9 @@ public:
                                         const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createString(const std::wstring &value = L"",
+                                        const std::wstring &name = L"");
+
+  common::AutoPtr<JSValue> createSymbol(const std::wstring &value = L"",
                                         const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createBoolean(bool value = false,
@@ -94,10 +144,17 @@ public:
                                            const std::wstring &message,
                                            const JSLocation &location = {});
 
-  common::AutoPtr<JSValue> Undefined();
+  common::AutoPtr<JSValue> undefined();
 
-  common::AutoPtr<JSValue> Null();
+  common::AutoPtr<JSValue> null();
 
   common::AutoPtr<JSValue> NaN();
+
+  common::AutoPtr<JSValue> Symbol();
+
+  common::AutoPtr<JSValue> truly();
+  common::AutoPtr<JSValue> falsely();
+
+  common::AutoPtr<JSValue> symbolValue();
 };
 } // namespace spark::engine
