@@ -156,10 +156,12 @@ public:
     NodeType type;
     Location location;
     int32_t level;
-    Node(const NodeType &type, int32_t level = 0) : type(type), level(level) {}
+    Node *parent;
+    Node(const NodeType &type, int32_t level = 0)
+        : type(type), level(level), parent(nullptr) {}
   };
 
-  struct NodeArray : public std::vector<common::AutoPtr<Node>> {};
+  using NodeArray = std::vector<common::AutoPtr<Node>>;
 
   struct Program : public Node {
     common::AutoPtr<Node> interpreter;
@@ -751,9 +753,6 @@ private:
   common::AutoPtr<Node> readEmptyStatement(uint32_t filename,
                                            const std::wstring &source,
                                            Position &position);
-
-  NodeArray readStatements(uint32_t filename, const std::wstring &source,
-                           Position &position);
 
   common::AutoPtr<Node> readDebuggerStatement(uint32_t filename,
                                               const std::wstring &source,
