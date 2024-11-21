@@ -870,9 +870,13 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
   common::AutoPtr program = new JSParser::Program();
   program->type = NodeType::PROGRAM;
   program->interpreter = interpreter;
+  if (interpreter != nullptr) {
+    interpreter->parent = (Node *)program.getRawPointer();
+  }
   skipInvisible(filename, source, current);
   auto directive = readDirective(filename, source, current);
   while (directive != nullptr) {
+    directive->parent = (Node *)program.getRawPointer();
     program->directives.push_back(directive);
     skipInvisible(filename, source, current);
     directive = readDirective(filename, source, current);
@@ -883,6 +887,7 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
     if (!statement) {
       break;
     }
+    statement->parent = (Node *)program.getRawPointer();
     program->body.push_back(statement);
     skipNewLine(filename, source, current);
   }
@@ -999,20 +1004,6 @@ JSParser::readStatement(uint32_t filename, const std::wstring &source,
   return node;
 }
 
-JSParser::NodeArray JSParser::readStatements(uint32_t filename,
-                                             const std::wstring &source,
-                                             Position &position) {
-  NodeArray result;
-  skipNewLine(filename, source, position);
-  auto statement = readStatement(filename, source, position);
-  while (statement != nullptr) {
-    result.push_back(statement);
-    statement = readStatement(filename, source, position);
-    skipNewLine(filename, source, position);
-  }
-  return result;
-}
-
 common::AutoPtr<JSParser::Node>
 JSParser::readDebuggerStatement(uint32_t filename, const std::wstring &source,
                                 JSParser::Position &position) {
@@ -1036,7 +1027,7 @@ JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"while")) {
-    auto node = new WhileStatement;
+    common::AutoPtr node = new WhileStatement;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L"(")) {
@@ -1050,6 +1041,7 @@ JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->condition->parent = (Node *)node.getRawPointer();
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L")")) {
@@ -1063,6 +1055,7 @@ JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->body->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1085,6 +1078,7 @@ JSParser::readDoWhileStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->body->parent = (Node *)node.getRawPointer();
     skipInvisible(filename, source, current);
     token = readKeywordToken(filename, source, current);
     if (token == nullptr || !token->location.isEqual(source, L"while")) {
@@ -1105,6 +1099,7 @@ JSParser::readDoWhileStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->condition->parent = (Node *)node.getRawPointer();
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L")")) {
@@ -1146,6 +1141,9 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    if (node->init != nullptr) {
+      node->init->parent = (Node *)node.getRawPointer();
+    }
     node->condition = readExpressions(filename, source, current);
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -1153,6 +1151,9 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
+    }
+    if (node->condition != nullptr) {
+      node->condition->parent = (Node *)node.getRawPointer();
     }
     node->update = readExpressions(filename, source, current);
     skipInvisible(filename, source, current);
@@ -1162,11 +1163,17 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    if (node->update != nullptr) {
+      node->update->parent = (Node *)node.getRawPointer();
+    }
     node->body = readStatement(filename, source, current);
     if (!node->body) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
+    }
+    if (node->body != nullptr) {
+      node->body->parent = (Node *)node.getRawPointer();
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1214,6 +1221,7 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
       node->declaration = readArrayDeclaration(filename, source, current);
     }
     if (node->declaration != nullptr) {
+      node->declaration->parent = (Node *)node.getRawPointer();
       skipInvisible(filename, source, current);
       token = readKeywordToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"in")) {
@@ -1223,6 +1231,7 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
+        node->expression->parent = (Node *)node.getRawPointer();
         skipInvisible(filename, source, current);
         token = readSymbolToken(filename, source, current);
         if (!token || !token->location.isEqual(source, L")")) {
@@ -1236,6 +1245,7 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
+        node->body->parent = (Node *)node.getRawPointer();
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -1294,6 +1304,7 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
       node->declaration = readArrayDeclaration(filename, source, current);
     }
     if (node->declaration != nullptr) {
+      node->declaration->parent = (Node *)node.getRawPointer();
       skipInvisible(filename, source, current);
       token = readIdentifierToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"of")) {
@@ -1303,6 +1314,7 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
+        node->expression->parent = (Node *)node.getRawPointer();
         skipInvisible(filename, source, current);
         token = readSymbolToken(filename, source, current);
         if (!token || !token->location.isEqual(source, L")")) {
@@ -1316,6 +1328,7 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
+        node->body->parent = (Node *)node.getRawPointer();
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -1354,6 +1367,9 @@ JSParser::readYieldStatement(uint32_t filename, const std::wstring &source,
     if (!isNewLine) {
       node->value = readExpressions(filename, source, current);
     }
+    if (node->value != nullptr) {
+      node->value->parent = (Node *)node.getRawPointer();
+    }
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1373,6 +1389,9 @@ JSParser::readReturnStatement(uint32_t filename, const std::wstring &source,
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
       node->value = readExpressions(filename, source, current);
+    }
+    if (node->value != nullptr) {
+      node->value->parent = (Node *)node.getRawPointer();
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1394,6 +1413,9 @@ JSParser::readThrowStatement(uint32_t filename, const std::wstring &source,
     if (!isNewLine) {
       node->value = readExpressions(filename, source, current);
     }
+    if (node->value != nullptr) {
+      node->value->parent = (Node *)node.getRawPointer();
+    }
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1413,6 +1435,9 @@ JSParser::readBreakStatement(uint32_t filename, const std::wstring &source,
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
       node->label = readIdentifierLiteral(filename, source, current);
+    }
+    if (node->label != nullptr) {
+      node->label->parent = (Node *)node.getRawPointer();
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1434,6 +1459,9 @@ JSParser::readContinueStatement(uint32_t filename, const std::wstring &source,
     if (!isNewLine) {
       node->label = readIdentifierLiteral(filename, source, current);
     }
+    if (node->label != nullptr) {
+      node->label->parent = (Node *)node.getRawPointer();
+    }
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1453,12 +1481,14 @@ JSParser::readLabelStatement(uint32_t filename, const std::wstring &source,
       common::AutoPtr node = new LabelStatement;
       node->type = NodeType::STATEMENT_LABEL;
       node->label = label;
+      label->parent = (Node *)node.getRawPointer();
       node->statement = readStatement(filename, source, current);
       if (!node->statement) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->statement->parent = (Node *)node.getRawPointer();
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -1488,6 +1518,7 @@ JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->condition->parent = (Node *)node.getRawPointer();
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L")")) {
@@ -1496,6 +1527,7 @@ JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->alternate = readStatement(filename, source, current);
+    node->alternate->parent = (Node *)node.getRawPointer();
     if (!node->alternate) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
@@ -1511,6 +1543,7 @@ JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->consequent->parent = (Node *)node.getRawPointer();
     } else {
       current = backup;
     }
@@ -1542,6 +1575,7 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->expression->parent = (Node *)node.getRawPointer();
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L")")) {
@@ -1558,6 +1592,7 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
     }
     auto case_ = readSwitchCaseStatement(filename, source, current);
     while (case_ != nullptr) {
+      case_->parent = (Node *)node.getRawPointer();
       node->cases.push_back(case_);
       case_ = readSwitchCaseStatement(filename, source, current);
     }
@@ -1591,6 +1626,7 @@ JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->match->parent = (Node *)node.getRawPointer();
     } else if (!token->location.isEqual(source, L"default")) {
       return nullptr;
     }
@@ -1610,6 +1646,7 @@ JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
       skipNewLine(filename, source, current);
       auto statement = readStatement(filename, source, current);
       while (statement != nullptr) {
+        statement->parent = (Node *)node.getRawPointer();
         node->statements.push_back(statement);
         skipNewLine(filename, source, current);
         backup = current;
@@ -1650,6 +1687,7 @@ JSParser::readTryStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->try_->parent = (Node *)node.getRawPointer();
     node->catch_ = readTryCatchStatement(filename, source, current);
     auto backup = current;
     skipInvisible(filename, source, current);
@@ -1668,6 +1706,12 @@ JSParser::readTryStatement(uint32_t filename, const std::wstring &source,
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
+    }
+    if (node->catch_ != nullptr) {
+      node->catch_->parent = (Node *)node.getRawPointer();
+    }
+    if (node->finally != nullptr) {
+      node->finally->parent = (Node *)node.getRawPointer();
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1694,6 +1738,7 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
     }
     if (token->location.isEqual(source, L"(")) {
       node->binding = readIdentifierLiteral(filename, source, current);
+
       if (!node->binding) {
         node->binding = readObjectPattern(filename, source, current);
       }
@@ -1705,6 +1750,7 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->binding->parent = (Node *)node.getRawPointer();
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
       if (!token || !token->location.isEqual(source, L")")) {
@@ -1716,6 +1762,12 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
       current = backup;
     }
     node->statement = readBlockStatement(filename, source, current);
+    if (!node->statement) {
+      throw error::JSSyntaxError(
+          formatException(L"Unexcepted token", filename, source, current),
+          {filename, current.line, current.column});
+    }
+    node->statement->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1785,6 +1837,7 @@ common::AutoPtr<JSParser::Node> JSParser::readValue(uint32_t filename,
       }
       if (expr != nullptr) {
         expr.cast<BinaryExpression>()->left = node;
+        node->parent = (Node *)expr.getRawPointer();
         node = expr;
         node->location = getLocation(source, position, current);
       } else {
@@ -1851,6 +1904,7 @@ common::AutoPtr<JSParser::Node> JSParser::readRValue(uint32_t filename,
       }
       if (expr != nullptr) {
         expr.cast<BinaryExpression>()->left = node;
+        node->parent = (Node *)expr.getRawPointer();
         node = expr;
         node->location = getLocation(source, position, current);
       } else {
@@ -1879,6 +1933,7 @@ JSParser::readDecorator(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->expression->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1916,6 +1971,8 @@ JSParser::readExpressions(uint32_t filename, const std::wstring &source,
     node->level = 18;
     node->left = expr;
     node->right = right;
+    expr->parent = (Node *)node.getRawPointer();
+    right->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     expr = node;
     next = current;
@@ -1942,6 +1999,7 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
     skipNewLine(filename, source, current);
     auto statement = readStatement(filename, source, current);
     while (statement != nullptr) {
+      statement->parent = (Node *)node.getRawPointer();
       node->body.push_back(statement);
       skipNewLine(filename, source, current);
       statement = readStatement(filename, source, current);
@@ -2054,6 +2112,7 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      exp->parent = (Node *)node.getRawPointer();
       node->expressions.push_back(exp);
       auto part = readTemplatePatternToken(filename, source, current);
       if (part != nullptr) {
@@ -2304,6 +2363,12 @@ JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
         node->level = (uint32_t)level;
         node->opt = opt;
         node->right = readRValue(filename, source, current, (uint32_t)level);
+        if (!node->right) {
+          throw error::JSSyntaxError(
+              formatException(L"Unexcepted token", filename, source, current),
+              {filename, current.line, current.column});
+        }
+        node->right->parent = (Node *)node.getRawPointer();
         position = current;
         return node;
       }
@@ -2331,6 +2396,12 @@ JSParser::readAssigmentExpression(uint32_t filename, const std::wstring &source,
       node->opt = opt;
       node->type = NodeType::EXPRESSION_ASSIGMENT;
       node->right = readRValue(filename, source, current, 17);
+      if (!node->right) {
+        throw error::JSSyntaxError(
+            formatException(L"Unexcepted token", filename, source, current),
+            {filename, current.line, current.column});
+      }
+      node->right->parent = (Node *)node.getRawPointer();
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -2376,9 +2447,12 @@ JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
 
     vnode->location = getLocation(source, next, current);
     vnode->left = truly;
+    truly->parent = (Node *)vnode.getRawPointer();
     vnode->right = falsely;
+    falsely->parent = (Node *)vnode.getRawPointer();
 
     node->right = vnode;
+    vnode->parent = (Node *)node.getRawPointer();
 
     node->location = getLocation(source, position, current);
     position = current;
@@ -2427,6 +2501,7 @@ JSParser::readUnaryExpression(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->right->parent = (Node *)node.getRawPointer();
       position = current;
       return node;
     }
@@ -2455,6 +2530,7 @@ JSParser::readGroupExpression(uint32_t filename, const std::wstring &source,
     }
     common::AutoPtr node = new GroupExpression;
     node->expression = expr;
+    expr->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2485,6 +2561,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
     common::AutoPtr node = new MemberExpression;
     node->location = getLocation(source, position, current);
     node->right = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2507,6 +2584,9 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
         node->level = field->level;
         node->type = NodeType::EXPRESSION_OPTIONAL_CALL;
         node->arguments = field->arguments;
+        for (auto &arg : node->arguments) {
+          arg->parent = (Node *)node.getRawPointer();
+        }
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -2521,6 +2601,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
         }
         common::AutoPtr node = new OptionalComputedMemberExpression;
         node->right = field->right;
+        node->right->parent = (Node *)node.getRawPointer();
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -2535,6 +2616,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->right = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2554,6 +2636,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
     }
     common::AutoPtr node = new ComputedMemberExpression;
     node->right = field;
+    field->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2574,6 +2657,7 @@ JSParser::readCallExpression(uint32_t filename, const std::wstring &source,
       arg = readExpression(filename, source, current);
     }
     while (arg != nullptr) {
+      arg->parent = (Node *)node.getRawPointer();
       node->arguments.push_back(arg);
       auto next = current;
       skipInvisible(filename, source, current);
@@ -2599,12 +2683,7 @@ JSParser::readCallExpression(uint32_t filename, const std::wstring &source,
     }
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
-    if (!token) {
-      throw error::JSSyntaxError(
-          formatException(L"Unexcepted token", filename, source, current),
-          {filename, current.line, current.column});
-    }
-    if (!token->location.isEqual(source, L")")) {
+    if (!token || !token->location.isEqual(source, L")")) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
@@ -2631,6 +2710,12 @@ JSParser::readRestExpression(uint32_t filename, const std::wstring &source,
     node->opt = L"...";
     node->type = NodeType::EXPRESSION_BINARY;
     node->right = readRValue(filename, source, current, 999);
+    if (!node->right) {
+      throw error::JSSyntaxError(
+          formatException(L"Unexcepted token", filename, source, current),
+          {filename, current.line, current.column});
+    }
+    node->right->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2653,6 +2738,7 @@ JSParser::readAwaitExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->right->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2674,6 +2760,7 @@ JSParser::readTypeofExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->right->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2695,6 +2782,7 @@ JSParser::readVoidExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->right->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2716,6 +2804,7 @@ JSParser::readNewExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->right->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2737,6 +2826,7 @@ JSParser::readDeleteExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->right->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2756,6 +2846,12 @@ JSParser::readInExpression(uint32_t filename, const std::wstring &source,
     node->opt = L"in";
     node->type = NodeType::EXPRESSION_BINARY;
     node->right = readRValue(filename, source, current, 9);
+    if (!node->right) {
+      throw error::JSSyntaxError(
+          formatException(L"Unexcepted token", filename, source, current),
+          {filename, current.line, current.column});
+    }
+    node->right->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2774,6 +2870,12 @@ common::AutoPtr<JSParser::Node> JSParser::readInstanceOfExpression(
     node->opt = L"instanceof";
     node->type = NodeType::EXPRESSION_BINARY;
     node->right = readRValue(filename, source, current, 9);
+    if (!node->right) {
+      throw error::JSSyntaxError(
+          formatException(L"Unexcepted token", filename, source, current),
+          {filename, current.line, current.column});
+    }
+    node->right->parent = (Node *)node.getRawPointer();
     position = current;
     return node;
   }
@@ -2789,7 +2891,7 @@ JSParser::readParameter(uint32_t filename, const std::wstring &source,
   }
   auto current = position;
   skipInvisible(filename, source, current);
-  auto node = new Parameter;
+  common::AutoPtr node = new Parameter;
   auto identifier = readIdentifierLiteral(filename, source, current);
   if (!identifier) {
     identifier = readObjectPattern(filename, source, current);
@@ -2799,6 +2901,7 @@ JSParser::readParameter(uint32_t filename, const std::wstring &source,
   }
   if (identifier != nullptr) {
     node->identifier = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
   } else {
     return nullptr;
   }
@@ -2816,6 +2919,7 @@ JSParser::readParameter(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->value = value;
+    value->parent = (Node *)node.getRawPointer();
     next = current;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -2848,6 +2952,7 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
   if (token != nullptr && token->location.isEqual(source, L"(")) {
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
+      param->parent = (Node *)node.getRawPointer();
       node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
@@ -2891,6 +2996,12 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
     } else {
       node->body = readExpression(filename, source, current);
     }
+    if (!node->body) {
+      throw error::JSSyntaxError(
+          formatException(L"Unexcepted token", filename, source, current),
+          {filename, current.line, current.column});
+    }
+    node->body->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2900,6 +3011,7 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"=>")) {
+      param->parent = (Node *)node.getRawPointer();
       node->arguments.push_back(param);
       auto next = current;
       skipInvisible(filename, source, current);
@@ -2914,6 +3026,12 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
       } else {
         node->body = readExpression(filename, source, current);
       }
+      if (!node->body) {
+        throw error::JSSyntaxError(
+            formatException(L"Unexcepted token", filename, source, current),
+            {filename, current.line, current.column});
+      }
+      node->body->parent = (Node *)node.getRawPointer();
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -2955,11 +3073,15 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
       node->generator = false;
     }
     node->identifier = readIdentifierLiteral(filename, source, current);
+    if (node->identifier != nullptr) {
+      node->identifier->parent = (Node *)node.getRawPointer();
+    }
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"(")) {
       auto param = readParameter(filename, source, current);
       while (param != nullptr) {
+        param->parent = (Node *)node.getRawPointer();
         node->arguments.push_back(param);
         skipInvisible(filename, source, current);
         auto next = current;
@@ -2998,6 +3120,7 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->body->parent = (Node *)node.getRawPointer();
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -3029,6 +3152,7 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"]")) {
         if (item != nullptr) {
+          item->parent = (Node *)node.getRawPointer();
           node->items.push_back(item);
         }
         current = next;
@@ -3039,6 +3163,7 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      item->parent = (Node *)node.getRawPointer();
       node->items.push_back(item);
       item = readRestExpression(filename, source, current);
       if (item == nullptr) {
@@ -3083,6 +3208,7 @@ JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"}")) {
         if (item != nullptr) {
+          item->parent = (Node *)node.getRawPointer();
           node->properties.push_back(item);
         }
         current = next;
@@ -3094,6 +3220,7 @@ JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      item->parent = (Node *)node.getRawPointer();
       node->properties.push_back(item);
       item = readObjectProperty(filename, source, current);
     }
@@ -3154,6 +3281,9 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
   }
   common::AutoPtr node = new ObjectProperty;
   node->identifier = identifier;
+  if (identifier != nullptr) {
+    identifier->parent = (Node *)node.getRawPointer();
+  }
   auto next = current;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -3165,6 +3295,7 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->implement = impl;
+    impl->parent = (Node *)node.getRawPointer();
     next = current;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -3241,8 +3372,10 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
     node->async = async != nullptr;
     node->generator = generator != nullptr;
     node->identifier = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
+      param->parent = (Node *)node.getRawPointer();
       node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
@@ -3281,6 +3414,7 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->body->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -3328,8 +3462,10 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
     node->kind = accessor->location.isEqual(source, L"get") ? AccessorKind::GET
                                                             : AccessorKind::SET;
     node->identifier = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
+      param->parent = (Node *)node.getRawPointer();
       node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
@@ -3368,6 +3504,7 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->body->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -3382,6 +3519,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassDeclaration;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
+    decorator->parent = (Node *)node.getRawPointer();
     node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
@@ -3400,12 +3538,18 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
     }
     auto clazz = exportNode->items[0].cast<ClassDeclaration>();
     clazz->decorators = node->decorators;
+    for (auto &dec : node->decorators) {
+      dec->parent = (Node *)clazz.getRawPointer();
+    }
     exportNode->location = getLocation(source, position, current);
     position = current;
     return exportNode;
   }
   if (token != nullptr && token->location.isEqual(source, L"class")) {
     node->identifier = readIdentifierLiteral(filename, source, current);
+    if (node->identifier != nullptr) {
+      node->identifier->parent = (Node *)node.getRawPointer();
+    }
     auto next = current;
     skipInvisible(filename, source, current);
     auto token = readKeywordToken(filename, source, current);
@@ -3418,6 +3562,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->extends->parent = (Node *)node.getRawPointer();
       next = current;
     } else {
       current = next;
@@ -3437,6 +3582,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
       token = readSymbolToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"}")) {
         if (item != nullptr) {
+          item->parent = (Node *)node.getRawPointer();
           node->properties.push_back(item);
         }
         current = next;
@@ -3492,6 +3638,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassMethod;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
+    decorator->parent = (Node *)node.getRawPointer();
     node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
@@ -3551,6 +3698,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
     }
   }
   if (identifier != nullptr) {
+    identifier->parent = (Node *)node.getRawPointer();
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"(")) {
@@ -3560,6 +3708,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
       node->identifier = identifier;
       auto param = readParameter(filename, source, current);
       while (param != nullptr) {
+        param->parent = (Node *)node.getRawPointer();
         node->arguments.push_back(param);
         skipInvisible(filename, source, current);
         auto next = current;
@@ -3598,6 +3747,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->body->parent = (Node *)node.getRawPointer();
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -3614,6 +3764,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassAccessor;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
+    decorator->parent = (Node *)node.getRawPointer();
     node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
@@ -3651,6 +3802,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
       }
     }
     if (identifier != nullptr) {
+      identifier->parent = (Node *)node.getRawPointer();
       skipInvisible(filename, source, current);
       auto token = readSymbolToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"(")) {
@@ -3661,6 +3813,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
         node->identifier = identifier;
         auto param = readParameter(filename, source, current);
         while (param != nullptr) {
+          param->parent = (Node *)node.getRawPointer();
           node->arguments.push_back(param);
           skipInvisible(filename, source, current);
           auto next = current;
@@ -3700,6 +3853,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
+        node->body->parent = (Node *)node.getRawPointer();
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -3732,6 +3886,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassProperty;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
+    decorator->parent = (Node *)node.getRawPointer();
     node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
@@ -3770,6 +3925,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
   if (!node->identifier) {
     return nullptr;
   }
+  node->identifier->parent = (Node *)node.getRawPointer();
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"=")) {
@@ -3779,6 +3935,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->value->parent = (Node *)node.getRawPointer();
   }
   node->location = getLocation(source, position, current);
   position = current;
@@ -3802,6 +3959,7 @@ JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
   }
   common::AutoPtr node = new VariableDeclarator;
   node->identifier = identifier;
+  identifier->parent = (Node *)node.getRawPointer();
   auto next = current;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -3816,6 +3974,7 @@ JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->value = value;
+    value->parent = (Node *)node.getRawPointer();
   } else {
     current = next;
   }
@@ -3848,6 +4007,7 @@ JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     while (declarator != nullptr) {
+      declarator->parent = (Node *)node.getRawPointer();
       node->declarations.push_back(declarator);
       auto next = current;
       skipInvisible(filename, source, current);
@@ -3890,6 +4050,7 @@ JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
     }
     common::AutoPtr node = new RestPatternItem;
     node->identifier = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -3928,6 +4089,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
         {filename, current.line, current.column});
   }
   node->identifier = identifier;
+  identifier->parent = (Node *)node.getRawPointer();
   next = current;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -3946,6 +4108,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->match = match;
+      match->parent = (Node *)node.getRawPointer();
       next = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
@@ -3960,6 +4123,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->value = value;
+      value->parent = (Node *)node.getRawPointer();
       next = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
@@ -3990,6 +4154,7 @@ JSParser::readObjectPattern(uint32_t filename, const std::wstring &source,
     common::AutoPtr node = new ObjectPattern;
     auto item = readObjectPatternItem(filename, source, current);
     while (item != nullptr) {
+      item->parent = (Node *)node.getRawPointer();
       node->items.push_back(item);
       auto next = current;
       skipInvisible(filename, source, current);
@@ -4040,6 +4205,7 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
   if (identifier != nullptr) {
     common::AutoPtr node = new ArrayPatternItem;
     node->identifier = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     auto next = current;
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
@@ -4051,6 +4217,7 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->value = value;
+      value->parent = (Node *)node.getRawPointer();
       next = current;
     }
     current = next;
@@ -4084,6 +4251,7 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"]")) {
         if (item != nullptr) {
+          item->parent = (Node *)node.getRawPointer();
           node->items.push_back(item);
         }
         current = next;
@@ -4092,6 +4260,7 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
       if (!token->location.isEqual(source, L",")) {
         return nullptr;
       }
+      item->parent = (Node *)node.getRawPointer();
       node->items.push_back(item);
       item = readArrayPatternItem(filename, source, current);
     }
@@ -4142,17 +4311,20 @@ JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
   if (identifier != nullptr) {
     common::AutoPtr node = new ImportSpecifier;
     node->identifier = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     auto backup = current;
     skipInvisible(filename, source, current);
     auto token = readIdentifierToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"as")) {
       skipInvisible(filename, source, current);
       node->alias = readIdentifierLiteral(filename, source, current);
+
       if (!node->alias) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->alias->parent = (Node *)node.getRawPointer();
     } else if (identifier->type == NodeType::LITERAL_STRING) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
@@ -4175,6 +4347,7 @@ common::AutoPtr<JSParser::Node> JSParser::readImportDefaultSpecifier(
   if (identifier != nullptr) {
     common::AutoPtr node = new ImportDefaultSpecifier;
     node->identifier = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4204,6 +4377,7 @@ common::AutoPtr<JSParser::Node> JSParser::readImportNamespaceSpecifier(
     }
     common::AutoPtr node = new ImportNamespaceSpecifier;
     node->alias = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4223,6 +4397,7 @@ JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
     common::AutoPtr node = new ImportAttribute;
     node->type = NodeType::IMPORT_ATTARTUBE;
     node->key = key;
+    key->parent = (Node *)node.getRawPointer();
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L":")) {
@@ -4236,6 +4411,7 @@ JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->value->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4255,13 +4431,16 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
     auto src = readStringLiteral(filename, source, current);
     if (src != nullptr) {
       node->source = src;
+      src->parent = (Node *)node.getRawPointer();
     } else {
       auto specifier = readImportNamespaceSpecifier(filename, source, current);
       if (specifier != nullptr) {
+        specifier->parent = (Node *)node.getRawPointer();
         node->items.push_back(specifier);
       } else {
         specifier = readImportDefaultSpecifier(filename, source, current);
         if (specifier != nullptr) {
+          specifier->parent = (Node *)node.getRawPointer();
           node->items.push_back(specifier);
           skipInvisible(filename, source, current);
           token = readSymbolToken(filename, source, current);
@@ -4292,9 +4471,11 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
                                     current),
                     {filename, current.line, current.column});
               }
+              specifier->parent = (Node *)node.getRawPointer();
               node->items.push_back(specifier);
             } else if (token->location.isEqual(source, L"}")) {
               if (specifier != nullptr) {
+                specifier->parent = (Node *)node.getRawPointer();
                 node->items.push_back(specifier);
               }
               break;
@@ -4312,6 +4493,7 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
         }
         specifier = readImportNamespaceSpecifier(filename, source, current);
         if (specifier != nullptr) {
+          specifier->parent = (Node *)node.getRawPointer();
           node->items.push_back(specifier);
         }
       }
@@ -4328,6 +4510,7 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      src->parent = (Node *)node.getRawPointer();
       node->source = src;
     }
     auto backup = current;
@@ -4347,6 +4530,7 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
       }
       auto attribute = readImportAttriabue(filename, source, current);
       while (attribute != nullptr) {
+        attribute->parent = (Node *)node.getRawPointer();
         node->attributes.push_back(attribute);
         auto backup = current;
         skipInvisible(filename, source, current);
@@ -4393,6 +4577,7 @@ JSParser::readExportSpecifier(uint32_t filename, const std::wstring &source,
   if (identifier != nullptr) {
     common::AutoPtr node = new ExportSpecifier;
     node->identifier = identifier;
+    identifier->parent = (Node *)node.getRawPointer();
     auto backup = current;
     skipInvisible(filename, source, current);
     auto token = readIdentifierToken(filename, source, current);
@@ -4407,6 +4592,7 @@ JSParser::readExportSpecifier(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->alias = alias;
+      alias->parent = (Node *)node.getRawPointer();
     } else {
       current = backup;
     }
@@ -4430,6 +4616,7 @@ common::AutoPtr<JSParser::Node> JSParser::readExportDefaultSpecifier(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    node->value->parent = (Node *)node.getRawPointer();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4455,6 +4642,7 @@ JSParser::readExportAllSpecifier(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      node->alias->parent = (Node *)node.getRawPointer();
     } else {
       current = backup;
     }
@@ -4498,10 +4686,12 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
       specifier = readVariableDeclaration(filename, source, current);
     }
     if (specifier != nullptr) {
+      specifier->parent = (Node *)node.getRawPointer();
       node->items.push_back(specifier);
     } else {
       specifier = readExportAllSpecifier(filename, source, current);
       if (specifier != nullptr) {
+        specifier->parent = (Node *)node.getRawPointer();
         node->items.push_back(specifier);
       } else {
         skipInvisible(filename, source, current);
@@ -4527,9 +4717,11 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
                                   current),
                   {filename, current.line, current.column});
             }
+            specifier->parent = (Node *)node.getRawPointer();
             node->items.push_back(specifier);
           } else if (token->location.isEqual(source, L"}")) {
             if (specifier != nullptr) {
+              specifier->parent = (Node *)node.getRawPointer();
               node->items.push_back(specifier);
             }
             break;
@@ -4551,6 +4743,7 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
+        src->parent = (Node *)node.getRawPointer();
         node->source = src;
         auto backup = current;
         skipInvisible(filename, source, current);
@@ -4569,6 +4762,7 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
           }
           auto attribute = readImportAttriabue(filename, source, current);
           while (attribute != nullptr) {
+            attribute->parent = (Node *)node.getRawPointer();
             node->attributes.push_back(attribute);
             auto backup = current;
             skipInvisible(filename, source, current);
