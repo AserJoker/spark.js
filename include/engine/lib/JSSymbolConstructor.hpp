@@ -15,6 +15,7 @@ private:
   };
 
 private:
+  static JS_FUNC(toPrimitive);
   static JS_FUNC(toString);
   static JS_FUNC(valueOf);
   static JS_FUNC(_for);

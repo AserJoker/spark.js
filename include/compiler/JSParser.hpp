@@ -1087,6 +1087,6 @@ private:
                                               Position &position);
 
 public:
-  common::AutoPtr<Node> parse(uint32_t filename, const std::string &source);
+  common::AutoPtr<Node> parse(uint32_t filename, const std::wstring &source);
 };
 }; // namespace spark::compiler

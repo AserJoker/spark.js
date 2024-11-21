@@ -27,10 +27,10 @@ static std::array KEYWORLDS = {
     L"yield"};
 
 common::AutoPtr<JSParser::Node> JSParser::parse(uint32_t filename,
-                                                const std::string &source) {
+                                                const std::wstring &source) {
   Position position = {0, 0, 0};
   static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-  return readProgram(filename, converter.from_bytes(source), position);
+  return readProgram(filename, source, position);
 }
 
 std::wstring JSParser::formatException(const std::wstring &message,

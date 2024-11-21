@@ -29,10 +29,6 @@ public:
   };
 
 private:
-  static JS_FUNC(JSObjectConstructor);
-
-  static JS_FUNC(JSFunctionConstructor);
-
   static JS_FUNC(JSArrayConstructor);
 
   static JS_FUNC(JSErrorConstructor);
@@ -60,6 +56,7 @@ private:
   common::AutoPtr<JSValue> _String;
   common::AutoPtr<JSValue> _Boolean;
   common::AutoPtr<JSValue> _BigInt;
+  common::AutoPtr<JSValue> _RegExp;
 
   common::AutoPtr<JSValue> _true;
   common::AutoPtr<JSValue> _false;
@@ -67,6 +64,7 @@ private:
   // internal
   std::unordered_map<std::wstring, JSEntity *> _symbols;
   common::AutoPtr<JSValue> _symbolValue;
+  common::AutoPtr<JSValue> _symbolPack;
 
 private:
   void initialize();
@@ -83,6 +81,9 @@ public:
   ~JSContext() override;
 
   common::AutoPtr<JSRuntime> &getRuntime();
+
+  common::AutoPtr<JSValue> eval(const std::wstring &source,
+                                const std::wstring &filename);
 
   JSScope *pushScope();
 
@@ -129,6 +130,8 @@ public:
   common::AutoPtr<JSValue> createObject(common::AutoPtr<JSValue> prototype,
                                         const std::wstring &name = L"");
 
+  common::AutoPtr<JSValue> createObject(const std::wstring &name = L"");
+
   common::AutoPtr<JSValue>
   createFunction(const std::function<JSFunction> &value,
                  const std::wstring &funcname = L"",
@@ -153,8 +156,11 @@ public:
   common::AutoPtr<JSValue> Symbol();
 
   common::AutoPtr<JSValue> truly();
+
   common::AutoPtr<JSValue> falsely();
 
   common::AutoPtr<JSValue> symbolValue();
+
+  common::AutoPtr<JSValue> symbolPack();
 };
 } // namespace spark::engine

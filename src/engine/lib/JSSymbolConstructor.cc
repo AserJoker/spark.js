@@ -21,10 +21,7 @@ JS_FUNC(JSSymbolConstructor::toString) {
     throw error::JSTypeError(
         L"Symbol.prototype.description requires that 'this' be a Symbol");
   }
-  auto symbol = self;
-  if (self->getType() == JSValueType::JS_OBJECT) {
-    symbol = self->toPrimitive(ctx);
-  }
+  auto symbol = self->toPrimitive(ctx);
   if (symbol->getType() != JSValueType::JS_SYMBOL) {
     throw error::JSTypeError(
         L"Symbol.prototype.description requires that 'this' be a Symbol");
@@ -38,10 +35,8 @@ JS_FUNC(JSSymbolConstructor::valueOf) {
     throw error::JSTypeError(
         L"Symbol.prototype.description requires that 'this' be a Symbol");
   }
-  auto symbol = self;
-  if (self->getType() == JSValueType::JS_OBJECT) {
-    symbol = self->getProperty(ctx, ctx->symbolValue());
-  }
+  auto symbol = self->getProperty(ctx, ctx->symbolValue());
+
   if (symbol->getType() != JSValueType::JS_SYMBOL) {
     throw error::JSTypeError(
         L"Symbol.prototype.description requires that 'this' be a Symbol");
@@ -88,16 +83,26 @@ JS_FUNC(JSSymbolConstructor::description) {
     throw error::JSTypeError(
         L"Symbol.prototype.description requires that 'this' be a Symbol");
   }
-  auto symbol = self;
-  if (symbol->getType() == JSValueType::JS_OBJECT) {
-    symbol = self->toPrimitive(ctx);
-  }
+  auto symbol = self->toPrimitive(ctx);
   if (symbol->getType() != JSValueType::JS_SYMBOL) {
     throw error::JSTypeError(
         L"Symbol.prototype.description requires that 'this' be a Symbol");
   }
   return ctx->createString(
       symbol->getEntity<JSSymbolEntity>()->getDescription());
+}
+
+JS_FUNC(JSSymbolConstructor::toPrimitive) {
+  if (self == nullptr) {
+    throw error::JSTypeError(
+        L"Symbol.prototype [ @@toPrimitive ] requires that 'this' be a Symbol");
+  }
+  auto symbol = self->getProperty(ctx, ctx->symbolValue());
+  if (symbol->getType() != JSValueType::JS_SYMBOL) {
+    throw error::JSTypeError(
+        L"Symbol.prototype [ @@toPrimitive ] requires that 'this' be a Symbol");
+  }
+  return symbol;
 }
 
 void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
@@ -126,14 +131,18 @@ void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
 
   Symbol->setProperty(ctx, L"split", ctx->createSymbol(L"Symbol.split"));
 
-  Symbol->setProperty(ctx, L"toPrimitive",
-                      ctx->createSymbol(L"Symbol.toPrimitive"));
+  auto toPrimitive = ctx->createSymbol(L"Symbol.toPrimitive");
 
-  Symbol->setProperty(ctx, L"toStringTag",
-                      ctx->createSymbol(L"Symbol.toStringTag"));
+  Symbol->setProperty(ctx, L"toPrimitive", toPrimitive);
+
+  auto toStringTag = ctx->createSymbol(L"Symbol.toStringTag");
+
+  Symbol->setProperty(ctx, L"toStringTag", toStringTag);
 
   Symbol->setProperty(ctx, L"unscopables",
                       ctx->createSymbol(L"Symbol.unscopables"));
+
+  proto->setProperty(ctx, L"constructor", Symbol);
 
   proto->setProperty(
       ctx, L"toString",
@@ -160,6 +169,11 @@ void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
           .get = ctx->createFunction(&JSSymbolConstructor::description)
                      ->getEntity(),
           .set = nullptr});
+
+  proto->setProperty(ctx, toPrimitive,
+                     ctx->createFunction(&JSSymbolConstructor::toPrimitive,
+                                         L"[Symbol.toPrimitive]"));
+  proto->setProperty(ctx, toStringTag, ctx->createString(L"Symbol"));
 
   Symbol->setOpaque<common::AutoPtr<JSSymbolOpaque>>(new JSSymbolOpaque);
 }

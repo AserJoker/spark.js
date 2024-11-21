@@ -179,6 +179,14 @@ common::AutoPtr<JSValue> JSValue::toPrimitive(common::AutoPtr<JSContext> ctx,
   if (getType() < JSValueType::JS_OBJECT) {
     return this;
   }
+  auto toPrimitive =
+      getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"toPrimitive"));
+  if (toPrimitive->getType() == JSValueType::JS_FUNCTION) {
+    auto res = toPrimitive->apply(ctx, this, {ctx->createString(L"default")});
+    if (res->getType() < JSValueType::JS_OBJECT) {
+      return res;
+    }
+  }
   auto getter = getProperty(ctx, L"valueOf");
   if (getter->getType() == JSValueType::JS_FUNCTION) {
     auto res = getter->apply(ctx, this);
@@ -214,6 +222,7 @@ common::AutoPtr<JSValue> JSValue::pack(common::AutoPtr<JSContext> ctx) {
   case JSValueType::JS_SYMBOL: {
     auto val = ctx->createObject(ctx->Symbol()->getProperty(ctx, L"prototype"));
     val->setProperty(ctx, ctx->symbolValue(), this);
+    val->setProperty(ctx, ctx->symbolPack(), ctx->Symbol());
     return val;
   } break;
   default:
@@ -435,6 +444,7 @@ std::wstring JSValue::getTypeName() {
   case JSValueType::JS_OBJECT:
   case JSValueType::JS_NULL:
   case JSValueType::JS_ARRAY:
+  case JSValueType::JS_REGEXP:
     return L"object";
   case JSValueType::JS_NAN:
   case JSValueType::JS_INFINITY:
