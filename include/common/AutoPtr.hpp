@@ -35,7 +35,11 @@ public:
       _object->addRef();
     }
   }
+  
   const T *getRawPointer() const { return _object; }
+
+  T *getRawPointer() { return _object; }
+
   template <class K> AutoPtr(const AutoPtr<K> &another) : _object(nullptr) {
     if (another != nullptr) {
       _object = const_cast<K *>(another.getRawPointer());

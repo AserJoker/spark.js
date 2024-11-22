@@ -20,6 +20,7 @@
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSValue.hpp"
+#include <fstream>
 #include <string>
 
 using namespace spark;
@@ -146,7 +147,8 @@ common::AutoPtr<JSValue> JSContext::eval(const std::wstring &source,
   auto parser = _runtime->getParser();
   auto index = _runtime->setSourceFilename(filename);
   auto ast = parser->parse(index, source);
-  
+  std::wofstream out("1.json");
+  out << parser->toJSON(filename, source, ast);
   return _undefined;
 }
 

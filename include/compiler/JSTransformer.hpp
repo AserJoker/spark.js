@@ -10,12 +10,13 @@ class JSTransormer : public common::Object {
 public:
   using Visitor =
       std::unordered_map<JSParser::NodeType,
-                         std::function<common::AutoPtr<JSParser::Node>(
-                             common::AutoPtr<JSParser::Node>)>>;
+                         std::function<void(common::AutoPtr<JSParser::Node>)>>;
 
 private:
   std::vector<Visitor> _visitors;
 
 public:
+  void setVisitor(const Visitor &visitor);
+  void transform(common::AutoPtr<JSParser::Node> node);
 };
 } // namespace spark::compiler

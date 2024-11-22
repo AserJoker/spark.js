@@ -26,11 +26,299 @@ static std::array KEYWORLDS = {
     L"private",    L"protected",  L"public",    L"static", L"await",
     L"yield"};
 
+void JSParser::bindDeclaration(common::AutoPtr<IdentifierLiteral> identifier) {
+  auto name = identifier->value;
+  Declaration *declar = nullptr;
+  auto scope = _currentScope;
+  while (!declar && scope) {
+    for (auto &dec : scope->declarations) {
+      if (dec.name == name) {
+        declar = &dec;
+        break;
+      }
+    }
+    if (declar != nullptr) {
+      break;
+    }
+    scope = scope->parent;
+  }
+  Binding *binding = nullptr;
+  for (auto &b : _currentScope->bindings) {
+    if (b.declaration == declar) {
+      binding = &b;
+      break;
+    }
+  }
+  if (!binding) {
+    _currentScope->bindings.push_back({});
+    binding = &*_currentScope->bindings.rbegin();
+    binding->declaration = declar;
+  }
+  binding->references.push_back(identifier.getRawPointer());
+}
+void JSParser::bindScope(common::AutoPtr<Node> node) {
+  auto scope = _currentScope;
+  if (node->scope != nullptr) {
+    _currentScope = node->scope.getRawPointer();
+  }
+  switch (node->type) {
+  case NodeType::LITERAL_IDENTITY:
+    bindDeclaration(node.cast<IdentifierLiteral>());
+    break;
+  case NodeType::DECLARATION_ARROW_FUNCTION: {
+    auto afunc = node.cast<ArrowFunctionDeclaration>();
+    for (auto &arg : afunc->arguments) {
+      bindScope(arg);
+    }
+    bindScope(afunc->body);
+  } break;
+  case NodeType::DECLARATION_FUNCTION: {
+    auto afunc = node.cast<FunctionDeclaration>();
+    for (auto &arg : afunc->arguments) {
+      bindScope(arg);
+    }
+    bindScope(afunc->body);
+  } break;
+
+  case NodeType::STATEMENT_FOR_IN: {
+    auto forin = node.cast<ForInStatement>();
+    bindScope(forin->expression);
+    bindScope(forin->body);
+    if (forin->declaration->type != NodeType::LITERAL_IDENTITY ||
+        forin->kind == DeclarationKind::UNKNOWN) {
+      bindScope(forin->declaration);
+    }
+  } break;
+  case NodeType::STATEMENT_FOR_OF: {
+    auto forof = node.cast<ForOfStatement>();
+    bindScope(forof->expression);
+    bindScope(forof->body);
+    if (forof->declaration->type != NodeType::LITERAL_IDENTITY ||
+        forof->kind == DeclarationKind::UNKNOWN) {
+      bindScope(forof->declaration);
+    }
+  } break;
+  case NodeType::STATEMENT_FOR_AWAIT_OF: {
+    auto forof = node.cast<ForAwaitOfStatement>();
+    bindScope(forof->expression);
+    bindScope(forof->body);
+    if (forof->declaration->type != NodeType::LITERAL_IDENTITY ||
+        forof->kind == DeclarationKind::UNKNOWN) {
+      bindScope(forof->declaration);
+    }
+  } break;
+  case NodeType::OBJECT_PROPERTY: {
+    auto prop = node.cast<ObjectProperty>();
+    if (prop->implement != nullptr) {
+      bindScope(prop->implement);
+    }
+    if (prop->identifier->type != NodeType::LITERAL_IDENTITY ||
+        !prop->implement) {
+      bindScope(prop->identifier);
+    }
+  } break;
+  case NodeType::OBJECT_METHOD: {
+    auto prop = node.cast<ObjectMethod>();
+    for (auto &arg : prop->arguments) {
+      bindScope(arg);
+    }
+    bindScope(prop->body);
+    if (prop->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(prop->identifier);
+    }
+  } break;
+  case NodeType::OBJECT_ACCESSOR: {
+    auto prop = node.cast<ObjectMethod>();
+    for (auto &arg : prop->arguments) {
+      bindScope(arg);
+    }
+    bindScope(prop->body);
+    if (prop->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(prop->identifier);
+    }
+  } break;
+  case NodeType::EXPRESSION_MEMBER: {
+    auto member = node.cast<MemberExpression>();
+    bindScope(member->left);
+  } break;
+  case NodeType::EXPRESSION_OPTIONAL_MEMBER: {
+    auto member = node.cast<OptionalMemberExpression>();
+    bindScope(member->left);
+  } break;
+  case NodeType::PATTERN_OBJECT_ITEM: {
+    auto objitem = node.cast<ObjectPatternItem>();
+    if (objitem->value != nullptr) {
+      bindScope(objitem->value);
+    }
+    if (objitem->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(objitem->identifier);
+    }
+  } break;
+  case NodeType::PATTERN_ARRAY_ITEM: {
+    auto arritem = node.cast<ArrayPatternItem>();
+    if (arritem->value != nullptr) {
+      bindScope(arritem->value);
+    }
+  } break;
+  case NodeType::CLASS_METHOD: {
+    auto method = node.cast<ClassMethod>();
+    for (auto &deco : method->decorators) {
+      bindScope(deco);
+    }
+    if (method->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(method->identifier);
+    }
+    for (auto &arg : method->arguments) {
+      bindScope(arg);
+    }
+    bindScope(method->body);
+  } break;
+  case NodeType::CLASS_PROPERTY: {
+    auto prop = node.cast<ClassProperty>();
+    for (auto &deco : prop->decorators) {
+      bindScope(deco);
+    }
+    if (prop->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(prop->identifier);
+    }
+    if (prop->value != nullptr) {
+      bindScope(prop->value);
+    }
+  } break;
+  case NodeType::CLASS_ACCESSOR: {
+    auto method = node.cast<ClassAccessor>();
+    for (auto &deco : method->decorators) {
+      bindScope(deco);
+    }
+    if (method->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(method->identifier);
+    }
+    for (auto &arg : method->arguments) {
+      bindScope(arg);
+    }
+    bindScope(method->body);
+  } break;
+  case NodeType::DECLARATION_PARAMETER: {
+    auto param = node.cast<Parameter>();
+    if (param->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(param);
+    }
+    if (param->value != nullptr) {
+      bindScope(param->value);
+    }
+  } break;
+  case NodeType::DECLARATION_CLASS: {
+    auto clazz = node.cast<ClassDeclaration>();
+    if (clazz->extends != nullptr) {
+      bindScope(clazz->extends);
+    }
+    for (auto &dec : clazz->decorators) {
+      bindScope(dec);
+    }
+    for (auto &prop : clazz->properties) {
+      bindScope(prop);
+    }
+  } break;
+  case NodeType::PATTERN_REST_ITEM: {
+    auto rest = node.cast<RestPatternItem>();
+    if (rest->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(rest->identifier);
+    }
+  } break;
+  case NodeType::EXPORT_SPECIFIER: {
+    auto specifier = node.cast<ExportSpecifier>();
+    bindScope(specifier->identifier);
+  } break;
+  case NodeType::VARIABLE_DECLARATOR: {
+    auto dec = node.cast<VariableDeclarator>();
+    if (dec->value != nullptr) {
+      bindScope(dec->value);
+    }
+    if (dec->identifier->type != NodeType::LITERAL_IDENTITY) {
+      bindScope(dec->identifier);
+    }
+  } break;
+  case NodeType::EXPORT_DEFAULT:
+  case NodeType::EXPORT_DECLARATION:
+  case NodeType::EXPRESSION_REST:
+  case NodeType::EXPRESSION_CALL:
+  case NodeType::EXPRESSION_OPTIONAL_CALL:
+  case NodeType::EXPRESSION_NEW:
+  case NodeType::EXPRESSION_DELETE:
+  case NodeType::EXPRESSION_AWAIT:
+  case NodeType::EXPRESSION_VOID:
+  case NodeType::EXPRESSION_TYPEOF:
+  case NodeType::EXPRESSION_GROUP:
+  case NodeType::EXPRESSION_ASSIGMENT:
+  case NodeType::PATTERN_OBJECT:
+  case NodeType::PATTERN_ARRAY:
+  case NodeType::STATIC_BLOCK:
+  case NodeType::DECLARATION_OBJECT:
+  case NodeType::DECLARATION_ARRAY:
+  case NodeType::PROGRAM:
+  case NodeType::STATEMENT_EMPTY:
+  case NodeType::STATEMENT_BLOCK:
+  case NodeType::STATEMENT_DEBUGGER:
+  case NodeType::STATEMENT_RETURN:
+  case NodeType::STATEMENT_YIELD:
+  case NodeType::STATEMENT_LABEL:
+  case NodeType::STATEMENT_BREAK:
+  case NodeType::STATEMENT_CONTINUE:
+  case NodeType::STATEMENT_IF:
+  case NodeType::STATEMENT_SWITCH:
+  case NodeType::STATEMENT_SWITCH_CASE:
+  case NodeType::STATEMENT_THROW:
+  case NodeType::STATEMENT_TRY:
+  case NodeType::STATEMENT_TRY_CATCH:
+  case NodeType::STATEMENT_WHILE:
+  case NodeType::STATEMENT_DO_WHILE:
+  case NodeType::STATEMENT_FOR:
+  case NodeType::VARIABLE_DECLARATION:
+  case NodeType::DECORATOR:
+  case NodeType::EXPRESSION_UNARY:
+  case NodeType::EXPRESSION_UPDATE:
+  case NodeType::EXPRESSION_BINARY:
+  case NodeType::EXPRESSION_COMPUTED_MEMBER:
+  case NodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER:
+  case NodeType::EXPRESSION_CONDITION: {
+    for (auto &child : node->children) {
+      bindScope(child);
+    }
+  } break;
+  case NodeType::THIS:
+  case NodeType::SUPER:
+  case NodeType::DIRECTIVE:
+  case NodeType::INTERPRETER_DIRECTIVE:
+  case NodeType::IMPORT_DECLARATION:
+  case NodeType::IMPORT_SPECIFIER:
+  case NodeType::IMPORT_DEFAULT:
+  case NodeType::IMPORT_NAMESPACE:
+  case NodeType::IMPORT_ATTARTUBE:
+  case NodeType::EXPORT_ALL:
+  case NodeType::PRIVATE_NAME:
+  case NodeType::LITERAL_REGEX:
+  case NodeType::LITERAL_NULL:
+  case NodeType::LITERAL_STRING:
+  case NodeType::LITERAL_BOOLEAN:
+  case NodeType::LITERAL_NUMBER:
+  case NodeType::LITERAL_COMMENT:
+  case NodeType::LITERAL_MULTILINE_COMMENT:
+  case NodeType::LITERAL_UNDEFINED:
+  case NodeType::LITERAL_TEMPLATE:
+  case NodeType::LITERAL_BIGINT:
+    return;
+  }
+  _currentScope = scope;
+}
+
 common::AutoPtr<JSParser::Node> JSParser::parse(uint32_t filename,
                                                 const std::wstring &source) {
   Position position = {0, 0, 0};
-  static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-  return readProgram(filename, source, position);
+  auto root = readProgram(filename, source, position);
+  if (root != nullptr) {
+    bindScope(root);
+  }
+  return root;
 }
 
 std::wstring JSParser::formatException(const std::wstring &message,
@@ -68,6 +356,53 @@ JSParser::Location JSParser::getLocation(const std::wstring &source,
   loc.end.offset--;
   loc.end.column--;
   return loc;
+}
+
+void JSParser::declareVariable(common::AutoPtr<Node> declarator,
+                               common::AutoPtr<Node> identifier,
+                               Declaration::TYPE type, bool isConst) {
+  if (identifier->type == NodeType::PATTERN_OBJECT) {
+    auto obj = identifier.cast<ObjectPattern>();
+    for (auto &item : obj->items) {
+      if (item->type == NodeType::PATTERN_OBJECT_ITEM) {
+        auto objitem = item.cast<ObjectPatternItem>();
+        if (!objitem->match) {
+          return declareVariable(declarator, objitem->identifier, type,
+                                 isConst);
+        } else {
+          return declareVariable(declarator, objitem->match, type, isConst);
+        }
+      } else if (item->type == NodeType::PATTERN_REST_ITEM) {
+        return declareVariable(declarator,
+                               item.cast<RestPatternItem>()->identifier, type,
+                               isConst);
+      }
+    }
+  }
+  if (identifier->type == NodeType::PATTERN_ARRAY) {
+    auto arr = identifier.cast<ArrayPattern>();
+    for (auto &item : arr->items) {
+      if (item->type == NodeType::PATTERN_ARRAY_ITEM) {
+        auto arritem = item.cast<ArrayPatternItem>();
+        return declareVariable(declarator, arritem->identifier, type, isConst);
+      } else if (item->type == NodeType::PATTERN_REST_ITEM) {
+        return declareVariable(declarator,
+                               item.cast<RestPatternItem>()->identifier, type,
+                               isConst);
+      }
+    }
+  }
+  Declaration declar;
+  declar.isConst = isConst;
+  declar.type = type;
+  declar.scope = _currentScope;
+  declar.node = declarator.getRawPointer();
+  if (identifier->type == NodeType::LITERAL_STRING) {
+    declar.name = identifier.cast<StringLiteral>()->value;
+  } else if (identifier->type == NodeType::LITERAL_IDENTITY) {
+    declar.name = identifier.cast<IdentifierLiteral>()->value;
+  }
+  _currentScope->declarations.push_back(declar);
 }
 
 bool JSParser::skipWhiteSpace(uint32_t filename, const std::wstring &source,
@@ -870,13 +1205,16 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
   common::AutoPtr program = new JSParser::Program();
   program->type = NodeType::PROGRAM;
   program->interpreter = interpreter;
+  program->scope = new Scope();
+  program->scope->node = program.getRawPointer();
+  _currentScope = program->scope.getRawPointer();
   if (interpreter != nullptr) {
-    interpreter->parent = (Node *)program.getRawPointer();
+    interpreter->addParent(program);
   }
   skipInvisible(filename, source, current);
   auto directive = readDirective(filename, source, current);
   while (directive != nullptr) {
-    directive->parent = (Node *)program.getRawPointer();
+    directive->addParent(program);
     program->directives.push_back(directive);
     skipInvisible(filename, source, current);
     directive = readDirective(filename, source, current);
@@ -887,7 +1225,7 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
     if (!statement) {
       break;
     }
-    statement->parent = (Node *)program.getRawPointer();
+    statement->addParent(program);
     program->body.push_back(statement);
     skipNewLine(filename, source, current);
   }
@@ -897,6 +1235,7 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
         formatException(L"Unexcepted token", filename, source, current),
         {filename, current.line, current.column});
   }
+  _currentScope = nullptr;
   program->location = getLocation(source, position, current);
   position = current;
   return program;
@@ -1041,7 +1380,7 @@ JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->condition->parent = (Node *)node.getRawPointer();
+    node->condition->addParent(node);
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L")")) {
@@ -1055,7 +1394,7 @@ JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->body->parent = (Node *)node.getRawPointer();
+    node->body->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1078,7 +1417,7 @@ JSParser::readDoWhileStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->body->parent = (Node *)node.getRawPointer();
+    node->body->addParent(node);
     skipInvisible(filename, source, current);
     token = readKeywordToken(filename, source, current);
     if (token == nullptr || !token->location.isEqual(source, L"while")) {
@@ -1099,7 +1438,7 @@ JSParser::readDoWhileStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->condition->parent = (Node *)node.getRawPointer();
+    node->condition->addParent(node);
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L")")) {
@@ -1122,6 +1461,12 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"for")) {
     common::AutoPtr node = new ForStatement;
+
+    auto parentScope = _currentScope;
+    node->scope = new Scope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
+
     node->type = NodeType::STATEMENT_FOR;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -1142,7 +1487,7 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     if (node->init != nullptr) {
-      node->init->parent = (Node *)node.getRawPointer();
+      node->init->addParent(node);
     }
     node->condition = readExpressions(filename, source, current);
     skipInvisible(filename, source, current);
@@ -1153,7 +1498,7 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     if (node->condition != nullptr) {
-      node->condition->parent = (Node *)node.getRawPointer();
+      node->condition->addParent(node);
     }
     node->update = readExpressions(filename, source, current);
     skipInvisible(filename, source, current);
@@ -1164,7 +1509,7 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     if (node->update != nullptr) {
-      node->update->parent = (Node *)node.getRawPointer();
+      node->update->addParent(node);
     }
     node->body = readStatement(filename, source, current);
     if (!node->body) {
@@ -1173,8 +1518,9 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     if (node->body != nullptr) {
-      node->body->parent = (Node *)node.getRawPointer();
+      node->body->addParent(node);
     }
+    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1201,13 +1547,17 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
     auto backup = current;
     skipInvisible(filename, source, current);
     token = readKeywordToken(filename, source, current);
+    Declaration::TYPE type = Declaration::TYPE::UNINITIALIZED;
+    bool isConst = false;
     if (token != nullptr) {
       if (token->location.isEqual(source, L"const")) {
         node->kind = DeclarationKind::CONST;
+        isConst = true;
       } else if (token->location.isEqual(source, L"let")) {
         node->kind = DeclarationKind::LET;
       } else if (token->location.isEqual(source, L"var")) {
         node->kind = DeclarationKind::VAR;
+        type = Declaration::TYPE::UNDEFINED;
       } else {
         node->kind = DeclarationKind::UNKNOWN;
         current = backup;
@@ -1221,17 +1571,27 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
       node->declaration = readArrayDeclaration(filename, source, current);
     }
     if (node->declaration != nullptr) {
-      node->declaration->parent = (Node *)node.getRawPointer();
+      node->declaration->addParent(node);
       skipInvisible(filename, source, current);
       token = readKeywordToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"in")) {
+
+        auto parentScope = _currentScope;
+        node->scope = new Scope(parentScope);
+        node->scope->node = node.getRawPointer();
+        _currentScope = node->scope.getRawPointer();
+
+        if (node->kind != DeclarationKind::UNKNOWN) {
+          declareVariable(node, node->declaration, type, isConst);
+        }
+
         node->expression = readExpressions(filename, source, current);
         if (!node->expression) {
           throw error::JSSyntaxError(
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        node->expression->parent = (Node *)node.getRawPointer();
+        node->expression->addParent(node);
         skipInvisible(filename, source, current);
         token = readSymbolToken(filename, source, current);
         if (!token || !token->location.isEqual(source, L")")) {
@@ -1245,7 +1605,9 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        node->body->parent = (Node *)node.getRawPointer();
+        node->body->addParent(node);
+        _currentScope = parentScope;
+
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -1284,13 +1646,17 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
     backup = current;
     skipInvisible(filename, source, current);
     token = readKeywordToken(filename, source, current);
+    Declaration::TYPE type = Declaration::TYPE::UNINITIALIZED;
+    bool isConst = false;
     if (token != nullptr) {
       if (token->location.isEqual(source, L"const")) {
         node->kind = DeclarationKind::CONST;
+        isConst = true;
       } else if (token->location.isEqual(source, L"let")) {
         node->kind = DeclarationKind::LET;
       } else if (token->location.isEqual(source, L"var")) {
         node->kind = DeclarationKind::VAR;
+        type = Declaration::TYPE::UNDEFINED;
       } else {
         node->kind = DeclarationKind::UNKNOWN;
         current = backup;
@@ -1304,17 +1670,25 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
       node->declaration = readArrayDeclaration(filename, source, current);
     }
     if (node->declaration != nullptr) {
-      node->declaration->parent = (Node *)node.getRawPointer();
+      node->declaration->addParent(node);
       skipInvisible(filename, source, current);
       token = readIdentifierToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"of")) {
+
+        auto parentScope = _currentScope;
+        node->scope = new Scope(parentScope);
+        node->scope->node = node.getRawPointer();
+        _currentScope = node->scope.getRawPointer();
+        if (node->kind != DeclarationKind::UNKNOWN) {
+          declareVariable(node, node->declaration, type, isConst);
+        }
         node->expression = readExpressions(filename, source, current);
         if (!node->expression) {
           throw error::JSSyntaxError(
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        node->expression->parent = (Node *)node.getRawPointer();
+        node->expression->addParent(node);
         skipInvisible(filename, source, current);
         token = readSymbolToken(filename, source, current);
         if (!token || !token->location.isEqual(source, L")")) {
@@ -1328,7 +1702,8 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        node->body->parent = (Node *)node.getRawPointer();
+        node->body->addParent(node);
+        _currentScope = parentScope;
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -1368,7 +1743,7 @@ JSParser::readYieldStatement(uint32_t filename, const std::wstring &source,
       node->value = readExpressions(filename, source, current);
     }
     if (node->value != nullptr) {
-      node->value->parent = (Node *)node.getRawPointer();
+      node->value->addParent(node);
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1391,7 +1766,7 @@ JSParser::readReturnStatement(uint32_t filename, const std::wstring &source,
       node->value = readExpressions(filename, source, current);
     }
     if (node->value != nullptr) {
-      node->value->parent = (Node *)node.getRawPointer();
+      node->value->addParent(node);
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1414,7 +1789,7 @@ JSParser::readThrowStatement(uint32_t filename, const std::wstring &source,
       node->value = readExpressions(filename, source, current);
     }
     if (node->value != nullptr) {
-      node->value->parent = (Node *)node.getRawPointer();
+      node->value->addParent(node);
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1437,7 +1812,7 @@ JSParser::readBreakStatement(uint32_t filename, const std::wstring &source,
       node->label = readIdentifierLiteral(filename, source, current);
     }
     if (node->label != nullptr) {
-      node->label->parent = (Node *)node.getRawPointer();
+      node->label->addParent(node);
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1460,7 +1835,7 @@ JSParser::readContinueStatement(uint32_t filename, const std::wstring &source,
       node->label = readIdentifierLiteral(filename, source, current);
     }
     if (node->label != nullptr) {
-      node->label->parent = (Node *)node.getRawPointer();
+      node->label->addParent(node);
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1481,14 +1856,14 @@ JSParser::readLabelStatement(uint32_t filename, const std::wstring &source,
       common::AutoPtr node = new LabelStatement;
       node->type = NodeType::STATEMENT_LABEL;
       node->label = label;
-      label->parent = (Node *)node.getRawPointer();
+      label->addParent(node);
       node->statement = readStatement(filename, source, current);
       if (!node->statement) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->statement->parent = (Node *)node.getRawPointer();
+      node->statement->addParent(node);
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -1518,7 +1893,7 @@ JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->condition->parent = (Node *)node.getRawPointer();
+    node->condition->addParent(node);
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L")")) {
@@ -1527,7 +1902,7 @@ JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->alternate = readStatement(filename, source, current);
-    node->alternate->parent = (Node *)node.getRawPointer();
+    node->alternate->addParent(node);
     if (!node->alternate) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
@@ -1543,7 +1918,7 @@ JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->consequent->parent = (Node *)node.getRawPointer();
+      node->consequent->addParent(node);
     } else {
       current = backup;
     }
@@ -1575,7 +1950,7 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->expression->parent = (Node *)node.getRawPointer();
+    node->expression->addParent(node);
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L")")) {
@@ -1590,9 +1965,14 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    auto parentScope = _currentScope;
+    node->scope = new Scope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
+
     auto case_ = readSwitchCaseStatement(filename, source, current);
     while (case_ != nullptr) {
-      case_->parent = (Node *)node.getRawPointer();
+      case_->addParent(node);
       node->cases.push_back(case_);
       case_ = readSwitchCaseStatement(filename, source, current);
     }
@@ -1603,6 +1983,8 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    _currentScope = parentScope;
+
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1626,7 +2008,7 @@ JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->match->parent = (Node *)node.getRawPointer();
+      node->match->addParent(node);
     } else if (!token->location.isEqual(source, L"default")) {
       return nullptr;
     }
@@ -1646,7 +2028,7 @@ JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
       skipNewLine(filename, source, current);
       auto statement = readStatement(filename, source, current);
       while (statement != nullptr) {
-        statement->parent = (Node *)node.getRawPointer();
+        statement->addParent(node);
         node->statements.push_back(statement);
         skipNewLine(filename, source, current);
         backup = current;
@@ -1687,7 +2069,7 @@ JSParser::readTryStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->try_->parent = (Node *)node.getRawPointer();
+    node->try_->addParent(node);
     node->catch_ = readTryCatchStatement(filename, source, current);
     auto backup = current;
     skipInvisible(filename, source, current);
@@ -1708,10 +2090,10 @@ JSParser::readTryStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     if (node->catch_ != nullptr) {
-      node->catch_->parent = (Node *)node.getRawPointer();
+      node->catch_->addParent(node);
     }
     if (node->finally != nullptr) {
-      node->finally->parent = (Node *)node.getRawPointer();
+      node->finally->addParent(node);
     }
     node->location = getLocation(source, position, current);
     position = current;
@@ -1728,6 +2110,12 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"catch")) {
     common::AutoPtr node = new TryCatchStatement;
+
+    auto parentScope = _currentScope;
+    node->scope = new Scope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
+
     auto backup = current;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -1750,7 +2138,7 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->binding->parent = (Node *)node.getRawPointer();
+      node->binding->addParent(node);
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
       if (!token || !token->location.isEqual(source, L")")) {
@@ -1758,6 +2146,8 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
+      declareVariable(node, node->binding, Declaration::TYPE::UNINITIALIZED,
+                      false);
     } else {
       current = backup;
     }
@@ -1767,7 +2157,8 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->statement->parent = (Node *)node.getRawPointer();
+    node->statement->addParent(node);
+    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1837,7 +2228,7 @@ common::AutoPtr<JSParser::Node> JSParser::readValue(uint32_t filename,
       }
       if (expr != nullptr) {
         expr.cast<BinaryExpression>()->left = node;
-        node->parent = (Node *)expr.getRawPointer();
+        node->addParent(expr);
         node = expr;
         node->location = getLocation(source, position, current);
       } else {
@@ -1904,7 +2295,7 @@ common::AutoPtr<JSParser::Node> JSParser::readRValue(uint32_t filename,
       }
       if (expr != nullptr) {
         expr.cast<BinaryExpression>()->left = node;
-        node->parent = (Node *)expr.getRawPointer();
+        node->addParent(expr);
         node = expr;
         node->location = getLocation(source, position, current);
       } else {
@@ -1933,7 +2324,7 @@ JSParser::readDecorator(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->expression->parent = (Node *)node.getRawPointer();
+    node->expression->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1971,8 +2362,8 @@ JSParser::readExpressions(uint32_t filename, const std::wstring &source,
     node->level = 18;
     node->left = expr;
     node->right = right;
-    expr->parent = (Node *)node.getRawPointer();
-    right->parent = (Node *)node.getRawPointer();
+    expr->addParent(node);
+    right->addParent(node);
     node->location = getLocation(source, position, current);
     expr = node;
     next = current;
@@ -1990,16 +2381,14 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"{")) {
     common::AutoPtr node = new BlockStatement;
-    // skipNewLine(filename, source, current);
-    // auto directive = readDirective(filename, source, current);
-    // while (directive != nullptr) {
-    //   node->directives.push_back(directive);
-    //   directive = readDirective(filename, source, current);
-    // }
+    auto parentScope = _currentScope;
+    node->scope = new Scope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
     skipNewLine(filename, source, current);
     auto statement = readStatement(filename, source, current);
     while (statement != nullptr) {
-      statement->parent = (Node *)node.getRawPointer();
+      statement->addParent(node);
       node->body.push_back(statement);
       skipNewLine(filename, source, current);
       statement = readStatement(filename, source, current);
@@ -2011,6 +2400,7 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2112,7 +2502,7 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      exp->parent = (Node *)node.getRawPointer();
+      exp->addParent(node);
       node->expressions.push_back(exp);
       auto part = readTemplatePatternToken(filename, source, current);
       if (part != nullptr) {
@@ -2368,7 +2758,7 @@ JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        node->right->parent = (Node *)node.getRawPointer();
+        node->right->addParent(node);
         position = current;
         return node;
       }
@@ -2401,7 +2791,7 @@ JSParser::readAssigmentExpression(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->right->parent = (Node *)node.getRawPointer();
+      node->right->addParent(node);
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -2447,12 +2837,12 @@ JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
 
     vnode->location = getLocation(source, next, current);
     vnode->left = truly;
-    truly->parent = (Node *)vnode.getRawPointer();
+    truly->addParent(vnode);
     vnode->right = falsely;
-    falsely->parent = (Node *)vnode.getRawPointer();
+    falsely->addParent(vnode);
 
     node->right = vnode;
-    vnode->parent = (Node *)node.getRawPointer();
+    vnode->addParent(node);
 
     node->location = getLocation(source, position, current);
     position = current;
@@ -2501,7 +2891,7 @@ JSParser::readUnaryExpression(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->right->parent = (Node *)node.getRawPointer();
+      node->right->addParent(node);
       position = current;
       return node;
     }
@@ -2530,7 +2920,7 @@ JSParser::readGroupExpression(uint32_t filename, const std::wstring &source,
     }
     common::AutoPtr node = new GroupExpression;
     node->expression = expr;
-    expr->parent = (Node *)node.getRawPointer();
+    expr->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2561,7 +2951,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
     common::AutoPtr node = new MemberExpression;
     node->location = getLocation(source, position, current);
     node->right = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     position = current;
     return node;
   }
@@ -2585,7 +2975,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
         node->type = NodeType::EXPRESSION_OPTIONAL_CALL;
         node->arguments = field->arguments;
         for (auto &arg : node->arguments) {
-          arg->parent = (Node *)node.getRawPointer();
+          arg->addParent(node);
         }
         node->location = getLocation(source, position, current);
         position = current;
@@ -2601,7 +2991,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
         }
         common::AutoPtr node = new OptionalComputedMemberExpression;
         node->right = field->right;
-        node->right->parent = (Node *)node.getRawPointer();
+        node->right->addParent(node);
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -2616,7 +3006,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->right = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     position = current;
     return node;
   }
@@ -2636,7 +3026,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
     }
     common::AutoPtr node = new ComputedMemberExpression;
     node->right = field;
-    field->parent = (Node *)node.getRawPointer();
+    field->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2657,7 +3047,7 @@ JSParser::readCallExpression(uint32_t filename, const std::wstring &source,
       arg = readExpression(filename, source, current);
     }
     while (arg != nullptr) {
-      arg->parent = (Node *)node.getRawPointer();
+      arg->addParent(node);
       node->arguments.push_back(arg);
       auto next = current;
       skipInvisible(filename, source, current);
@@ -2715,7 +3105,7 @@ JSParser::readRestExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->parent = (Node *)node.getRawPointer();
+    node->right->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2738,7 +3128,7 @@ JSParser::readAwaitExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->parent = (Node *)node.getRawPointer();
+    node->right->addParent(node);
     position = current;
     return node;
   }
@@ -2760,7 +3150,7 @@ JSParser::readTypeofExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->parent = (Node *)node.getRawPointer();
+    node->right->addParent(node);
     position = current;
     return node;
   }
@@ -2782,7 +3172,7 @@ JSParser::readVoidExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->parent = (Node *)node.getRawPointer();
+    node->right->addParent(node);
     position = current;
     return node;
   }
@@ -2804,7 +3194,7 @@ JSParser::readNewExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->parent = (Node *)node.getRawPointer();
+    node->right->addParent(node);
     position = current;
     return node;
   }
@@ -2826,7 +3216,7 @@ JSParser::readDeleteExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->parent = (Node *)node.getRawPointer();
+    node->right->addParent(node);
     position = current;
     return node;
   }
@@ -2851,7 +3241,7 @@ JSParser::readInExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->parent = (Node *)node.getRawPointer();
+    node->right->addParent(node);
     position = current;
     return node;
   }
@@ -2875,7 +3265,7 @@ common::AutoPtr<JSParser::Node> JSParser::readInstanceOfExpression(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->parent = (Node *)node.getRawPointer();
+    node->right->addParent(node);
     position = current;
     return node;
   }
@@ -2901,7 +3291,7 @@ JSParser::readParameter(uint32_t filename, const std::wstring &source,
   }
   if (identifier != nullptr) {
     node->identifier = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
   } else {
     return nullptr;
   }
@@ -2919,7 +3309,7 @@ JSParser::readParameter(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->value = value;
-    value->parent = (Node *)node.getRawPointer();
+    value->addParent(node);
     next = current;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -2952,7 +3342,8 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
   if (token != nullptr && token->location.isEqual(source, L"(")) {
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
-      param->parent = (Node *)node.getRawPointer();
+      param->addParent(node);
+
       node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
@@ -2985,6 +3376,22 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
     }
     auto next = current;
     skipInvisible(filename, source, current);
+
+    auto parentScope = _currentScope;
+    node->scope = new Scope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
+
+    for (auto &param : node->arguments) {
+      if (param->type == NodeType::PATTERN_REST_ITEM) {
+        declareVariable(node, param.cast<RestPatternItem>()->identifier,
+                        Declaration::TYPE::ARGUMENT, false);
+      } else {
+        declareVariable(node, param.cast<Parameter>()->identifier,
+                        Declaration::TYPE::ARGUMENT, false);
+      }
+    }
+
     token = readSymbolToken(filename, source, current);
     if (token != nullptr) {
       current = next;
@@ -3001,17 +3408,28 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->body->parent = (Node *)node.getRawPointer();
+    node->body->addParent(node);
+    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
   }
+  // aaa=>{...}
   auto param = readIdentifierLiteral(filename, source, current);
   if (param != nullptr) {
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"=>")) {
-      param->parent = (Node *)node.getRawPointer();
+
+      auto parentScope = _currentScope;
+      node->scope = new Scope(parentScope);
+      node->scope->node = node.getRawPointer();
+      _currentScope = node->scope.getRawPointer();
+
+      declareVariable(node, param.cast<Parameter>()->identifier,
+                      Declaration::TYPE::ARGUMENT, false);
+
+      param->addParent(node);
       node->arguments.push_back(param);
       auto next = current;
       skipInvisible(filename, source, current);
@@ -3031,7 +3449,8 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->body->parent = (Node *)node.getRawPointer();
+      node->body->addParent(node);
+      _currentScope = parentScope;
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -3074,14 +3493,31 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
     }
     node->identifier = readIdentifierLiteral(filename, source, current);
     if (node->identifier != nullptr) {
-      node->identifier->parent = (Node *)node.getRawPointer();
+      node->identifier->addParent(node);
+      declareVariable(node, node->identifier, Declaration::TYPE::FUNCTION,
+                      false);
     }
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"(")) {
+
+      auto parentScope = _currentScope;
+      node->scope = new Scope(parentScope);
+      node->scope->node = node.getRawPointer();
+      _currentScope = node->scope.getRawPointer();
+
       auto param = readParameter(filename, source, current);
       while (param != nullptr) {
-        param->parent = (Node *)node.getRawPointer();
+        param->addParent(node);
+
+        if (param->type == NodeType::PATTERN_REST_ITEM) {
+          declareVariable(node, param.cast<RestPatternItem>()->identifier,
+                          Declaration::TYPE::ARGUMENT, false);
+        } else {
+          declareVariable(node, param.cast<Parameter>()->identifier,
+                          Declaration::TYPE::ARGUMENT, false);
+        }
+
         node->arguments.push_back(param);
         skipInvisible(filename, source, current);
         auto next = current;
@@ -3120,7 +3556,8 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->body->parent = (Node *)node.getRawPointer();
+      node->body->addParent(node);
+      _currentScope = parentScope;
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -3152,7 +3589,7 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"]")) {
         if (item != nullptr) {
-          item->parent = (Node *)node.getRawPointer();
+          item->addParent(node);
           node->items.push_back(item);
         }
         current = next;
@@ -3163,7 +3600,7 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      item->parent = (Node *)node.getRawPointer();
+      item->addParent(node);
       node->items.push_back(item);
       item = readRestExpression(filename, source, current);
       if (item == nullptr) {
@@ -3208,7 +3645,7 @@ JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"}")) {
         if (item != nullptr) {
-          item->parent = (Node *)node.getRawPointer();
+          item->addParent(node);
           node->properties.push_back(item);
         }
         current = next;
@@ -3220,7 +3657,7 @@ JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      item->parent = (Node *)node.getRawPointer();
+      item->addParent(node);
       node->properties.push_back(item);
       item = readObjectProperty(filename, source, current);
     }
@@ -3282,7 +3719,7 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ObjectProperty;
   node->identifier = identifier;
   if (identifier != nullptr) {
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
   }
   auto next = current;
   skipInvisible(filename, source, current);
@@ -3295,7 +3732,7 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->implement = impl;
-    impl->parent = (Node *)node.getRawPointer();
+    impl->addParent(node);
     next = current;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -3372,10 +3809,25 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
     node->async = async != nullptr;
     node->generator = generator != nullptr;
     node->identifier = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
+
+    auto parentScope = _currentScope;
+    node->scope = new Scope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
+
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
-      param->parent = (Node *)node.getRawPointer();
+      param->addParent(node);
+
+      if (param->type == NodeType::PATTERN_REST_ITEM) {
+        declareVariable(node, param.cast<RestPatternItem>()->identifier,
+                        Declaration::TYPE::ARGUMENT, false);
+      } else {
+        declareVariable(node, param.cast<Parameter>()->identifier,
+                        Declaration::TYPE::ARGUMENT, false);
+      }
+
       node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
@@ -3414,7 +3866,8 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->body->parent = (Node *)node.getRawPointer();
+    node->body->addParent(node);
+    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -3459,13 +3912,26 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"(")) {
     common::AutoPtr node = new ObjectAccessor;
+
+    auto parentScope = _currentScope;
+    node->scope = new Scope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
+
     node->kind = accessor->location.isEqual(source, L"get") ? AccessorKind::GET
                                                             : AccessorKind::SET;
     node->identifier = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
-      param->parent = (Node *)node.getRawPointer();
+      if (param->type == NodeType::PATTERN_REST_ITEM) {
+        declareVariable(node, param.cast<RestPatternItem>()->identifier,
+                        Declaration::TYPE::ARGUMENT, false);
+      } else {
+        declareVariable(node, param.cast<Parameter>()->identifier,
+                        Declaration::TYPE::ARGUMENT, false);
+      }
+      param->addParent(node);
       node->arguments.push_back(param);
       skipInvisible(filename, source, current);
       auto next = current;
@@ -3504,7 +3970,8 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->body->parent = (Node *)node.getRawPointer();
+    node->body->addParent(node);
+    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -3519,7 +3986,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassDeclaration;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
-    decorator->parent = (Node *)node.getRawPointer();
+    decorator->addParent(node);
     node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
@@ -3539,7 +4006,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
     auto clazz = exportNode->items[0].cast<ClassDeclaration>();
     clazz->decorators = node->decorators;
     for (auto &dec : node->decorators) {
-      dec->parent = (Node *)clazz.getRawPointer();
+      dec->addParent(clazz);
     }
     exportNode->location = getLocation(source, position, current);
     position = current;
@@ -3548,7 +4015,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
   if (token != nullptr && token->location.isEqual(source, L"class")) {
     node->identifier = readIdentifierLiteral(filename, source, current);
     if (node->identifier != nullptr) {
-      node->identifier->parent = (Node *)node.getRawPointer();
+      node->identifier->addParent(node);
     }
     auto next = current;
     skipInvisible(filename, source, current);
@@ -3562,7 +4029,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->extends->parent = (Node *)node.getRawPointer();
+      node->extends->addParent(node);
       next = current;
     } else {
       current = next;
@@ -3582,7 +4049,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
       token = readSymbolToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"}")) {
         if (item != nullptr) {
-          item->parent = (Node *)node.getRawPointer();
+          item->addParent(node);
           node->properties.push_back(item);
         }
         current = next;
@@ -3638,7 +4105,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassMethod;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
-    decorator->parent = (Node *)node.getRawPointer();
+    decorator->addParent(node);
     node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
@@ -3698,7 +4165,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
     }
   }
   if (identifier != nullptr) {
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"(")) {
@@ -3706,9 +4173,22 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
       node->async = async != nullptr;
       node->generator = generator != nullptr;
       node->identifier = identifier;
+
+      auto parentScope = _currentScope;
+      node->scope = new Scope(parentScope);
+      node->scope->node = node.getRawPointer();
+      _currentScope = node->scope.getRawPointer();
+
       auto param = readParameter(filename, source, current);
       while (param != nullptr) {
-        param->parent = (Node *)node.getRawPointer();
+        if (param->type == NodeType::PATTERN_REST_ITEM) {
+          declareVariable(node, param.cast<RestPatternItem>()->identifier,
+                          Declaration::TYPE::ARGUMENT, false);
+        } else {
+          declareVariable(node, param.cast<Parameter>()->identifier,
+                          Declaration::TYPE::ARGUMENT, false);
+        }
+        param->addParent(node);
         node->arguments.push_back(param);
         skipInvisible(filename, source, current);
         auto next = current;
@@ -3747,7 +4227,10 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->body->parent = (Node *)node.getRawPointer();
+      node->body->addParent(node);
+
+      _currentScope = parentScope;
+
       node->location = getLocation(source, position, current);
       position = current;
       return node;
@@ -3764,7 +4247,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassAccessor;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
-    decorator->parent = (Node *)node.getRawPointer();
+    decorator->addParent(node);
     node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
@@ -3802,10 +4285,16 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
       }
     }
     if (identifier != nullptr) {
-      identifier->parent = (Node *)node.getRawPointer();
+      identifier->addParent(node);
       skipInvisible(filename, source, current);
       auto token = readSymbolToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"(")) {
+
+        auto parentScope = _currentScope;
+        node->scope = new Scope(parentScope);
+        node->scope->node = node.getRawPointer();
+        _currentScope = node->scope.getRawPointer();
+
         node->static_ = static_ != nullptr;
         node->kind = accessor->location.isEqual(source, L"get")
                          ? AccessorKind::GET
@@ -3813,7 +4302,14 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
         node->identifier = identifier;
         auto param = readParameter(filename, source, current);
         while (param != nullptr) {
-          param->parent = (Node *)node.getRawPointer();
+          if (param->type == NodeType::PATTERN_REST_ITEM) {
+            declareVariable(node, param.cast<RestPatternItem>()->identifier,
+                            Declaration::TYPE::ARGUMENT, false);
+          } else {
+            declareVariable(node, param.cast<Parameter>()->identifier,
+                            Declaration::TYPE::ARGUMENT, false);
+          }
+          param->addParent(node);
           node->arguments.push_back(param);
           skipInvisible(filename, source, current);
           auto next = current;
@@ -3853,7 +4349,8 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        node->body->parent = (Node *)node.getRawPointer();
+        node->body->addParent(node);
+        _currentScope = parentScope;
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -3886,7 +4383,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
   common::AutoPtr node = new ClassProperty;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
-    decorator->parent = (Node *)node.getRawPointer();
+    decorator->addParent(node);
     node->decorators.push_back(decorator);
     decorator = readDecorator(filename, source, current);
   }
@@ -3925,7 +4422,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
   if (!node->identifier) {
     return nullptr;
   }
-  node->identifier->parent = (Node *)node.getRawPointer();
+  node->identifier->addParent(node);
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"=")) {
@@ -3935,7 +4432,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->value->parent = (Node *)node.getRawPointer();
+    node->value->addParent(node);
   }
   node->location = getLocation(source, position, current);
   position = current;
@@ -3959,7 +4456,7 @@ JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
   }
   common::AutoPtr node = new VariableDeclarator;
   node->identifier = identifier;
-  identifier->parent = (Node *)node.getRawPointer();
+  identifier->addParent(node);
   auto next = current;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -3974,7 +4471,7 @@ JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->value = value;
-    value->parent = (Node *)node.getRawPointer();
+    value->addParent(node);
   } else {
     current = next;
   }
@@ -3991,12 +4488,16 @@ JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
   auto kind = readKeywordToken(filename, source, current);
   if (kind != nullptr) {
     common::AutoPtr node = new VariableDeclaration;
+    Declaration::TYPE type = Declaration::TYPE::UNINITIALIZED;
+    bool isConst = false;
     if (kind->location.isEqual(source, L"var")) {
       node->kind = DeclarationKind::VAR;
+      type = Declaration::TYPE::UNDEFINED;
     } else if (kind->location.isEqual(source, L"let")) {
       node->kind = DeclarationKind::LET;
     } else if (kind->location.isEqual(source, L"const")) {
       node->kind = DeclarationKind::CONST;
+      isConst = true;
     } else {
       return nullptr;
     }
@@ -4007,7 +4508,10 @@ JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     while (declarator != nullptr) {
-      declarator->parent = (Node *)node.getRawPointer();
+      declarator->addParent(node);
+      declareVariable(declarator,
+                      declarator.cast<VariableDeclarator>()->identifier, type,
+                      isConst);
       node->declarations.push_back(declarator);
       auto next = current;
       skipInvisible(filename, source, current);
@@ -4050,7 +4554,7 @@ JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
     }
     common::AutoPtr node = new RestPatternItem;
     node->identifier = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4089,7 +4593,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
         {filename, current.line, current.column});
   }
   node->identifier = identifier;
-  identifier->parent = (Node *)node.getRawPointer();
+  identifier->addParent(node);
   next = current;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -4108,7 +4612,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->match = match;
-      match->parent = (Node *)node.getRawPointer();
+      match->addParent(node);
       next = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
@@ -4123,7 +4627,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->value = value;
-      value->parent = (Node *)node.getRawPointer();
+      value->addParent(node);
       next = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
@@ -4154,7 +4658,7 @@ JSParser::readObjectPattern(uint32_t filename, const std::wstring &source,
     common::AutoPtr node = new ObjectPattern;
     auto item = readObjectPatternItem(filename, source, current);
     while (item != nullptr) {
-      item->parent = (Node *)node.getRawPointer();
+      item->addParent(node);
       node->items.push_back(item);
       auto next = current;
       skipInvisible(filename, source, current);
@@ -4202,10 +4706,13 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
   if (!identifier) {
     identifier = readIdentifierLiteral(filename, source, current);
   }
+  if (!identifier) {
+    identifier = readStringLiteral(filename, source, current);
+  }
   if (identifier != nullptr) {
     common::AutoPtr node = new ArrayPatternItem;
     node->identifier = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     auto next = current;
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
@@ -4217,7 +4724,7 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->value = value;
-      value->parent = (Node *)node.getRawPointer();
+      value->addParent(node);
       next = current;
     }
     current = next;
@@ -4251,7 +4758,7 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
       }
       if (token->location.isEqual(source, L"]")) {
         if (item != nullptr) {
-          item->parent = (Node *)node.getRawPointer();
+          item->addParent(node);
           node->items.push_back(item);
         }
         current = next;
@@ -4260,7 +4767,7 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
       if (!token->location.isEqual(source, L",")) {
         return nullptr;
       }
-      item->parent = (Node *)node.getRawPointer();
+      item->addParent(node);
       node->items.push_back(item);
       item = readArrayPatternItem(filename, source, current);
     }
@@ -4311,7 +4818,7 @@ JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
   if (identifier != nullptr) {
     common::AutoPtr node = new ImportSpecifier;
     node->identifier = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     auto backup = current;
     skipInvisible(filename, source, current);
     auto token = readIdentifierToken(filename, source, current);
@@ -4324,7 +4831,7 @@ JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->alias->parent = (Node *)node.getRawPointer();
+      node->alias->addParent(node);
     } else if (identifier->type == NodeType::LITERAL_STRING) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
@@ -4347,7 +4854,7 @@ common::AutoPtr<JSParser::Node> JSParser::readImportDefaultSpecifier(
   if (identifier != nullptr) {
     common::AutoPtr node = new ImportDefaultSpecifier;
     node->identifier = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4377,7 +4884,7 @@ common::AutoPtr<JSParser::Node> JSParser::readImportNamespaceSpecifier(
     }
     common::AutoPtr node = new ImportNamespaceSpecifier;
     node->alias = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4397,7 +4904,7 @@ JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
     common::AutoPtr node = new ImportAttribute;
     node->type = NodeType::IMPORT_ATTARTUBE;
     node->key = key;
-    key->parent = (Node *)node.getRawPointer();
+    key->addParent(node);
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L":")) {
@@ -4411,7 +4918,7 @@ JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->value->parent = (Node *)node.getRawPointer();
+    node->value->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4431,16 +4938,22 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
     auto src = readStringLiteral(filename, source, current);
     if (src != nullptr) {
       node->source = src;
-      src->parent = (Node *)node.getRawPointer();
+      src->addParent(node);
     } else {
       auto specifier = readImportNamespaceSpecifier(filename, source, current);
       if (specifier != nullptr) {
-        specifier->parent = (Node *)node.getRawPointer();
+        specifier->addParent(node);
+        declareVariable(specifier,
+                        specifier.cast<ImportNamespaceSpecifier>()->alias,
+                        Declaration::TYPE::UNINITIALIZED, true);
         node->items.push_back(specifier);
       } else {
         specifier = readImportDefaultSpecifier(filename, source, current);
         if (specifier != nullptr) {
-          specifier->parent = (Node *)node.getRawPointer();
+          specifier->addParent(node);
+          declareVariable(specifier,
+                          specifier.cast<ImportDefaultSpecifier>()->identifier,
+                          Declaration::TYPE::UNINITIALIZED, true);
           node->items.push_back(specifier);
           skipInvisible(filename, source, current);
           token = readSymbolToken(filename, source, current);
@@ -4471,11 +4984,27 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
                                     current),
                     {filename, current.line, current.column});
               }
-              specifier->parent = (Node *)node.getRawPointer();
+              specifier->addParent(node);
+              auto ispec = specifier.cast<ImportSpecifier>();
+              if (ispec->alias != nullptr) {
+                declareVariable(specifier, ispec->alias,
+                                Declaration::TYPE::UNINITIALIZED, true);
+              } else {
+                declareVariable(specifier, ispec->identifier,
+                                Declaration::TYPE::UNINITIALIZED, true);
+              }
               node->items.push_back(specifier);
             } else if (token->location.isEqual(source, L"}")) {
               if (specifier != nullptr) {
-                specifier->parent = (Node *)node.getRawPointer();
+                specifier->addParent(node);
+                auto ispec = specifier.cast<ImportSpecifier>();
+                if (ispec->alias != nullptr) {
+                  declareVariable(specifier, ispec->alias,
+                                  Declaration::TYPE::UNINITIALIZED, true);
+                } else {
+                  declareVariable(specifier, ispec->identifier,
+                                  Declaration::TYPE::UNINITIALIZED, true);
+                }
                 node->items.push_back(specifier);
               }
               break;
@@ -4493,7 +5022,10 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
         }
         specifier = readImportNamespaceSpecifier(filename, source, current);
         if (specifier != nullptr) {
-          specifier->parent = (Node *)node.getRawPointer();
+          declareVariable(specifier,
+                          specifier.cast<ImportNamespaceSpecifier>()->alias,
+                          Declaration::TYPE::UNINITIALIZED, true);
+          specifier->addParent(node);
           node->items.push_back(specifier);
         }
       }
@@ -4510,7 +5042,7 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      src->parent = (Node *)node.getRawPointer();
+      src->addParent(node);
       node->source = src;
     }
     auto backup = current;
@@ -4530,7 +5062,7 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
       }
       auto attribute = readImportAttriabue(filename, source, current);
       while (attribute != nullptr) {
-        attribute->parent = (Node *)node.getRawPointer();
+        attribute->addParent(node);
         node->attributes.push_back(attribute);
         auto backup = current;
         skipInvisible(filename, source, current);
@@ -4577,7 +5109,7 @@ JSParser::readExportSpecifier(uint32_t filename, const std::wstring &source,
   if (identifier != nullptr) {
     common::AutoPtr node = new ExportSpecifier;
     node->identifier = identifier;
-    identifier->parent = (Node *)node.getRawPointer();
+    identifier->addParent(node);
     auto backup = current;
     skipInvisible(filename, source, current);
     auto token = readIdentifierToken(filename, source, current);
@@ -4592,7 +5124,7 @@ JSParser::readExportSpecifier(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->alias = alias;
-      alias->parent = (Node *)node.getRawPointer();
+      alias->addParent(node);
     } else {
       current = backup;
     }
@@ -4616,7 +5148,7 @@ common::AutoPtr<JSParser::Node> JSParser::readExportDefaultSpecifier(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->value->parent = (Node *)node.getRawPointer();
+    node->value->addParent(node);
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -4642,7 +5174,7 @@ JSParser::readExportAllSpecifier(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      node->alias->parent = (Node *)node.getRawPointer();
+      node->alias->addParent(node);
     } else {
       current = backup;
     }
@@ -4686,12 +5218,12 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
       specifier = readVariableDeclaration(filename, source, current);
     }
     if (specifier != nullptr) {
-      specifier->parent = (Node *)node.getRawPointer();
+      specifier->addParent(node);
       node->items.push_back(specifier);
     } else {
       specifier = readExportAllSpecifier(filename, source, current);
       if (specifier != nullptr) {
-        specifier->parent = (Node *)node.getRawPointer();
+        specifier->addParent(node);
         node->items.push_back(specifier);
       } else {
         skipInvisible(filename, source, current);
@@ -4717,11 +5249,11 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
                                   current),
                   {filename, current.line, current.column});
             }
-            specifier->parent = (Node *)node.getRawPointer();
+            specifier->addParent(node);
             node->items.push_back(specifier);
           } else if (token->location.isEqual(source, L"}")) {
             if (specifier != nullptr) {
-              specifier->parent = (Node *)node.getRawPointer();
+              specifier->addParent(node);
               node->items.push_back(specifier);
             }
             break;
@@ -4743,7 +5275,7 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        src->parent = (Node *)node.getRawPointer();
+        src->addParent(node);
         node->source = src;
         auto backup = current;
         skipInvisible(filename, source, current);
@@ -4762,7 +5294,7 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
           }
           auto attribute = readImportAttriabue(filename, source, current);
           while (attribute != nullptr) {
-            attribute->parent = (Node *)node.getRawPointer();
+            attribute->addParent(node);
             node->attributes.push_back(attribute);
             auto backup = current;
             skipInvisible(filename, source, current);
@@ -4809,4 +5341,359 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
     return node;
   }
   return nullptr;
+}
+std::wstring JSParser::toJSON(const std::wstring &filename,
+                              const std::wstring &source,
+                              common::AutoPtr<Node> node) {
+  std::wstring type;
+  switch (node->type) {
+  case NodeType::PRIVATE_NAME:
+    type = L"PRIVATE_NAME";
+    break;
+  case NodeType::LITERAL_REGEX:
+    type = L"LITERAL_REGEX";
+    break;
+  case NodeType::LITERAL_NULL:
+    type = L"LITERAL_NULL";
+    break;
+  case NodeType::LITERAL_STRING:
+    type = L"LITERAL_STRING";
+    break;
+  case NodeType::LITERAL_BOOLEAN:
+    type = L"LITERAL_BOOLEAN";
+    break;
+  case NodeType::LITERAL_NUMBER:
+    type = L"LITERAL_NUMBER";
+    break;
+  case NodeType::LITERAL_COMMENT:
+    type = L"LITERAL_COMMENT";
+    break;
+  case NodeType::LITERAL_MULTILINE_COMMENT:
+    type = L"LITERAL_MULTILINE_COMMENT";
+    break;
+  case NodeType::LITERAL_UNDEFINED:
+    type = L"LITERAL_UNDEFINED";
+    break;
+  case NodeType::LITERAL_IDENTITY:
+    type = L"LITERAL_IDENTITY";
+    break;
+  case NodeType::LITERAL_TEMPLATE:
+    type = L"LITERAL_TEMPLATE";
+    break;
+  case NodeType::LITERAL_BIGINT:
+    type = L"LITERAL_BIGINT";
+    break;
+  case NodeType::THIS:
+    type = L"THIS";
+    break;
+  case NodeType::SUPER:
+    type = L"SUPER";
+    break;
+  case NodeType::PROGRAM:
+    type = L"PROGRAM";
+    break;
+  case NodeType::STATEMENT_EMPTY:
+    type = L"STATEMENT_EMPTY";
+    break;
+  case NodeType::STATEMENT_BLOCK:
+    type = L"STATEMENT_BLOCK";
+    break;
+  case NodeType::STATEMENT_DEBUGGER:
+    type = L"STATEMENT_DEBUGGER";
+    break;
+  case NodeType::STATEMENT_RETURN:
+    type = L"STATEMENT_RETURN";
+    break;
+  case NodeType::STATEMENT_YIELD:
+    type = L"STATEMENT_YIELD";
+    break;
+  case NodeType::STATEMENT_LABEL:
+    type = L"STATEMENT_LABEL";
+    break;
+  case NodeType::STATEMENT_BREAK:
+    type = L"STATEMENT_BREAK";
+    break;
+  case NodeType::STATEMENT_CONTINUE:
+    type = L"STATEMENT_CONTINUE";
+    break;
+  case NodeType::STATEMENT_IF:
+    type = L"STATEMENT_IF";
+    break;
+  case NodeType::STATEMENT_SWITCH:
+    type = L"STATEMENT_SWITCH";
+    break;
+  case NodeType::STATEMENT_SWITCH_CASE:
+    type = L"STATEMENT_SWITCH_CASE";
+    break;
+  case NodeType::STATEMENT_THROW:
+    type = L"STATEMENT_THROW";
+    break;
+  case NodeType::STATEMENT_TRY:
+    type = L"STATEMENT_TRY";
+    break;
+  case NodeType::STATEMENT_TRY_CATCH:
+    type = L"STATEMENT_TRY_CATCH";
+    break;
+  case NodeType::STATEMENT_WHILE:
+    type = L"STATEMENT_WHILE";
+    break;
+  case NodeType::STATEMENT_DO_WHILE:
+    type = L"STATEMENT_DO_WHILE";
+    break;
+  case NodeType::STATEMENT_FOR:
+    type = L"STATEMENT_FOR";
+    break;
+  case NodeType::STATEMENT_FOR_IN:
+    type = L"STATEMENT_FOR_IN";
+    break;
+  case NodeType::STATEMENT_FOR_OF:
+    type = L"STATEMENT_FOR_OF";
+    break;
+  case NodeType::STATEMENT_FOR_AWAIT_OF:
+    type = L"STATEMENT_FOR_AWAIT_OF";
+    break;
+  case NodeType::VARIABLE_DECLARATION:
+    type = L"VARIABLE_DECLARATION";
+    break;
+  case NodeType::VARIABLE_DECLARATOR:
+    type = L"VARIABLE_DECLARATOR";
+    break;
+  case NodeType::DECORATOR:
+    type = L"DECORATOR";
+    break;
+  case NodeType::DIRECTIVE:
+    type = L"DIRECTIVE";
+    break;
+  case NodeType::INTERPRETER_DIRECTIVE:
+    type = L"INTERPRETER_DIRECTIVE";
+    break;
+  case NodeType::OBJECT_PROPERTY:
+    type = L"OBJECT_PROPERTY";
+    break;
+  case NodeType::OBJECT_METHOD:
+    type = L"OBJECT_METHOD";
+    break;
+  case NodeType::OBJECT_ACCESSOR:
+    type = L"OBJECT_ACCESSOR";
+    break;
+  case NodeType::EXPRESSION_UNARY:
+    type = L"EXPRESSION_UNARY";
+    break;
+  case NodeType::EXPRESSION_UPDATE:
+    type = L"EXPRESSION_UPDATE";
+    break;
+  case NodeType::EXPRESSION_BINARY:
+    type = L"EXPRESSION_BINARY";
+    break;
+  case NodeType::EXPRESSION_MEMBER:
+    type = L"EXPRESSION_MEMBER";
+    break;
+  case NodeType::EXPRESSION_OPTIONAL_MEMBER:
+    type = L"EXPRESSION_OPTIONAL_MEMBER";
+    break;
+  case NodeType::EXPRESSION_COMPUTED_MEMBER:
+    type = L"EXPRESSION_COMPUTED_MEMBER";
+    break;
+  case NodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER:
+    type = L"EXPRESSION_OPTIONAL_COMPUTED_MEMBER";
+    break;
+  case NodeType::EXPRESSION_CONDITION:
+    type = L"EXPRESSION_CONDITION";
+    break;
+  case NodeType::EXPRESSION_CALL:
+    type = L"EXPRESSION_CALL";
+    break;
+  case NodeType::EXPRESSION_OPTIONAL_CALL:
+    type = L"EXPRESSION_OPTIONAL_CALL";
+    break;
+  case NodeType::EXPRESSION_NEW:
+    type = L"EXPRESSION_NEW";
+    break;
+  case NodeType::EXPRESSION_DELETE:
+    type = L"EXPRESSION_DELETE";
+    break;
+  case NodeType::EXPRESSION_AWAIT:
+    type = L"EXPRESSION_AWAIT";
+    break;
+  case NodeType::EXPRESSION_VOID:
+    type = L"EXPRESSION_VOID";
+    break;
+  case NodeType::EXPRESSION_TYPEOF:
+    type = L"EXPRESSION_TYPEOF";
+    break;
+  case NodeType::EXPRESSION_GROUP:
+    type = L"EXPRESSION_GROUP";
+    break;
+  case NodeType::EXPRESSION_ASSIGMENT:
+    type = L"EXPRESSION_ASSIGMENT";
+    break;
+  case NodeType::EXPRESSION_REST:
+    type = L"EXPRESSION_REST";
+    break;
+  case NodeType::PATTERN_REST_ITEM:
+    type = L"PATTERN_REST_ITEM";
+    break;
+  case NodeType::PATTERN_OBJECT:
+    type = L"PATTERN_OBJECT";
+    break;
+  case NodeType::PATTERN_OBJECT_ITEM:
+    type = L"PATTERN_OBJECT_ITEM";
+    break;
+  case NodeType::PATTERN_ARRAY:
+    type = L"PATTERN_ARRAY";
+    break;
+  case NodeType::PATTERN_ARRAY_ITEM:
+    type = L"PATTERN_ARRAY_ITEM";
+    break;
+  case NodeType::CLASS_METHOD:
+    type = L"CLASS_METHOD";
+    break;
+  case NodeType::CLASS_PROPERTY:
+    type = L"CLASS_PROPERTY";
+    break;
+  case NodeType::CLASS_ACCESSOR:
+    type = L"CLASS_ACCESSOR";
+    break;
+  case NodeType::STATIC_BLOCK:
+    type = L"STATIC_BLOCK";
+    break;
+  case NodeType::IMPORT_DECLARATION:
+    type = L"IMPORT_DECLARATION";
+    break;
+  case NodeType::IMPORT_SPECIFIER:
+    type = L"IMPORT_SPECIFIER";
+    break;
+  case NodeType::IMPORT_DEFAULT:
+    type = L"IMPORT_DEFAULT";
+    break;
+  case NodeType::IMPORT_NAMESPACE:
+    type = L"IMPORT_NAMESPACE";
+    break;
+  case NodeType::IMPORT_ATTARTUBE:
+    type = L"IMPORT_ATTARTUBE";
+    break;
+  case NodeType::EXPORT_DECLARATION:
+    type = L"EXPORT_DECLARATION";
+    break;
+  case NodeType::EXPORT_DEFAULT:
+    type = L"EXPORT_DEFAULT";
+    break;
+  case NodeType::EXPORT_SPECIFIER:
+    type = L"EXPORT_SPECIFIER";
+    break;
+  case NodeType::EXPORT_ALL:
+    type = L"EXPORT_ALL";
+    break;
+  case NodeType::DECLARATION_ARROW_FUNCTION:
+    type = L"DECLARATION_ARROW_FUNCTION";
+    break;
+  case NodeType::DECLARATION_FUNCTION:
+    type = L"DECLARATION_FUNCTION";
+    break;
+  case NodeType::DECLARATION_PARAMETER:
+    type = L"DECLARATION_PARAMETER";
+    break;
+  case NodeType::DECLARATION_OBJECT:
+    type = L"DECLARATION_OBJECT";
+    break;
+  case NodeType::DECLARATION_ARRAY:
+    type = L"DECLARATION_ARRAY";
+    break;
+  case NodeType::DECLARATION_CLASS:
+    type = L"DECLARATION_CLASS";
+    break;
+    break;
+  }
+  std::wstring result = L"{";
+  result += fmt::format(L"\"type\":\"{}\"", type);
+  result += L",\"children\":[";
+  size_t index = 0;
+  for (auto &child : node->children) {
+    result += toJSON(filename, source, child);
+    if (index != node->children.size() - 1) {
+      result += L",";
+    }
+    index++;
+  }
+  result += L"]";
+  result += fmt::format(L",\"id\":{}", node->id);
+  if (node->scope != nullptr) {
+    result += fmt::format(L",\"scope\":{{\"node\":{},\"declarations\":[",
+                          node->scope->node->id);
+    size_t index = 0;
+    for (auto &declaration : node->scope->declarations) {
+      result += L"{";
+      std::wstring type;
+      switch (declaration.type) {
+      case Declaration::TYPE::UNDEFINED:
+        type = L"undefined";
+        break;
+      case Declaration::TYPE::UNINITIALIZED:
+        type = L"uninitialized";
+        break;
+      case Declaration::TYPE::FUNCTION:
+        type = L"function";
+        break;
+      case Declaration::TYPE::ARGUMENT:
+        type = L"argument";
+        break;
+      case Declaration::TYPE::CATCH:
+        type = L"catch";
+        break;
+      }
+      result += fmt::format(
+          L"\"identifier\":\"{}\",\"isConst\":{},\"node\":{},\"type\":\"{}\"",
+          declaration.name, declaration.isConst, declaration.node->id, type);
+      result += L"}";
+      if (index != node->scope->declarations.size() - 1) {
+        result += L",";
+      }
+      index++;
+    }
+    result += L"]";
+    result += L",\"bindings\":[";
+    index = 0;
+    for (auto &binding : node->scope->bindings) {
+      result += L"{";
+      if (binding.declaration) {
+        result += fmt::format(L"\"name\":\"{}\"", binding.declaration->name);
+        result += fmt::format(L",\"node\":{},", binding.declaration->node->id);
+      }
+      result += L"\"references\":[";
+      size_t vindex = 0;
+      for (auto &node : binding.references) {
+        result += fmt::format(L"{}", node->id);
+        if (vindex != binding.references.size() - 1) {
+          result += L",";
+        }
+        vindex++;
+      }
+      result += L"]";
+      result += L"}";
+      if (index != node->scope->bindings.size() - 1) {
+        result += L",";
+      }
+      index++;
+    }
+    result += L"]";
+    result += L"}";
+  }
+  std::wstring src = node->location.getSource(source);
+  std::wstring dst;
+  for (auto &ch : src) {
+    if (ch == L'\\') {
+      dst += L"\\\\";
+    } else if (ch == L'\"') {
+      dst += L"\\\"";
+    } else if (ch == L'\n') {
+      dst += L"\\n";
+    } else if (ch == L'\r') {
+      dst += L"\\r";
+    } else {
+      dst += ch;
+    }
+  }
+  result += fmt::format(L",\"location\":{{\"source\":\"{}\"}}", dst);
+  result += L"}";
+  return result;
 }

@@ -7,6 +7,7 @@
 #include "engine/runtime/JSValue.hpp"
 #include <exception>
 #include <fmt/xchar.h>
+#include <fstream>
 #include <iostream>
 
 using namespace spark;
@@ -23,13 +24,16 @@ int main(int argc, char *argv[]) {
   try {
     common::AutoPtr runtime = new engine::JSRuntime();
     common::AutoPtr ctx = new engine::JSContext(runtime);
-    auto scope = ctx->pushScope();
-    auto symbol = ctx->Symbol()->getProperty(ctx, L"iterator");
-    fmt::print(L"{}", symbol->getProperty(ctx, L"toString")
-                          ->apply(ctx, symbol)
-                          ->getString()
-                          .value());
-    ctx->popScope(scope);
+    std::wifstream in("index.js", std::ios::binary);
+    in.seekg(0, std::ios::end);
+    size_t len = in.tellg();
+    in.seekg(0, std::ios::beg);
+    wchar_t *buf = new wchar_t[len + 1];
+    buf[len] = 0;
+    in.read(buf, len);
+    in.close();
+    ctx->eval(buf, L"index.js");
+    delete[] buf;
   } catch (std::exception &e) {
     std::cout << e.what() << std::endl;
   }

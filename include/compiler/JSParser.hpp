@@ -58,7 +58,6 @@ public:
     DECORATOR,
 
     DIRECTIVE,
-    DIRECTIVE_LITERAL,
     INTERPRETER_DIRECTIVE,
 
     OBJECT_PROPERTY,
@@ -112,7 +111,6 @@ public:
     DECLARATION_ARROW_FUNCTION,
     DECLARATION_FUNCTION,
     DECLARATION_PARAMETER,
-    DECLARATION_REST_PARAMETER,
     DECLARATION_OBJECT,
     DECLARATION_ARRAY,
     DECLARATION_CLASS,
@@ -131,7 +129,7 @@ public:
   struct Location {
     Position start;
     Position end;
-    std::wstring getSource(const std::wstring &source) {
+    std::wstring getSource(const std::wstring &source) const {
       return source.substr(start.offset, end.offset - start.offset + 1);
     }
     bool isEqual(const std::wstring &source, const std::wstring &another) {
@@ -152,13 +150,60 @@ public:
     Location location;
   };
 
+  struct Node;
+
+  struct Scope;
+
+  struct Declaration {
+    enum class TYPE {
+      UNDEFINED,
+      UNINITIALIZED,
+      FUNCTION,
+      ARGUMENT,
+      CATCH
+    } type;
+    bool isConst;
+    std::wstring name;
+    Node *node;
+    Scope *scope;
+    Declaration() : node(nullptr), scope(nullptr), type(TYPE::UNINITIALIZED) {}
+  };
+
+  struct Binding {
+    Declaration *declaration;
+    std::vector<Node *> references;
+    Binding() : declaration(nullptr) {}
+  };
+
+  struct Scope : public common::Object {
+    std::vector<Binding> bindings;
+    std::vector<Declaration> declarations;
+    Node *node;
+    uint32_t id;
+    Scope *parent;
+    Scope(Scope *parent = nullptr) : parent(parent) {
+      static uint32_t id = 0;
+      this->id = ++id;
+    }
+  };
+
   struct Node : public common::Object {
     NodeType type;
     Location location;
     int32_t level;
     Node *parent;
+    std::vector<Node *> children;
+    uint32_t id;
+    common::AutoPtr<Scope> scope;
+    void addParent(common::AutoPtr<Node> parent) {
+      parent->children.push_back(this);
+      this->parent = parent.getRawPointer();
+    }
     Node(const NodeType &type, int32_t level = 0)
-        : type(type), level(level), parent(nullptr) {}
+        : type(type), level(level), parent(nullptr) {
+      static uint32_t id = 0;
+      this->id = ++id;
+    }
   };
 
   using NodeArray = std::vector<common::AutoPtr<Node>>;
@@ -654,11 +699,22 @@ public:
   };
 
 private:
+  Scope *_currentScope;
+
+private:
   std::wstring formatException(const std::wstring &message, uint32_t filename,
                                const std::wstring &source, Position position);
 
   Location getLocation(const std::wstring &source, Position &start,
                        Position &end);
+
+  void declareVariable(common::AutoPtr<Node> declarator,
+                       common::AutoPtr<Node> identifier, Declaration::TYPE type,
+                       bool isConst);
+
+  void bindScope(common::AutoPtr<Node> node);
+
+  void bindDeclaration(common::AutoPtr<IdentifierLiteral> node);
 
 private:
   bool skipWhiteSpace(uint32_t filename, const std::wstring &source,
@@ -1087,5 +1143,8 @@ private:
 
 public:
   common::AutoPtr<Node> parse(uint32_t filename, const std::wstring &source);
+
+  std::wstring toJSON(const std::wstring &filename, const std::wstring &source,
+                      common::AutoPtr<Node> node);
 };
 }; // namespace spark::compiler
