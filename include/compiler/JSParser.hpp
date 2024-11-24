@@ -110,6 +110,7 @@ public:
 
     DECLARATION_ARROW_FUNCTION,
     DECLARATION_FUNCTION,
+    DECLARATION_FUNCTION_BODY,
     DECLARATION_PARAMETER,
     DECLARATION_OBJECT,
     DECLARATION_ARRAY,
@@ -523,14 +524,11 @@ public:
 
   struct ArrowFunctionDeclaration : public Node {
     std::wstring name;
-
     std::string sourceFile;
-
     bool async;
-
     NodeArray arguments;
-
     common::AutoPtr<Node> body;
+    NodeArray directives;
     ArrowFunctionDeclaration()
         : Node(NodeType::DECLARATION_ARROW_FUNCTION, -2) {}
   };
@@ -544,6 +542,11 @@ public:
     FunctionDeclaration() : Node(NodeType::DECLARATION_FUNCTION, -2) {}
   };
 
+  struct FunctionBodyDeclaration : public Node {
+    NodeArray statements;
+    NodeArray directives;
+    FunctionBodyDeclaration() : Node(NodeType::DECLARATION_FUNCTION_BODY, -2) {}
+  };
   struct ObjectAccessor : public Node {
     AccessorKind kind;
     NodeArray arguments;
@@ -1032,6 +1035,10 @@ private:
   common::AutoPtr<Node> readFunctionDeclaration(uint32_t filename,
                                                 const std::wstring &source,
                                                 Position &position);
+
+  common::AutoPtr<Node> readFunctionBody(uint32_t filename,
+                                         const std::wstring &source,
+                                         Position &position);
 
   common::AutoPtr<Node> readArrayDeclaration(uint32_t filename,
                                              const std::wstring &source,

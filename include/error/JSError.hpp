@@ -18,7 +18,7 @@ private:
 
   std::string format(const std::wstring &type, const std::wstring &message) {
     static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    return fmt::format("{} {}", converter.to_bytes(type),
+    return fmt::format("{}: {}", converter.to_bytes(type),
                        converter.to_bytes(message));
   }
 

@@ -238,6 +238,7 @@ void JSParser::bindScope(common::AutoPtr<Node> node) {
       bindScope(dec->identifier);
     }
   } break;
+  case NodeType::DECLARATION_FUNCTION_BODY:
   case NodeType::EXPORT_DEFAULT:
   case NodeType::EXPORT_DECLARATION:
   case NodeType::EXPRESSION_REST:
@@ -395,14 +396,40 @@ void JSParser::declareVariable(common::AutoPtr<Node> declarator,
   Declaration declar;
   declar.isConst = isConst;
   declar.type = type;
-  declar.scope = _currentScope;
+  auto scope = _currentScope;
+  if (type == Declaration::TYPE::UNDEFINED) {
+    while (scope->parent &&
+           scope->node->type != NodeType::DECLARATION_FUNCTION &&
+           scope->node->type != NodeType::DECLARATION_ARROW_FUNCTION &&
+           scope->node->type != NodeType::OBJECT_METHOD &&
+           scope->node->type != NodeType::OBJECT_ACCESSOR &&
+           scope->node->type != NodeType::CLASS_ACCESSOR &&
+           scope->node->type != NodeType::CLASS_METHOD) {
+      scope = scope->parent;
+    }
+  }
+  declar.scope = scope;
   declar.node = declarator.getRawPointer();
   if (identifier->type == NodeType::LITERAL_STRING) {
     declar.name = identifier.cast<StringLiteral>()->value;
   } else if (identifier->type == NodeType::LITERAL_IDENTITY) {
     declar.name = identifier.cast<IdentifierLiteral>()->value;
   }
-  _currentScope->declarations.push_back(declar);
+  Declaration *decr = nullptr;
+  for (auto &dec : scope->declarations) {
+    if (dec.name == declar.name) {
+      decr = &dec;
+      break;
+    }
+  }
+  if (decr != nullptr) {
+    if (type == Declaration::TYPE::UNINITIALIZED) {
+      throw error::JSSyntaxError(fmt::format(
+          L"Identifier '{}' has already been declared", decr->name));
+    }
+  } else {
+    scope->declarations.push_back(declar);
+  }
 }
 
 bool JSParser::skipWhiteSpace(uint32_t filename, const std::wstring &source,
@@ -3374,7 +3401,6 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
     if (!token || !token->location.isEqual(source, L"=>")) {
       return nullptr;
     }
-    auto next = current;
     skipInvisible(filename, source, current);
 
     auto parentScope = _currentScope;
@@ -3393,13 +3419,8 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
     }
 
     token = readSymbolToken(filename, source, current);
-    if (token != nullptr) {
-      current = next;
-      if (token->location.isEqual(source, L"{")) {
-        node->body = readBlockStatement(filename, source, current);
-      } else {
-        node->body = readExpression(filename, source, current);
-      }
+    if (token != nullptr && token->location.isEqual(source, L"{")) {
+      node->body = readFunctionBody(filename, source, current);
     } else {
       node->body = readExpression(filename, source, current);
     }
@@ -3455,6 +3476,42 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
       position = current;
       return node;
     }
+  }
+  return nullptr;
+}
+
+common::AutoPtr<JSParser::Node>
+JSParser::readFunctionBody(uint32_t filename, const std::wstring &source,
+                           Position &position) {
+  auto current = position;
+  skipInvisible(filename, source, current);
+  auto token = readSymbolToken(filename, source, current);
+  if (token != nullptr && token->location.isEqual(source, L"{")) {
+    common::AutoPtr node = new FunctionBodyDeclaration;
+    auto directive = readDirective(filename, source, current);
+    while (directive != nullptr) {
+      directive->addParent(node);
+      node->directives.push_back(directive);
+      directive = readDirective(filename, source, current);
+    }
+    skipNewLine(filename, source, current);
+    auto statement = readStatement(filename, source, current);
+    while (statement != nullptr) {
+      statement->addParent(node);
+      node->statements.push_back(statement);
+      skipNewLine(filename, source, current);
+      statement = readStatement(filename, source, current);
+    }
+    skipNewLine(filename, source, current);
+    token = readSymbolToken(filename, source, current);
+    if (token == nullptr || !token->location.isEqual(source, L"}")) {
+      throw error::JSSyntaxError(
+          formatException(L"Unexcepted token", filename, source, current),
+          {filename, current.line, current.column});
+    }
+    node->location = getLocation(source, position, current);
+    position = current;
+    return node;
   }
   return nullptr;
 }
@@ -3550,7 +3607,7 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       skipInvisible(filename, source, current);
-      node->body = readBlockStatement(filename, source, current);
+      node->body = readFunctionBody(filename, source, current);
       if (!node->body) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),
@@ -3860,7 +3917,7 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     skipInvisible(filename, source, current);
-    node->body = readBlockStatement(filename, source, current);
+    node->body = readFunctionBody(filename, source, current);
     if (!node->body) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
@@ -3964,7 +4021,7 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     skipInvisible(filename, source, current);
-    node->body = readBlockStatement(filename, source, current);
+    node->body = readFunctionBody(filename, source, current);
     if (!node->body) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
@@ -4221,7 +4278,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       skipInvisible(filename, source, current);
-      node->body = readBlockStatement(filename, source, current);
+      node->body = readFunctionBody(filename, source, current);
       if (!node->body) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),
@@ -4343,7 +4400,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
               {filename, current.line, current.column});
         }
         skipInvisible(filename, source, current);
-        node->body = readBlockStatement(filename, source, current);
+        node->body = readFunctionBody(filename, source, current);
         if (!node->body) {
           throw error::JSSyntaxError(
               formatException(L"Unexcepted token", filename, source, current),
@@ -5602,6 +5659,8 @@ std::wstring JSParser::toJSON(const std::wstring &filename,
   case NodeType::DECLARATION_CLASS:
     type = L"DECLARATION_CLASS";
     break;
+  case NodeType::DECLARATION_FUNCTION_BODY:
+    type = L"DECLARATION_FUNCTION_BODY";
     break;
   }
   std::wstring result = L"{";
