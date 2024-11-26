@@ -4,6 +4,7 @@
 #include "engine/base/JSLocation.hpp"
 #include <codecvt>
 #include <fmt/format.h>
+#include <fmt/xchar.h>
 #include <locale>
 #include <stdexcept>
 #include <string>
@@ -18,8 +19,8 @@ private:
 
   std::string format(const std::wstring &type, const std::wstring &message) {
     static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-    return fmt::format("{}: {}", converter.to_bytes(type),
-                       converter.to_bytes(message));
+    std::wstring msg = fmt::format(L"{}: {}", type, message);
+    return converter.to_bytes(msg);
   }
 
 public:

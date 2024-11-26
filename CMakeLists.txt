@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 20)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/common COMMON_SOURCES)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/compiler COMPILER_SOURCES)
+aux_source_directory(${PROJECT_SOURCE_DIR}/src/vm VM_SOURCES)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/engine/base ENGINE_BASE_SOURCES)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/engine/entity ENGINE_ENTITY_SOURCES)
 aux_source_directory(${PROJECT_SOURCE_DIR}/src/engine/runtime ENGINE_RUNTIME_SOURCES)
@@ -16,5 +17,6 @@ add_executable(${PROJECT_NAME}
     ${ENGINE_BASE_SOURCES}
     ${ENGINE_ENTITY_SOURCES}
     ${ENGINE_RUNTIME_SOURCES}
-    ${ENGINE_LIB_SOURCES})
+    ${ENGINE_LIB_SOURCES}
+    ${VM_SOURCES})
 target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)

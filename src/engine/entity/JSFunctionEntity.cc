@@ -1,53 +1,38 @@
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
-#include "engine/runtime/JSContext.hpp"
-#include <fmt/xchar.h>
-#include <string>
+
 using namespace spark;
 using namespace spark::engine;
-
 JSFunctionEntity::JSFunctionEntity(
-    JSEntity *funcProto, const std::wstring &name,
-    const std::function<JSFunction> &callee,
-    const common::Map<std::wstring, JSEntity *> &closure)
-    : JSObjectEntity(funcProto), _name(name), _callee(callee), _bind(nullptr),
-      _closure(closure) {
+    JSEntity *prototype, const common::AutoPtr<compiler::JSModule> &module)
+    : JSObjectEntity(prototype) {
   _type = JSValueType::JS_FUNCTION;
+  _module = module;
 }
-
-void JSFunctionEntity::bind(JSEntity *self) { _bind = self; }
-
-const std::function<JSFunction> &JSFunctionEntity::getCallee() const {
-  return _callee;
-};
-
-const common::Map<std::wstring, JSEntity *> &
+void JSFunctionEntity::setAsync(bool async) { _async = async; }
+void JSFunctionEntity::setAddress(uint32_t address) { _address = address; }
+void JSFunctionEntity::setLength(uint32_t length) { _length = length; }
+void JSFunctionEntity::setClosure(const std::wstring &name, JSEntity *entity) {
+  if (_closure.contains(name)) {
+    if (_closure.at(name) == entity) {
+      return;
+    }
+    appendChild(entity);
+    removeChild(_closure.at(name));
+  } else {
+    appendChild(entity);
+  }
+  _closure[name] = entity;
+}
+bool JSFunctionEntity::getAsync() { return _async; }
+uint32_t JSFunctionEntity::getAddress() { return _address; }
+uint32_t JSFunctionEntity::getLength() { return _length; }
+const std::unordered_map<std::wstring, JSEntity *> &
 JSFunctionEntity::getClosure() const {
   return _closure;
 }
-
-const JSEntity *
-JSFunctionEntity::getBind(common::AutoPtr<JSContext> ctx) const {
-  return _bind;
+const common::AutoPtr<compiler::JSModule> &JSFunctionEntity::getModule() const {
+  return _module;
 }
-
-JSEntity *JSFunctionEntity::getBind(common::AutoPtr<JSContext> ctx) {
-  return _bind;
-}
-
-const std::wstring &JSFunctionEntity::getFunctionName() const {
-  static std::wstring anonymous = L"anonymous";
-  if (_name.empty()) {
-    return anonymous;
-  }
-  return _name;
-}
-
-std::wstring JSFunctionEntity::toString(common::AutoPtr<JSContext> ctx) const {
-  return fmt::format(L"function {}(){{[native code]}}", getFunctionName());
-};
-
-bool JSFunctionEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
-  return true;
-};

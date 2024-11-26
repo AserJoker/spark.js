@@ -26,9 +26,10 @@ static std::array KEYWORLDS = {
     L"private",    L"protected",  L"public",    L"static", L"await",
     L"yield"};
 
-void JSParser::bindDeclaration(common::AutoPtr<IdentifierLiteral> identifier) {
+void JSParser::bindDeclaration(
+    common::AutoPtr<JSIdentifierLiteral> identifier) {
   auto name = identifier->value;
-  Declaration *declar = nullptr;
+  JSSourceDeclaration *declar = nullptr;
   auto scope = _currentScope;
   while (!declar && scope) {
     for (auto &dec : scope->declarations) {
@@ -42,7 +43,7 @@ void JSParser::bindDeclaration(common::AutoPtr<IdentifierLiteral> identifier) {
     }
     scope = scope->parent;
   }
-  Binding *binding = nullptr;
+  JSSourceBinding *binding = nullptr;
   for (auto &b : _currentScope->bindings) {
     if (b.declaration == declar) {
       binding = &b;
@@ -56,116 +57,116 @@ void JSParser::bindDeclaration(common::AutoPtr<IdentifierLiteral> identifier) {
   }
   binding->references.push_back(identifier.getRawPointer());
 }
-void JSParser::bindScope(common::AutoPtr<Node> node) {
+void JSParser::bindScope(common::AutoPtr<JSNode> node) {
   auto scope = _currentScope;
   if (node->scope != nullptr) {
     _currentScope = node->scope.getRawPointer();
   }
   switch (node->type) {
-  case NodeType::LITERAL_IDENTITY:
-    bindDeclaration(node.cast<IdentifierLiteral>());
+  case JSNodeType::LITERAL_IDENTITY:
+    bindDeclaration(node.cast<JSIdentifierLiteral>());
     break;
-  case NodeType::DECLARATION_ARROW_FUNCTION: {
-    auto afunc = node.cast<ArrowFunctionDeclaration>();
+  case JSNodeType::DECLARATION_ARROW_FUNCTION: {
+    auto afunc = node.cast<JSArrowFunctionDeclaration>();
     for (auto &arg : afunc->arguments) {
       bindScope(arg);
     }
     bindScope(afunc->body);
   } break;
-  case NodeType::DECLARATION_FUNCTION: {
-    auto afunc = node.cast<FunctionDeclaration>();
+  case JSNodeType::DECLARATION_FUNCTION: {
+    auto afunc = node.cast<JSFunctionDeclaration>();
     for (auto &arg : afunc->arguments) {
       bindScope(arg);
     }
     bindScope(afunc->body);
   } break;
 
-  case NodeType::STATEMENT_FOR_IN: {
-    auto forin = node.cast<ForInStatement>();
+  case JSNodeType::STATEMENT_FOR_IN: {
+    auto forin = node.cast<JSForInStatement>();
     bindScope(forin->expression);
     bindScope(forin->body);
-    if (forin->declaration->type != NodeType::LITERAL_IDENTITY ||
-        forin->kind == DeclarationKind::UNKNOWN) {
+    if (forin->declaration->type != JSNodeType::LITERAL_IDENTITY ||
+        forin->kind == JSDeclarationKind::UNKNOWN) {
       bindScope(forin->declaration);
     }
   } break;
-  case NodeType::STATEMENT_FOR_OF: {
-    auto forof = node.cast<ForOfStatement>();
+  case JSNodeType::STATEMENT_FOR_OF: {
+    auto forof = node.cast<JSForOfStatement>();
     bindScope(forof->expression);
     bindScope(forof->body);
-    if (forof->declaration->type != NodeType::LITERAL_IDENTITY ||
-        forof->kind == DeclarationKind::UNKNOWN) {
+    if (forof->declaration->type != JSNodeType::LITERAL_IDENTITY ||
+        forof->kind == JSDeclarationKind::UNKNOWN) {
       bindScope(forof->declaration);
     }
   } break;
-  case NodeType::STATEMENT_FOR_AWAIT_OF: {
-    auto forof = node.cast<ForAwaitOfStatement>();
+  case JSNodeType::STATEMENT_FOR_AWAIT_OF: {
+    auto forof = node.cast<JSForAwaitOfStatement>();
     bindScope(forof->expression);
     bindScope(forof->body);
-    if (forof->declaration->type != NodeType::LITERAL_IDENTITY ||
-        forof->kind == DeclarationKind::UNKNOWN) {
+    if (forof->declaration->type != JSNodeType::LITERAL_IDENTITY ||
+        forof->kind == JSDeclarationKind::UNKNOWN) {
       bindScope(forof->declaration);
     }
   } break;
-  case NodeType::OBJECT_PROPERTY: {
-    auto prop = node.cast<ObjectProperty>();
+  case JSNodeType::OBJECT_PROPERTY: {
+    auto prop = node.cast<JSObjectProperty>();
     if (prop->implement != nullptr) {
       bindScope(prop->implement);
     }
-    if (prop->identifier->type != NodeType::LITERAL_IDENTITY ||
+    if (prop->identifier->type != JSNodeType::LITERAL_IDENTITY ||
         !prop->implement) {
       bindScope(prop->identifier);
     }
   } break;
-  case NodeType::OBJECT_METHOD: {
-    auto prop = node.cast<ObjectMethod>();
+  case JSNodeType::OBJECT_METHOD: {
+    auto prop = node.cast<JSObjectMethod>();
     for (auto &arg : prop->arguments) {
       bindScope(arg);
     }
     bindScope(prop->body);
-    if (prop->identifier->type != NodeType::LITERAL_IDENTITY) {
+    if (prop->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(prop->identifier);
     }
   } break;
-  case NodeType::OBJECT_ACCESSOR: {
-    auto prop = node.cast<ObjectMethod>();
+  case JSNodeType::OBJECT_ACCESSOR: {
+    auto prop = node.cast<JSObjectMethod>();
     for (auto &arg : prop->arguments) {
       bindScope(arg);
     }
     bindScope(prop->body);
-    if (prop->identifier->type != NodeType::LITERAL_IDENTITY) {
+    if (prop->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(prop->identifier);
     }
   } break;
-  case NodeType::EXPRESSION_MEMBER: {
-    auto member = node.cast<MemberExpression>();
+  case JSNodeType::EXPRESSION_MEMBER: {
+    auto member = node.cast<JSMemberExpression>();
     bindScope(member->left);
   } break;
-  case NodeType::EXPRESSION_OPTIONAL_MEMBER: {
-    auto member = node.cast<OptionalMemberExpression>();
+  case JSNodeType::EXPRESSION_OPTIONAL_MEMBER: {
+    auto member = node.cast<JSOptionalMemberExpression>();
     bindScope(member->left);
   } break;
-  case NodeType::PATTERN_OBJECT_ITEM: {
-    auto objitem = node.cast<ObjectPatternItem>();
+  case JSNodeType::PATTERN_OBJECT_ITEM: {
+    auto objitem = node.cast<JSObjectPatternItem>();
     if (objitem->value != nullptr) {
       bindScope(objitem->value);
     }
-    if (objitem->identifier->type != NodeType::LITERAL_IDENTITY) {
+    if (objitem->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(objitem->identifier);
     }
   } break;
-  case NodeType::PATTERN_ARRAY_ITEM: {
-    auto arritem = node.cast<ArrayPatternItem>();
+  case JSNodeType::PATTERN_ARRAY_ITEM: {
+    auto arritem = node.cast<JSArrayPatternItem>();
     if (arritem->value != nullptr) {
       bindScope(arritem->value);
     }
   } break;
-  case NodeType::CLASS_METHOD: {
-    auto method = node.cast<ClassMethod>();
+  case JSNodeType::CLASS_METHOD: {
+    auto method = node.cast<JSClassMethod>();
     for (auto &deco : method->decorators) {
       bindScope(deco);
     }
-    if (method->identifier->type != NodeType::LITERAL_IDENTITY) {
+    if (method->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(method->identifier);
     }
     for (auto &arg : method->arguments) {
@@ -173,24 +174,24 @@ void JSParser::bindScope(common::AutoPtr<Node> node) {
     }
     bindScope(method->body);
   } break;
-  case NodeType::CLASS_PROPERTY: {
-    auto prop = node.cast<ClassProperty>();
+  case JSNodeType::CLASS_PROPERTY: {
+    auto prop = node.cast<JSClassProperty>();
     for (auto &deco : prop->decorators) {
       bindScope(deco);
     }
-    if (prop->identifier->type != NodeType::LITERAL_IDENTITY) {
+    if (prop->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(prop->identifier);
     }
     if (prop->value != nullptr) {
       bindScope(prop->value);
     }
   } break;
-  case NodeType::CLASS_ACCESSOR: {
-    auto method = node.cast<ClassAccessor>();
+  case JSNodeType::CLASS_ACCESSOR: {
+    auto method = node.cast<JSClassAccessor>();
     for (auto &deco : method->decorators) {
       bindScope(deco);
     }
-    if (method->identifier->type != NodeType::LITERAL_IDENTITY) {
+    if (method->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(method->identifier);
     }
     for (auto &arg : method->arguments) {
@@ -198,17 +199,17 @@ void JSParser::bindScope(common::AutoPtr<Node> node) {
     }
     bindScope(method->body);
   } break;
-  case NodeType::DECLARATION_PARAMETER: {
-    auto param = node.cast<Parameter>();
-    if (param->identifier->type != NodeType::LITERAL_IDENTITY) {
+  case JSNodeType::DECLARATION_PARAMETER: {
+    auto param = node.cast<JSParameterDeclaration>();
+    if (param->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(param);
     }
     if (param->value != nullptr) {
       bindScope(param->value);
     }
   } break;
-  case NodeType::DECLARATION_CLASS: {
-    auto clazz = node.cast<ClassDeclaration>();
+  case JSNodeType::DECLARATION_CLASS: {
+    auto clazz = node.cast<JSClassDeclaration>();
     if (clazz->extends != nullptr) {
       bindScope(clazz->extends);
     }
@@ -219,102 +220,102 @@ void JSParser::bindScope(common::AutoPtr<Node> node) {
       bindScope(prop);
     }
   } break;
-  case NodeType::PATTERN_REST_ITEM: {
-    auto rest = node.cast<RestPatternItem>();
-    if (rest->identifier->type != NodeType::LITERAL_IDENTITY) {
+  case JSNodeType::PATTERN_REST_ITEM: {
+    auto rest = node.cast<JSRestPatternItem>();
+    if (rest->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(rest->identifier);
     }
   } break;
-  case NodeType::EXPORT_SPECIFIER: {
-    auto specifier = node.cast<ExportSpecifier>();
+  case JSNodeType::EXPORT_SPECIFIER: {
+    auto specifier = node.cast<JSExportSpecifier>();
     bindScope(specifier->identifier);
   } break;
-  case NodeType::VARIABLE_DECLARATOR: {
-    auto dec = node.cast<VariableDeclarator>();
+  case JSNodeType::VARIABLE_DECLARATOR: {
+    auto dec = node.cast<JSVariableDeclarator>();
     if (dec->value != nullptr) {
       bindScope(dec->value);
     }
-    if (dec->identifier->type != NodeType::LITERAL_IDENTITY) {
+    if (dec->identifier->type != JSNodeType::LITERAL_IDENTITY) {
       bindScope(dec->identifier);
     }
   } break;
-  case NodeType::DECLARATION_FUNCTION_BODY:
-  case NodeType::EXPORT_DEFAULT:
-  case NodeType::EXPORT_DECLARATION:
-  case NodeType::EXPRESSION_REST:
-  case NodeType::EXPRESSION_CALL:
-  case NodeType::EXPRESSION_OPTIONAL_CALL:
-  case NodeType::EXPRESSION_NEW:
-  case NodeType::EXPRESSION_DELETE:
-  case NodeType::EXPRESSION_AWAIT:
-  case NodeType::EXPRESSION_VOID:
-  case NodeType::EXPRESSION_TYPEOF:
-  case NodeType::EXPRESSION_GROUP:
-  case NodeType::EXPRESSION_ASSIGMENT:
-  case NodeType::PATTERN_OBJECT:
-  case NodeType::PATTERN_ARRAY:
-  case NodeType::STATIC_BLOCK:
-  case NodeType::DECLARATION_OBJECT:
-  case NodeType::DECLARATION_ARRAY:
-  case NodeType::PROGRAM:
-  case NodeType::STATEMENT_EMPTY:
-  case NodeType::STATEMENT_BLOCK:
-  case NodeType::STATEMENT_DEBUGGER:
-  case NodeType::STATEMENT_RETURN:
-  case NodeType::STATEMENT_YIELD:
-  case NodeType::STATEMENT_LABEL:
-  case NodeType::STATEMENT_BREAK:
-  case NodeType::STATEMENT_CONTINUE:
-  case NodeType::STATEMENT_IF:
-  case NodeType::STATEMENT_SWITCH:
-  case NodeType::STATEMENT_SWITCH_CASE:
-  case NodeType::STATEMENT_THROW:
-  case NodeType::STATEMENT_TRY:
-  case NodeType::STATEMENT_TRY_CATCH:
-  case NodeType::STATEMENT_WHILE:
-  case NodeType::STATEMENT_DO_WHILE:
-  case NodeType::STATEMENT_FOR:
-  case NodeType::VARIABLE_DECLARATION:
-  case NodeType::DECORATOR:
-  case NodeType::EXPRESSION_UNARY:
-  case NodeType::EXPRESSION_UPDATE:
-  case NodeType::EXPRESSION_BINARY:
-  case NodeType::EXPRESSION_COMPUTED_MEMBER:
-  case NodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER:
-  case NodeType::EXPRESSION_CONDITION: {
+  case JSNodeType::DECLARATION_FUNCTION_BODY:
+  case JSNodeType::EXPORT_DEFAULT:
+  case JSNodeType::EXPORT_DECLARATION:
+  case JSNodeType::EXPRESSION_REST:
+  case JSNodeType::EXPRESSION_CALL:
+  case JSNodeType::EXPRESSION_OPTIONAL_CALL:
+  case JSNodeType::EXPRESSION_NEW:
+  case JSNodeType::EXPRESSION_DELETE:
+  case JSNodeType::EXPRESSION_AWAIT:
+  case JSNodeType::EXPRESSION_VOID:
+  case JSNodeType::EXPRESSION_TYPEOF:
+  case JSNodeType::EXPRESSION_GROUP:
+  case JSNodeType::EXPRESSION_ASSIGMENT:
+  case JSNodeType::PATTERN_OBJECT:
+  case JSNodeType::PATTERN_ARRAY:
+  case JSNodeType::STATIC_BLOCK:
+  case JSNodeType::DECLARATION_OBJECT:
+  case JSNodeType::DECLARATION_ARRAY:
+  case JSNodeType::PROGRAM:
+  case JSNodeType::STATEMENT_EMPTY:
+  case JSNodeType::STATEMENT_BLOCK:
+  case JSNodeType::STATEMENT_DEBUGGER:
+  case JSNodeType::STATEMENT_RETURN:
+  case JSNodeType::STATEMENT_YIELD:
+  case JSNodeType::STATEMENT_LABEL:
+  case JSNodeType::STATEMENT_BREAK:
+  case JSNodeType::STATEMENT_CONTINUE:
+  case JSNodeType::STATEMENT_IF:
+  case JSNodeType::STATEMENT_SWITCH:
+  case JSNodeType::STATEMENT_SWITCH_CASE:
+  case JSNodeType::STATEMENT_THROW:
+  case JSNodeType::STATEMENT_TRY:
+  case JSNodeType::STATEMENT_TRY_CATCH:
+  case JSNodeType::STATEMENT_WHILE:
+  case JSNodeType::STATEMENT_DO_WHILE:
+  case JSNodeType::STATEMENT_FOR:
+  case JSNodeType::VARIABLE_DECLARATION:
+  case JSNodeType::DECORATOR:
+  case JSNodeType::EXPRESSION_UNARY:
+  case JSNodeType::EXPRESSION_UPDATE:
+  case JSNodeType::EXPRESSION_BINARY:
+  case JSNodeType::EXPRESSION_COMPUTED_MEMBER:
+  case JSNodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER:
+  case JSNodeType::EXPRESSION_CONDITION: {
     for (auto &child : node->children) {
       bindScope(child);
     }
   } break;
-  case NodeType::THIS:
-  case NodeType::SUPER:
-  case NodeType::DIRECTIVE:
-  case NodeType::INTERPRETER_DIRECTIVE:
-  case NodeType::IMPORT_DECLARATION:
-  case NodeType::IMPORT_SPECIFIER:
-  case NodeType::IMPORT_DEFAULT:
-  case NodeType::IMPORT_NAMESPACE:
-  case NodeType::IMPORT_ATTARTUBE:
-  case NodeType::EXPORT_ALL:
-  case NodeType::PRIVATE_NAME:
-  case NodeType::LITERAL_REGEX:
-  case NodeType::LITERAL_NULL:
-  case NodeType::LITERAL_STRING:
-  case NodeType::LITERAL_BOOLEAN:
-  case NodeType::LITERAL_NUMBER:
-  case NodeType::LITERAL_COMMENT:
-  case NodeType::LITERAL_MULTILINE_COMMENT:
-  case NodeType::LITERAL_UNDEFINED:
-  case NodeType::LITERAL_TEMPLATE:
-  case NodeType::LITERAL_BIGINT:
+  case JSNodeType::THIS:
+  case JSNodeType::SUPER:
+  case JSNodeType::DIRECTIVE:
+  case JSNodeType::INTERPRETER_DIRECTIVE:
+  case JSNodeType::IMPORT_DECLARATION:
+  case JSNodeType::IMPORT_SPECIFIER:
+  case JSNodeType::IMPORT_DEFAULT:
+  case JSNodeType::IMPORT_NAMESPACE:
+  case JSNodeType::IMPORT_ATTARTUBE:
+  case JSNodeType::EXPORT_ALL:
+  case JSNodeType::PRIVATE_NAME:
+  case JSNodeType::LITERAL_REGEX:
+  case JSNodeType::LITERAL_NULL:
+  case JSNodeType::LITERAL_STRING:
+  case JSNodeType::LITERAL_BOOLEAN:
+  case JSNodeType::LITERAL_NUMBER:
+  case JSNodeType::LITERAL_COMMENT:
+  case JSNodeType::LITERAL_MULTILINE_COMMENT:
+  case JSNodeType::LITERAL_UNDEFINED:
+  case JSNodeType::LITERAL_TEMPLATE:
+  case JSNodeType::LITERAL_BIGINT:
     return;
   }
   _currentScope = scope;
 }
 
-common::AutoPtr<JSParser::Node> JSParser::parse(uint32_t filename,
-                                                const std::wstring &source) {
-  Position position = {0, 0, 0};
+common::AutoPtr<JSNode> JSParser::parse(uint32_t filename,
+                                        const std::wstring &source) {
+  JSSourceLocation::Position position = {0, 0, 0};
   auto root = readProgram(filename, source, position);
   if (root != nullptr) {
     bindScope(root);
@@ -325,7 +326,7 @@ common::AutoPtr<JSParser::Node> JSParser::parse(uint32_t filename,
 std::wstring JSParser::formatException(const std::wstring &message,
                                        uint32_t filename,
                                        const std::wstring &source,
-                                       Position position) {
+                                       JSSourceLocation::Position position) {
   static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
   std::wstring line;
   std::wstring spaceLine;
@@ -349,9 +350,10 @@ std::wstring JSParser::formatException(const std::wstring &message,
   return fmt::format(L"{}: \n{}\n{}\n", message, line, spaceLine);
 }
 
-JSParser::Location JSParser::getLocation(const std::wstring &source,
-                                         Position &start, Position &end) {
-  Location loc;
+JSSourceLocation JSParser::getLocation(const std::wstring &source,
+                                       JSSourceLocation::Position &start,
+                                       JSSourceLocation::Position &end) {
+  JSSourceLocation loc;
   loc.start = start;
   loc.end = end;
   loc.end.offset--;
@@ -359,63 +361,67 @@ JSParser::Location JSParser::getLocation(const std::wstring &source,
   return loc;
 }
 
-void JSParser::declareVariable(common::AutoPtr<Node> declarator,
-                               common::AutoPtr<Node> identifier,
-                               Declaration::TYPE type, bool isConst) {
-  if (identifier->type == NodeType::PATTERN_OBJECT) {
-    auto obj = identifier.cast<ObjectPattern>();
-    for (auto &item : obj->items) {
-      if (item->type == NodeType::PATTERN_OBJECT_ITEM) {
-        auto objitem = item.cast<ObjectPatternItem>();
-        if (!objitem->match) {
-          return declareVariable(declarator, objitem->identifier, type,
-                                 isConst);
-        } else {
-          return declareVariable(declarator, objitem->match, type, isConst);
-        }
-      } else if (item->type == NodeType::PATTERN_REST_ITEM) {
-        return declareVariable(declarator,
-                               item.cast<RestPatternItem>()->identifier, type,
-                               isConst);
-      }
-    }
-  }
-  if (identifier->type == NodeType::PATTERN_ARRAY) {
-    auto arr = identifier.cast<ArrayPattern>();
-    for (auto &item : arr->items) {
-      if (item->type == NodeType::PATTERN_ARRAY_ITEM) {
-        auto arritem = item.cast<ArrayPatternItem>();
-        return declareVariable(declarator, arritem->identifier, type, isConst);
-      } else if (item->type == NodeType::PATTERN_REST_ITEM) {
-        return declareVariable(declarator,
-                               item.cast<RestPatternItem>()->identifier, type,
-                               isConst);
-      }
-    }
-  }
-  Declaration declar;
-  declar.isConst = isConst;
-  declar.type = type;
+void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
+                               common::AutoPtr<JSNode> declarator,
+                               common::AutoPtr<JSNode> identifier,
+                               JSSourceDeclaration::TYPE type, bool isConst) {
   auto scope = _currentScope;
-  if (type == Declaration::TYPE::UNDEFINED) {
+  if (type == JSSourceDeclaration::TYPE::UNDEFINED ||
+      type == JSSourceDeclaration::TYPE::FUNCTION) {
     while (scope->parent &&
-           scope->node->type != NodeType::DECLARATION_FUNCTION &&
-           scope->node->type != NodeType::DECLARATION_ARROW_FUNCTION &&
-           scope->node->type != NodeType::OBJECT_METHOD &&
-           scope->node->type != NodeType::OBJECT_ACCESSOR &&
-           scope->node->type != NodeType::CLASS_ACCESSOR &&
-           scope->node->type != NodeType::CLASS_METHOD) {
+           scope->node->type != JSNodeType::DECLARATION_FUNCTION &&
+           scope->node->type != JSNodeType::DECLARATION_ARROW_FUNCTION &&
+           scope->node->type != JSNodeType::OBJECT_METHOD &&
+           scope->node->type != JSNodeType::OBJECT_ACCESSOR &&
+           scope->node->type != JSNodeType::CLASS_ACCESSOR &&
+           scope->node->type != JSNodeType::CLASS_METHOD) {
       scope = scope->parent;
     }
   }
+  if (identifier->type == JSNodeType::PATTERN_OBJECT) {
+    auto obj = identifier.cast<JSObjectPattern>();
+    for (auto &item : obj->items) {
+      if (item->type == JSNodeType::PATTERN_OBJECT_ITEM) {
+        auto objitem = item.cast<JSObjectPatternItem>();
+        if (!objitem->match) {
+          return declareVariable(filename, source, declarator,
+                                 objitem->identifier, type, isConst);
+        } else {
+          return declareVariable(filename, source, declarator, objitem->match,
+                                 type, isConst);
+        }
+      } else if (item->type == JSNodeType::PATTERN_REST_ITEM) {
+        return declareVariable(filename, source, declarator,
+                               item.cast<JSRestPatternItem>()->identifier, type,
+                               isConst);
+      }
+    }
+  }
+  if (identifier->type == JSNodeType::PATTERN_ARRAY) {
+    auto arr = identifier.cast<JSArrayPattern>();
+    for (auto &item : arr->items) {
+      if (item->type == JSNodeType::PATTERN_ARRAY_ITEM) {
+        auto arritem = item.cast<JSArrayPatternItem>();
+        return declareVariable(filename, source, declarator,
+                               arritem->identifier, type, isConst);
+      } else if (item->type == JSNodeType::PATTERN_REST_ITEM) {
+        return declareVariable(filename, source, declarator,
+                               item.cast<JSRestPatternItem>()->identifier, type,
+                               isConst);
+      }
+    }
+  }
+  JSSourceDeclaration declar;
+  declar.isConst = isConst;
+  declar.type = type;
   declar.scope = scope;
   declar.node = declarator.getRawPointer();
-  if (identifier->type == NodeType::LITERAL_STRING) {
-    declar.name = identifier.cast<StringLiteral>()->value;
-  } else if (identifier->type == NodeType::LITERAL_IDENTITY) {
-    declar.name = identifier.cast<IdentifierLiteral>()->value;
+  if (identifier->type == JSNodeType::LITERAL_STRING) {
+    declar.name = identifier.cast<JSStringLiteral>()->value;
+  } else if (identifier->type == JSNodeType::LITERAL_IDENTITY) {
+    declar.name = identifier.cast<JSIdentifierLiteral>()->value;
   }
-  Declaration *decr = nullptr;
+  JSSourceDeclaration *decr = nullptr;
   for (auto &dec : scope->declarations) {
     if (dec.name == declar.name) {
       decr = &dec;
@@ -423,9 +429,14 @@ void JSParser::declareVariable(common::AutoPtr<Node> declarator,
     }
   }
   if (decr != nullptr) {
-    if (type == Declaration::TYPE::UNINITIALIZED) {
-      throw error::JSSyntaxError(fmt::format(
-          L"Identifier '{}' has already been declared", decr->name));
+    if (type == JSSourceDeclaration::TYPE::UNINITIALIZED) {
+      throw error::JSSyntaxError(
+          formatException(
+              fmt::format(L"Identifier '{}' has already been declared",
+                          decr->name),
+              filename, source, identifier->location.start),
+          {filename, identifier->location.start.line,
+           identifier->location.start.column});
     }
   } else {
     scope->declarations.push_back(declar);
@@ -433,7 +444,7 @@ void JSParser::declareVariable(common::AutoPtr<Node> declarator,
 }
 
 bool JSParser::skipWhiteSpace(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto &chr = source[position.offset];
   if (std::find(WSC.begin(), WSC.end(), chr) == WSC.end()) {
     return false;
@@ -451,7 +462,7 @@ bool JSParser::skipWhiteSpace(uint32_t filename, const std::wstring &source,
 }
 
 bool JSParser::skipComment(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto node = readComment(filename, source, position);
   if (node != nullptr) {
     position = node->location.end;
@@ -465,7 +476,7 @@ bool JSParser::skipComment(uint32_t filename, const std::wstring &source,
 
 bool JSParser::skipLineTerminatior(uint32_t filename,
                                    const std::wstring &source,
-                                   Position &position) {
+                                   JSSourceLocation::Position &position) {
   auto &chr = source[position.offset];
   if (std::find(LTC.begin(), LTC.end(), chr) == LTC.end()) {
     return false;
@@ -489,7 +500,7 @@ bool JSParser::skipLineTerminatior(uint32_t filename,
 }
 
 bool JSParser::skipSemi(uint32_t filename, const std::wstring &source,
-                        Position &position) {
+                        JSSourceLocation::Position &position) {
   auto &chr = source[position.offset];
   if (chr == ';') {
     position.offset++;
@@ -500,7 +511,8 @@ bool JSParser::skipSemi(uint32_t filename, const std::wstring &source,
 }
 
 void JSParser::skipInvisible(uint32_t filename, const std::wstring &source,
-                             Position &position, bool *isNewline) {
+                             JSSourceLocation::Position &position,
+                             bool *isNewline) {
   auto current = position;
   while (skipLineTerminatior(filename, source, position) ||
          skipComment(filename, source, position) ||
@@ -513,7 +525,8 @@ void JSParser::skipInvisible(uint32_t filename, const std::wstring &source,
 }
 
 void JSParser::skipNewLine(uint32_t filename, const std::wstring &source,
-                           Position &position, bool *isNewline) {
+                           JSSourceLocation::Position &position,
+                           bool *isNewline) {
   auto current = position;
   while (skipComment(filename, source, position) ||
          skipWhiteSpace(filename, source, position) ||
@@ -525,13 +538,13 @@ void JSParser::skipNewLine(uint32_t filename, const std::wstring &source,
   }
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readStringToken(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
   if (chr == '\"' || chr == L'\'') {
-    common::AutoPtr token = new Token;
+    common::AutoPtr token = new JSToken;
     auto start = chr;
     auto mask = false;
     for (;;) {
@@ -564,9 +577,9 @@ JSParser::readStringToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readCommentToken(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
   if (chr == '/') {
@@ -582,7 +595,7 @@ JSParser::readCommentToken(uint32_t filename, const std::wstring &source,
         current.offset++;
       }
       current.column += current.offset - position.offset;
-      common::AutoPtr token = new Token();
+      common::AutoPtr token = new JSToken();
       current.offset++;
       current.column++;
       token->location = getLocation(source, position, current);
@@ -611,7 +624,7 @@ JSParser::readCommentToken(uint32_t filename, const std::wstring &source,
         }
         current.offset++;
       }
-      common::AutoPtr token = new Token();
+      common::AutoPtr token = new JSToken();
       current.offset++;
       current.column++;
       token->location = getLocation(source, position, current);
@@ -622,9 +635,9 @@ JSParser::readCommentToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readNumberToken(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
 
   auto current = position;
   auto &chr = source[current.offset];
@@ -686,7 +699,7 @@ JSParser::readNumberToken(uint32_t filename, const std::wstring &source,
     }
     current.offset--;
     current.column += current.offset - position.offset;
-    common::AutoPtr<Token> token = new Token;
+    common::AutoPtr<JSToken> token = new JSToken;
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -696,9 +709,9 @@ JSParser::readNumberToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readBigIntToken(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
 
   auto current = position;
   auto &chr = source[current.offset];
@@ -756,7 +769,7 @@ JSParser::readBigIntToken(uint32_t filename, const std::wstring &source,
     }
     current.offset--;
     current.column += current.offset - position.offset;
-    common::AutoPtr<Token> token = new Token;
+    common::AutoPtr<JSToken> token = new JSToken;
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -766,9 +779,9 @@ JSParser::readBigIntToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readRegexToken(uint32_t filename, const std::wstring &source,
-                         Position &position) {
+                         JSSourceLocation::Position &position) {
   static std::array regexFlags = {'d', 'g', 'i', 'm', 's', 'y'};
   auto current = position;
   auto &chr = source[current.offset];
@@ -818,7 +831,7 @@ JSParser::readRegexToken(uint32_t filename, const std::wstring &source,
       }
     }
     current.column += current.offset - position.offset;
-    common::AutoPtr token = new Token();
+    common::AutoPtr token = new JSToken();
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -828,9 +841,9 @@ JSParser::readRegexToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readBooleanToken(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   static wchar_t t[] = L"true";
   static wchar_t f[] = L"false";
   auto current = position;
@@ -851,7 +864,7 @@ JSParser::readBooleanToken(uint32_t filename, const std::wstring &source,
     p++;
     current.offset++;
   }
-  common::AutoPtr token = new Token();
+  common::AutoPtr token = new JSToken();
   current.offset--;
   current.column += current.offset - position.offset;
   current.offset++;
@@ -860,9 +873,9 @@ JSParser::readBooleanToken(uint32_t filename, const std::wstring &source,
   return token;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readNullToken(uint32_t filename, const std::wstring &source,
-                        Position &position) {
+                        JSSourceLocation::Position &position) {
   static wchar_t s[] = L"null";
   auto current = position;
   auto &chr = source[position.offset];
@@ -878,7 +891,7 @@ JSParser::readNullToken(uint32_t filename, const std::wstring &source,
     p++;
     current.offset++;
   }
-  common::AutoPtr token = new Token();
+  common::AutoPtr token = new JSToken();
   current.offset--;
   current.column += current.offset - position.offset;
   current.offset++;
@@ -887,9 +900,9 @@ JSParser::readNullToken(uint32_t filename, const std::wstring &source,
   return token;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readUndefinedToken(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   static wchar_t s[] = L"undefined";
   auto current = position;
   auto &chr = source[position.offset];
@@ -905,7 +918,7 @@ JSParser::readUndefinedToken(uint32_t filename, const std::wstring &source,
     p++;
     current.offset++;
   }
-  common::AutoPtr token = new Token();
+  common::AutoPtr token = new JSToken();
   current.offset--;
   current.column += current.offset - position.offset;
   current.offset++;
@@ -913,9 +926,9 @@ JSParser::readUndefinedToken(uint32_t filename, const std::wstring &source,
   position = current;
   return token;
 }
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readKeywordToken(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
   if ((chr >= 'a' && chr <= 'z')) {
@@ -930,7 +943,7 @@ JSParser::readKeywordToken(uint32_t filename, const std::wstring &source,
       }
     }
     current.column += current.offset - position.offset;
-    common::AutoPtr token = new Token();
+    common::AutoPtr token = new JSToken();
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -944,9 +957,10 @@ JSParser::readKeywordToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readIdentifierToken(uint32_t filename, const std::wstring &source,
-                              Position &position, bool allowKeyword) {
+                              JSSourceLocation::Position &position,
+                              bool allowKeyword) {
   // TODO: unicode support
   auto current = position;
   auto &chr = source[current.offset];
@@ -964,7 +978,7 @@ JSParser::readIdentifierToken(uint32_t filename, const std::wstring &source,
       }
     }
     current.column += current.offset - position.offset;
-    common::AutoPtr token = new Token();
+    common::AutoPtr token = new JSToken();
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -981,9 +995,9 @@ JSParser::readIdentifierToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readSymbolToken(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   static const std::vector<std::wstring> operators = {
       L">>>=",   L"...", L"<<=", L">>>", L"===", L"!==", L"**=", L">>=", L"&&=",
       LR"(??=)", L"**",  L"==",  L"!=",  L"<<",  L">>",  L"<=",  L">=",  L"&&",
@@ -1009,7 +1023,7 @@ JSParser::readSymbolToken(uint32_t filename, const std::wstring &source,
     if (found) {
       current.offset = offset;
       current.column += current.offset - position.offset;
-      common::AutoPtr token = new Token();
+      common::AutoPtr token = new JSToken();
       current.offset++;
       current.column++;
       token->location = getLocation(source, position, current);
@@ -1020,9 +1034,9 @@ JSParser::readSymbolToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readTemplateToken(uint32_t filename, const std::wstring &source,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
   if (chr == '`') {
@@ -1061,7 +1075,7 @@ JSParser::readTemplateToken(uint32_t filename, const std::wstring &source,
         current.column++;
       }
     }
-    common::AutoPtr token = new Token();
+    common::AutoPtr token = new JSToken();
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -1071,9 +1085,9 @@ JSParser::readTemplateToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readTemplateStartToken(uint32_t filename, const std::wstring &source,
-                                 Position &position) {
+                                 JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
   if (chr == '`') {
@@ -1112,7 +1126,7 @@ JSParser::readTemplateStartToken(uint32_t filename, const std::wstring &source,
         current.column++;
       }
     }
-    common::AutoPtr token = new Token();
+    common::AutoPtr token = new JSToken();
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -1122,8 +1136,10 @@ JSParser::readTemplateStartToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token> JSParser::readTemplatePatternToken(
-    uint32_t filename, const std::wstring &source, Position &position) {
+common::AutoPtr<JSParser::JSToken>
+JSParser::readTemplatePatternToken(uint32_t filename,
+                                   const std::wstring &source,
+                                   JSSourceLocation::Position &position) {
 
   auto current = position;
   auto &chr = source[current.offset];
@@ -1163,7 +1179,7 @@ common::AutoPtr<JSParser::Token> JSParser::readTemplatePatternToken(
         current.column++;
       }
     }
-    common::AutoPtr token = new Token();
+    common::AutoPtr token = new JSToken();
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -1173,9 +1189,9 @@ common::AutoPtr<JSParser::Token> JSParser::readTemplatePatternToken(
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Token>
+common::AutoPtr<JSParser::JSToken>
 JSParser::readTemplateEndToken(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
   if (chr == '}') {
@@ -1214,7 +1230,7 @@ JSParser::readTemplateEndToken(uint32_t filename, const std::wstring &source,
         current.column++;
       }
     }
-    common::AutoPtr token = new Token();
+    common::AutoPtr token = new JSToken();
     current.offset++;
     current.column++;
     token->location = getLocation(source, position, current);
@@ -1224,15 +1240,15 @@ JSParser::readTemplateEndToken(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readProgram(uint32_t filename, const std::wstring &source,
-                      Position &position) {
+                      JSSourceLocation::Position &position) {
   auto current = position;
   auto interpreter = readInterpreterDirective(filename, source, current);
-  common::AutoPtr program = new JSParser::Program();
-  program->type = NodeType::PROGRAM;
+  common::AutoPtr program = new JSProgram();
+  program->type = JSNodeType::PROGRAM;
   program->interpreter = interpreter;
-  program->scope = new Scope();
+  program->scope = new JSSourceScope();
   program->scope->node = program.getRawPointer();
   _currentScope = program->scope.getRawPointer();
   if (interpreter != nullptr) {
@@ -1268,10 +1284,10 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
   return program;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readStatement(uint32_t filename, const std::wstring &source,
-                        Position &position) {
-  common::AutoPtr<Node> node = nullptr;
+                        JSSourceLocation::Position &position) {
+  common::AutoPtr<JSNode> node = nullptr;
   auto current = position;
   if (!node) {
     node = readEmptyStatement(filename, source, current);
@@ -1340,15 +1356,15 @@ JSParser::readStatement(uint32_t filename, const std::wstring &source,
     position = current;
     return node;
   }
-  common::AutoPtr<Node> check;
+  common::AutoPtr<JSNode> check;
   if (!node) {
     node = readVariableDeclaration(filename, source, current);
   }
   if (node == nullptr) {
     node = readExpressionStatement(filename, source, current);
   }
-  if (node != nullptr && node->type != NodeType::DECLARATION_CLASS &&
-      node->type != NodeType::DECLARATION_FUNCTION) {
+  if (node != nullptr && node->type != JSNodeType::DECLARATION_CLASS &&
+      node->type != JSNodeType::DECLARATION_FUNCTION) {
     bool isNewLine = false;
     auto backup = current;
     skipInvisible(filename, source, current, &isNewLine);
@@ -1370,15 +1386,15 @@ JSParser::readStatement(uint32_t filename, const std::wstring &source,
   return node;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readDebuggerStatement(uint32_t filename, const std::wstring &source,
-                                JSParser::Position &position) {
+                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto identifier = readKeywordToken(filename, source, current);
   if (identifier != nullptr &&
       identifier->location.isEqual(source, L"debugger")) {
-    common::AutoPtr node = new DebuggerStatement;
+    common::AutoPtr node = new JSDebuggerStatement;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1386,14 +1402,14 @@ JSParser::readDebuggerStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"while")) {
-    common::AutoPtr node = new WhileStatement;
+    common::AutoPtr node = new JSWhileStatement;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L"(")) {
@@ -1429,15 +1445,15 @@ JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readDoWhileStatement(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"do")) {
-    common::AutoPtr node = new DoWhileStatement;
-    node->type = NodeType::STATEMENT_DO_WHILE;
+    common::AutoPtr node = new JSDoWhileStatement;
+    node->type = JSNodeType::STATEMENT_DO_WHILE;
     node->body = readStatement(filename, source, current);
     if (!node->body) {
       throw error::JSSyntaxError(
@@ -1480,21 +1496,21 @@ JSParser::readDoWhileStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readForStatement(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"for")) {
-    common::AutoPtr node = new ForStatement;
+    common::AutoPtr node = new JSForStatement;
 
     auto parentScope = _currentScope;
-    node->scope = new Scope(parentScope);
+    node->scope = new JSSourceScope(parentScope);
     node->scope->node = node.getRawPointer();
     _currentScope = node->scope.getRawPointer();
 
-    node->type = NodeType::STATEMENT_FOR;
+    node->type = JSNodeType::STATEMENT_FOR;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L"(")) {
@@ -1555,15 +1571,15 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"for")) {
-    common::AutoPtr node = new ForInStatement;
-    node->type = NodeType::STATEMENT_FOR_IN;
+    common::AutoPtr node = new JSForInStatement;
+    node->type = JSNodeType::STATEMENT_FOR_IN;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L"(")) {
@@ -1574,19 +1590,19 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
     auto backup = current;
     skipInvisible(filename, source, current);
     token = readKeywordToken(filename, source, current);
-    Declaration::TYPE type = Declaration::TYPE::UNINITIALIZED;
+    JSSourceDeclaration::TYPE type = JSSourceDeclaration::TYPE::UNINITIALIZED;
     bool isConst = false;
     if (token != nullptr) {
       if (token->location.isEqual(source, L"const")) {
-        node->kind = DeclarationKind::CONST;
+        node->kind = JSDeclarationKind::CONST;
         isConst = true;
       } else if (token->location.isEqual(source, L"let")) {
-        node->kind = DeclarationKind::LET;
+        node->kind = JSDeclarationKind::LET;
       } else if (token->location.isEqual(source, L"var")) {
-        node->kind = DeclarationKind::VAR;
-        type = Declaration::TYPE::UNDEFINED;
+        node->kind = JSDeclarationKind::VAR;
+        type = JSSourceDeclaration::TYPE::UNDEFINED;
       } else {
-        node->kind = DeclarationKind::UNKNOWN;
+        node->kind = JSDeclarationKind::UNKNOWN;
         current = backup;
       }
     }
@@ -1604,12 +1620,13 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
       if (token != nullptr && token->location.isEqual(source, L"in")) {
 
         auto parentScope = _currentScope;
-        node->scope = new Scope(parentScope);
+        node->scope = new JSSourceScope(parentScope);
         node->scope->node = node.getRawPointer();
         _currentScope = node->scope.getRawPointer();
 
-        if (node->kind != DeclarationKind::UNKNOWN) {
-          declareVariable(node, node->declaration, type, isConst);
+        if (node->kind != JSDeclarationKind::UNKNOWN) {
+          declareVariable(filename, source, node, node->declaration, type,
+                          isConst);
         }
 
         node->expression = readExpressions(filename, source, current);
@@ -1644,23 +1661,23 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"for")) {
-    common::AutoPtr<ForOfStatement> node;
+    common::AutoPtr<JSForOfStatement> node;
     auto backup = current;
     skipInvisible(filename, source, current);
     token = readKeywordToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"await")) {
-      node = new ForAwaitOfStatement;
-      node->type = NodeType::STATEMENT_FOR_AWAIT_OF;
+      node = new JSForAwaitOfStatement;
+      node->type = JSNodeType::STATEMENT_FOR_AWAIT_OF;
     } else {
-      node = new ForOfStatement;
-      node->type = NodeType::STATEMENT_FOR_OF;
+      node = new JSForOfStatement;
+      node->type = JSNodeType::STATEMENT_FOR_OF;
       current = backup;
     }
     skipInvisible(filename, source, current);
@@ -1673,19 +1690,19 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
     backup = current;
     skipInvisible(filename, source, current);
     token = readKeywordToken(filename, source, current);
-    Declaration::TYPE type = Declaration::TYPE::UNINITIALIZED;
+    JSSourceDeclaration::TYPE type = JSSourceDeclaration::TYPE::UNINITIALIZED;
     bool isConst = false;
     if (token != nullptr) {
       if (token->location.isEqual(source, L"const")) {
-        node->kind = DeclarationKind::CONST;
+        node->kind = JSDeclarationKind::CONST;
         isConst = true;
       } else if (token->location.isEqual(source, L"let")) {
-        node->kind = DeclarationKind::LET;
+        node->kind = JSDeclarationKind::LET;
       } else if (token->location.isEqual(source, L"var")) {
-        node->kind = DeclarationKind::VAR;
-        type = Declaration::TYPE::UNDEFINED;
+        node->kind = JSDeclarationKind::VAR;
+        type = JSSourceDeclaration::TYPE::UNDEFINED;
       } else {
-        node->kind = DeclarationKind::UNKNOWN;
+        node->kind = JSDeclarationKind::UNKNOWN;
         current = backup;
       }
     }
@@ -1703,11 +1720,12 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
       if (token != nullptr && token->location.isEqual(source, L"of")) {
 
         auto parentScope = _currentScope;
-        node->scope = new Scope(parentScope);
+        node->scope = new JSSourceScope(parentScope);
         node->scope->node = node.getRawPointer();
         _currentScope = node->scope.getRawPointer();
-        if (node->kind != DeclarationKind::UNKNOWN) {
-          declareVariable(node, node->declaration, type, isConst);
+        if (node->kind != JSDeclarationKind::UNKNOWN) {
+          declareVariable(filename, source, node, node->declaration, type,
+                          isConst);
         }
         node->expression = readExpressions(filename, source, current);
         if (!node->expression) {
@@ -1740,15 +1758,15 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readEmptyStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L";")) {
-    common::AutoPtr node = new EmptyStatement;
-    node->type = NodeType::STATEMENT_EMPTY;
+    common::AutoPtr node = new JSEmptyStatement;
+    node->type = JSNodeType::STATEMENT_EMPTY;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1756,14 +1774,14 @@ JSParser::readEmptyStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readYieldStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readIdentifierToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"yield")) {
-    common::AutoPtr node = new YieldStatement;
+    common::AutoPtr node = new JSYieldStatement;
     auto isNewLine = false;
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
@@ -1779,14 +1797,14 @@ JSParser::readYieldStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readReturnStatement(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"return")) {
-    common::AutoPtr node = new YieldStatement;
+    common::AutoPtr node = new JSReturnStatement;
     auto isNewLine = false;
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
@@ -1802,14 +1820,14 @@ JSParser::readReturnStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readThrowStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"throw")) {
-    common::AutoPtr node = new ThrowStatement;
+    common::AutoPtr node = new JSThrowStatement;
     auto isNewLine = false;
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
@@ -1825,14 +1843,14 @@ JSParser::readThrowStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readBreakStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"break")) {
-    common::AutoPtr node = new BreakStatement;
+    common::AutoPtr node = new JSBreakStatement;
     auto isNewLine = false;
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
@@ -1848,14 +1866,14 @@ JSParser::readBreakStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readContinueStatement(uint32_t filename, const std::wstring &source,
-                                Position &position) {
+                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"continue")) {
-    common::AutoPtr node = new BreakStatement;
+    common::AutoPtr node = new JSContinueStatement;
     auto isNewLine = false;
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
@@ -1871,17 +1889,17 @@ JSParser::readContinueStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readLabelStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto label = readIdentifierLiteral(filename, source, current);
   if (label != nullptr) {
     auto token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L":")) {
-      common::AutoPtr node = new LabelStatement;
-      node->type = NodeType::STATEMENT_LABEL;
+      common::AutoPtr node = new JSLabelStatement;
+      node->type = JSNodeType::STATEMENT_LABEL;
       node->label = label;
       label->addParent(node);
       node->statement = readStatement(filename, source, current);
@@ -1899,14 +1917,14 @@ JSParser::readLabelStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"if")) {
-    common::AutoPtr node = new IfStatement;
+    common::AutoPtr node = new JSIfStatement;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L"(")) {
@@ -1956,14 +1974,14 @@ JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"switch")) {
-    common::AutoPtr node = new SwitchStatement;
+    common::AutoPtr node = new JSSwitchStatement;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L"(")) {
@@ -1993,7 +2011,7 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     auto parentScope = _currentScope;
-    node->scope = new Scope(parentScope);
+    node->scope = new JSSourceScope(parentScope);
     node->scope->node = node.getRawPointer();
     _currentScope = node->scope.getRawPointer();
 
@@ -2019,14 +2037,14 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
-                                  Position &position) {
+                                  JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr) {
-    common::AutoPtr node = new SwitchCaseStatement;
+    common::AutoPtr node = new JSSwitchCaseStatement;
     if (token->location.isEqual(source, L"case")) {
       skipInvisible(filename, source, current);
       node->match = readExpressions(filename, source, current);
@@ -2080,16 +2098,16 @@ JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readTryStatement(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
 
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"try")) {
-    common::AutoPtr node = new TryStatement;
-    node->type = NodeType::STATEMENT_TRY;
+    common::AutoPtr node = new JSTryStatement;
+    node->type = JSNodeType::STATEMENT_TRY;
     node->try_ = readBlockStatement(filename, source, current);
     if (!node->try_) {
       throw error::JSSyntaxError(
@@ -2129,17 +2147,17 @@ JSParser::readTryStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
-                                Position &position) {
+                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"catch")) {
-    common::AutoPtr node = new TryCatchStatement;
+    common::AutoPtr node = new JSTryCatchStatement;
 
     auto parentScope = _currentScope;
-    node->scope = new Scope(parentScope);
+    node->scope = new JSSourceScope(parentScope);
     node->scope->node = node.getRawPointer();
     _currentScope = node->scope.getRawPointer();
 
@@ -2173,8 +2191,8 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      declareVariable(node, node->binding, Declaration::TYPE::UNINITIALIZED,
-                      false);
+      declareVariable(filename, source, node, node->binding,
+                      JSSourceDeclaration::TYPE::UNINITIALIZED, false);
     } else {
       current = backup;
     }
@@ -2193,15 +2211,15 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readExpressionStatement(uint32_t filename, const std::wstring &source,
-                                  Position &position) {
+                                  JSSourceLocation::Position &position) {
   return readExpressions(filename, source, position);
 }
 
-common::AutoPtr<JSParser::Node> JSParser::readValue(uint32_t filename,
-                                                    const std::wstring &source,
-                                                    Position &position) {
+common::AutoPtr<JSNode>
+JSParser::readValue(uint32_t filename, const std::wstring &source,
+                    JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto node = readGroupExpression(filename, source, current);
@@ -2254,7 +2272,7 @@ common::AutoPtr<JSParser::Node> JSParser::readValue(uint32_t filename,
         expr = readCallExpression(filename, source, current);
       }
       if (expr != nullptr) {
-        expr.cast<BinaryExpression>()->left = node;
+        expr.cast<JSBinaryExpression>()->left = node;
         node->addParent(expr);
         node = expr;
         node->location = getLocation(source, position, current);
@@ -2269,13 +2287,12 @@ common::AutoPtr<JSParser::Node> JSParser::readValue(uint32_t filename,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node> JSParser::readRValue(uint32_t filename,
-                                                     const std::wstring &source,
-                                                     Position &position,
-                                                     int level) {
+common::AutoPtr<JSNode>
+JSParser::readRValue(uint32_t filename, const std::wstring &source,
+                     JSSourceLocation::Position &position, int level) {
   auto current = position;
   skipInvisible(filename, source, current);
-  common::AutoPtr<Node> node = nullptr;
+  common::AutoPtr<JSNode> node = nullptr;
   if (!node) {
     node = readUnaryExpression(filename, source, current);
   }
@@ -2321,7 +2338,7 @@ common::AutoPtr<JSParser::Node> JSParser::readRValue(uint32_t filename,
         expr = readConditionExpression(filename, source, current);
       }
       if (expr != nullptr) {
-        expr.cast<BinaryExpression>()->left = node;
+        expr.cast<JSBinaryExpression>()->left = node;
         node->addParent(expr);
         node = expr;
         node->location = getLocation(source, position, current);
@@ -2336,15 +2353,15 @@ common::AutoPtr<JSParser::Node> JSParser::readRValue(uint32_t filename,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readDecorator(uint32_t filename, const std::wstring &source,
-                        Position &position) {
+                        JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"@")) {
-    common::AutoPtr node = new Decorator;
-    node->type = NodeType::DECORATOR;
+    common::AutoPtr node = new JSDecorator;
+    node->type = JSNodeType::DECORATOR;
     node->expression = readValue(filename, source, current);
     if (!node->expression) {
       throw error::JSSyntaxError(
@@ -2359,15 +2376,15 @@ JSParser::readDecorator(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readExpression(uint32_t filename, const std::wstring &source,
-                         Position &position) {
+                         JSSourceLocation::Position &position) {
   return readRValue(filename, source, position, 999);
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readExpressions(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto expr = readExpression(filename, source, current);
@@ -2384,7 +2401,7 @@ JSParser::readExpressions(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    common::AutoPtr node = new BinaryExpression;
+    common::AutoPtr node = new JSBinaryExpression;
     node->opt = L",";
     node->level = 18;
     node->left = expr;
@@ -2400,16 +2417,16 @@ JSParser::readExpressions(uint32_t filename, const std::wstring &source,
   return expr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipNewLine(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"{")) {
-    common::AutoPtr node = new BlockStatement;
+    common::AutoPtr node = new JSBlockStatement;
     auto parentScope = _currentScope;
-    node->scope = new Scope(parentScope);
+    node->scope = new JSSourceScope(parentScope);
     node->scope->node = node.getRawPointer();
     _currentScope = node->scope.getRawPointer();
     skipNewLine(filename, source, current);
@@ -2435,8 +2452,10 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node> JSParser::readInterpreterDirective(
-    uint32_t filename, const std::wstring &source, Position &position) {
+common::AutoPtr<JSNode>
+JSParser::readInterpreterDirective(uint32_t filename,
+                                   const std::wstring &source,
+                                   JSSourceLocation::Position &position) {
   auto current = position;
   skipNewLine(filename, source, current);
   auto &chr = source[current.offset];
@@ -2449,7 +2468,7 @@ common::AutoPtr<JSParser::Node> JSParser::readInterpreterDirective(
       current.offset++;
     }
     current.column += current.offset - position.offset;
-    common::AutoPtr node = new InterpreterDirective();
+    common::AutoPtr node = new JSInterpreterDirective();
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2457,14 +2476,14 @@ common::AutoPtr<JSParser::Node> JSParser::readInterpreterDirective(
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readDirective(uint32_t filename, const std::wstring &source,
-                        Position &position) {
+                        JSSourceLocation::Position &position) {
   auto current = position;
   skipNewLine(filename, source, current);
   auto value = readStringToken(filename, source, current);
   if (value != nullptr) {
-    common::AutoPtr node = new Directive();
+    common::AutoPtr node = new JSDirective();
     node->location = value->location;
     auto backup = current;
     auto token = readSymbolToken(filename, source, current);
@@ -2477,14 +2496,14 @@ JSParser::readDirective(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readStringLiteral(uint32_t filename, const std::wstring &source,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readStringToken(filename, source, current);
   if (token != nullptr) {
-    common::AutoPtr node = new StringLiteral;
+    common::AutoPtr node = new JSStringLiteral;
     auto src = source.substr(token->location.start.offset,
                              token->location.end.offset -
                                  token->location.start.offset + 1);
@@ -2496,14 +2515,14 @@ JSParser::readStringLiteral(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto tag = readIdentifierToken(filename, source, current);
   auto temp = readTemplateToken(filename, source, current);
-  common::AutoPtr node = new TemplateLiteral;
+  common::AutoPtr node = new JSTemplateLiteral;
   if (tag != nullptr) {
     node->tag = source.substr(tag->location.start.offset,
                               tag->location.end.offset -
@@ -2553,14 +2572,14 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readNumberLiteral(uint32_t filename, const std::wstring &src,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, src, current);
   auto token = readNumberToken(filename, src, current);
   if (token != nullptr) {
-    common::AutoPtr node = new NumberLiteral;
+    common::AutoPtr node = new JSNumberLiteral;
     auto source = token->location.getSource(src);
     if (source[0] == '0' && (source[1] == 'x' || source[1] == 'X')) {
       node->value = (double)std::stol(source, nullptr, 16);
@@ -2575,14 +2594,14 @@ JSParser::readNumberLiteral(uint32_t filename, const std::wstring &src,
   }
   return nullptr;
 }
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readBigIntLiteral(uint32_t filename, const std::wstring &source,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readBigIntToken(filename, source, current);
   if (token != nullptr) {
-    common::AutoPtr node = new BigIntLiteral;
+    common::AutoPtr node = new JSBigIntLiteral;
     node->location = token->location;
     node->value = source.substr(token->location.start.offset,
                                 token->location.end.offset -
@@ -2593,14 +2612,14 @@ JSParser::readBigIntLiteral(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readRegexLiteral(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readRegexToken(filename, source, current);
   if (token != nullptr) {
-    common::AutoPtr node = new RegexLiteral;
+    common::AutoPtr node = new JSRegexLiteral;
     auto src = token->location.getSource(source);
     auto end = src.find_last_of('/');
     node->value = src.substr(1, end - 1);
@@ -2626,55 +2645,55 @@ JSParser::readRegexLiteral(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readBooleanLiteral(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readBooleanToken(filename, source, current);
   if (!token) {
     return nullptr;
   }
-  common::AutoPtr node = new BooleanLiteral();
+  common::AutoPtr node = new JSBooleanLiteral();
   node->value = token->location.isEqual(source, L"true");
   node->location = token->location;
   position = current;
   return node;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readUndefinedLiteral(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readUndefinedToken(filename, source, current);
   if (!token) {
     return nullptr;
   }
-  common::AutoPtr node = new UndefinedLiteral();
+  common::AutoPtr node = new JSUndefinedLiteral();
   node->location = token->location;
   position = current;
   return node;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readNullLiteral(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readNullToken(filename, source, current);
   if (!token) {
     return nullptr;
   }
-  common::AutoPtr node = new NullLiteral();
+  common::AutoPtr node = new JSNullLiteral();
   node->location = token->location;
   position = current;
   return node;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readIdentifierLiteral(uint32_t filename, const std::wstring &source,
-                                Position &position) {
+                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readIdentifierToken(filename, source, current);
@@ -2682,16 +2701,16 @@ JSParser::readIdentifierLiteral(uint32_t filename, const std::wstring &source,
     token = readKeywordToken(filename, source, current);
     if (token != nullptr) {
       if (token->location.isEqual(source, L"this")) {
-        common::AutoPtr node = new IdentifierLiteral();
-        node->type = NodeType::THIS;
+        common::AutoPtr node = new JSIdentifierLiteral();
+        node->type = JSNodeType::THIS;
         node->value = token->location.getSource(source);
         node->location = token->location;
         position = current;
         return node;
       }
       if (token->location.isEqual(source, L"super")) {
-        common::AutoPtr node = new IdentifierLiteral();
-        node->type = NodeType::SUPER;
+        common::AutoPtr node = new JSIdentifierLiteral();
+        node->type = JSNodeType::SUPER;
         node->value = token->location.getSource(source);
         node->location = token->location;
         position = current;
@@ -2700,32 +2719,32 @@ JSParser::readIdentifierLiteral(uint32_t filename, const std::wstring &source,
     }
     return nullptr;
   }
-  common::AutoPtr node = new IdentifierLiteral();
+  common::AutoPtr node = new JSIdentifierLiteral();
   node->value = token->location.getSource(source);
   node->location = token->location;
   position = current;
   return node;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readMemberLiteral(uint32_t filename, const std::wstring &source,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readIdentifierToken(filename, source, current, true);
   if (token == nullptr) {
     return nullptr;
   }
-  common::AutoPtr node = new IdentifierLiteral();
+  common::AutoPtr node = new JSIdentifierLiteral();
   node->value = token->location.getSource(source);
   node->location = token->location;
   position = current;
   return node;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readPrivateName(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -2734,7 +2753,7 @@ JSParser::readPrivateName(uint32_t filename, const std::wstring &source,
     if (!token) {
       return nullptr;
     }
-    common::AutoPtr node = new PrivateName();
+    common::AutoPtr node = new JSPrivateName();
     node->value = token->location.getSource(source);
     node->location = getLocation(source, position, current);
     position = current;
@@ -2743,9 +2762,9 @@ JSParser::readPrivateName(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
-                               JSParser::Position &position) {
+                               JSSourceLocation::Position &position) {
   const std::vector<std::vector<std::wstring>> operators = {
       {},
       {},
@@ -2775,7 +2794,7 @@ JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
   for (size_t level = 0; level < operators.size(); level++) {
     for (auto &opt : operators[level]) {
       if (token->location.isEqual(source, opt)) {
-        common::AutoPtr node = new BinaryExpression;
+        common::AutoPtr node = new JSBinaryExpression;
         node->location = token->location;
         node->level = (uint32_t)level;
         node->opt = opt;
@@ -2794,9 +2813,9 @@ JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readAssigmentExpression(uint32_t filename, const std::wstring &source,
-                                  JSParser::Position &position) {
+                                  JSSourceLocation::Position &position) {
   const std::vector<std::wstring> operators = {
       {L"=", L"+=", L"-=", L"**=", L"*=", L"/=", L"%=", L">>>=", L"<<=", L">>=",
        L"&&=", L"||=", L"&=", L"^=", L"|=", LR"(??=)"}};
@@ -2808,10 +2827,10 @@ JSParser::readAssigmentExpression(uint32_t filename, const std::wstring &source,
   }
   for (auto &opt : operators) {
     if (token->location.isEqual(source, opt)) {
-      common::AutoPtr node = new BinaryExpression;
+      common::AutoPtr node = new JSBinaryExpression;
       node->level = 17;
       node->opt = opt;
-      node->type = NodeType::EXPRESSION_ASSIGMENT;
+      node->type = JSNodeType::EXPRESSION_ASSIGMENT;
       node->right = readRValue(filename, source, current, 17);
       if (!node->right) {
         throw error::JSSyntaxError(
@@ -2827,9 +2846,9 @@ JSParser::readAssigmentExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
-                                  Position &position) {
+                                  JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -2857,9 +2876,9 @@ JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    common::AutoPtr node = new ConditionExpression;
+    common::AutoPtr node = new JSConditionExpression;
 
-    common::AutoPtr vnode = new BinaryExpression;
+    common::AutoPtr vnode = new JSBinaryExpression;
     vnode->level = -2;
 
     vnode->location = getLocation(source, next, current);
@@ -2878,16 +2897,16 @@ JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readUpdateExpression(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr) {
     if (token->location.isEqual(source, L"++") ||
         token->location.isEqual(source, L"--")) {
-      common::AutoPtr node = new UpdateExpression;
+      common::AutoPtr node = new JSUpdateExpression;
       node->location = token->location;
       node->opt = token->location.getSource(source);
       position = current;
@@ -2897,9 +2916,9 @@ JSParser::readUpdateExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readUnaryExpression(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   static std::vector<std::wstring> unarys = {L"!", L"~",  L"+",
                                              L"-", L"++", L"--"};
   auto current = position;
@@ -2909,7 +2928,7 @@ JSParser::readUnaryExpression(uint32_t filename, const std::wstring &source,
     auto src = token->location.getSource(source);
     auto it = std::find(unarys.begin(), unarys.end(), src);
     if (it != unarys.end()) {
-      common::AutoPtr node = new UnaryExpression;
+      common::AutoPtr node = new JSUnaryExpression;
       node->location = token->location;
       node->opt = src;
       node->right = readRValue(filename, source, current, 4);
@@ -2926,9 +2945,9 @@ JSParser::readUnaryExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readGroupExpression(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -2945,7 +2964,7 @@ JSParser::readGroupExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    common::AutoPtr node = new GroupExpression;
+    common::AutoPtr node = new JSGroupExpression;
     node->expression = expr;
     expr->addParent(node);
     node->location = getLocation(source, position, current);
@@ -2955,9 +2974,9 @@ JSParser::readGroupExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -2975,7 +2994,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    common::AutoPtr node = new MemberExpression;
+    common::AutoPtr node = new JSMemberExpression;
     node->location = getLocation(source, position, current);
     node->right = identifier;
     identifier->addParent(node);
@@ -2991,15 +3010,15 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
       if (token->location.isEqual(source, L"(")) {
         current = next;
         auto field = readCallExpression(filename, source, current)
-                         .cast<CallExpression>();
+                         .cast<JSCallExpression>();
         if (!field) {
           throw error::JSSyntaxError(
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        common::AutoPtr node = new OptionalCallExpression;
+        common::AutoPtr node = new JSOptionalCallExpression;
         node->level = field->level;
-        node->type = NodeType::EXPRESSION_OPTIONAL_CALL;
+        node->type = JSNodeType::EXPRESSION_OPTIONAL_CALL;
         node->arguments = field->arguments;
         for (auto &arg : node->arguments) {
           arg->addParent(node);
@@ -3010,13 +3029,13 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
       } else if (token->location.isEqual(source, L"[")) {
         current = next;
         auto field = readMemberExpression(filename, source, current)
-                         .cast<ComputedMemberExpression>();
+                         .cast<JSComputedMemberExpression>();
         if (!field) {
           throw error::JSSyntaxError(
               formatException(L"Unexcepted token", filename, source, current),
               {filename, current.line, current.column});
         }
-        common::AutoPtr node = new OptionalComputedMemberExpression;
+        common::AutoPtr node = new JSOptionalComputedMemberExpression;
         node->right = field->right;
         node->right->addParent(node);
         node->location = getLocation(source, position, current);
@@ -3024,7 +3043,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
         return node;
       }
     }
-    common::AutoPtr node = new OptionalMemberExpression;
+    common::AutoPtr node = new JSOptionalMemberExpression;
     node->location = getLocation(source, position, current);
     auto identifier = readIdentifierLiteral(filename, source, current);
     if (!identifier) {
@@ -3051,7 +3070,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    common::AutoPtr node = new ComputedMemberExpression;
+    common::AutoPtr node = new JSComputedMemberExpression;
     node->right = field;
     field->addParent(node);
     node->location = getLocation(source, position, current);
@@ -3061,14 +3080,14 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readCallExpression(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"(")) {
-    common::AutoPtr node = new CallExpression;
+    common::AutoPtr node = new JSCallExpression;
     auto arg = readRestExpression(filename, source, current);
     if (!arg) {
       arg = readExpression(filename, source, current);
@@ -3112,9 +3131,9 @@ JSParser::readCallExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readRestExpression(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -3122,10 +3141,10 @@ JSParser::readRestExpression(uint32_t filename, const std::wstring &source,
     return nullptr;
   }
   if (token->location.isEqual(source, L"...")) {
-    common::AutoPtr node = new BinaryExpression;
+    common::AutoPtr node = new JSBinaryExpression;
     node->level = 19;
     node->opt = L"...";
-    node->type = NodeType::EXPRESSION_BINARY;
+    node->type = JSNodeType::EXPRESSION_BINARY;
     node->right = readRValue(filename, source, current, 999);
     if (!node->right) {
       throw error::JSSyntaxError(
@@ -3140,14 +3159,14 @@ JSParser::readRestExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readAwaitExpression(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readIdentifierToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"await")) {
-    common::AutoPtr node = new AwaitExpression;
+    common::AutoPtr node = new JSAwaitExpression;
     node->location = getLocation(source, position, current);
     node->right = readRValue(filename, source, current, 4);
     if (!node->right) {
@@ -3162,14 +3181,14 @@ JSParser::readAwaitExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readTypeofExpression(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"typeof")) {
-    common::AutoPtr node = new TypeofExpression;
+    common::AutoPtr node = new JSTypeofExpression;
     node->location = getLocation(source, position, current);
     node->right = readRValue(filename, source, current, 4);
     if (!node->right) {
@@ -3184,14 +3203,14 @@ JSParser::readTypeofExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readVoidExpression(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"void")) {
-    common::AutoPtr node = new VoidExpression;
+    common::AutoPtr node = new JSVoidExpression;
     node->location = getLocation(source, position, current);
     node->right = readRValue(filename, source, current, 4);
     if (!node->right) {
@@ -3206,14 +3225,14 @@ JSParser::readVoidExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readNewExpression(uint32_t filename, const std::wstring &source,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"new")) {
-    common::AutoPtr node = new NewExpression;
+    common::AutoPtr node = new JSNewExpression;
     node->location = getLocation(source, position, current);
     node->right = readRValue(filename, source, current, 2);
     if (!node->right) {
@@ -3228,14 +3247,14 @@ JSParser::readNewExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readDeleteExpression(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"delete")) {
-    common::AutoPtr node = new DeleteExpression;
+    common::AutoPtr node = new JSDeleteExpression;
     node->location = getLocation(source, position, current);
     node->right = readRValue(filename, source, current, 4);
     if (!node->right) {
@@ -3250,18 +3269,18 @@ JSParser::readDeleteExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readInExpression(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"in")) {
-    common::AutoPtr node = new BinaryExpression;
+    common::AutoPtr node = new JSBinaryExpression;
     node->location = token->location;
     node->level = 9;
     node->opt = L"in";
-    node->type = NodeType::EXPRESSION_BINARY;
+    node->type = JSNodeType::EXPRESSION_BINARY;
     node->right = readRValue(filename, source, current, 9);
     if (!node->right) {
       throw error::JSSyntaxError(
@@ -3275,17 +3294,19 @@ JSParser::readInExpression(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node> JSParser::readInstanceOfExpression(
-    uint32_t filename, const std::wstring &source, Position &position) {
+common::AutoPtr<JSNode>
+JSParser::readInstanceOfExpression(uint32_t filename,
+                                   const std::wstring &source,
+                                   JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"instanceof")) {
-    common::AutoPtr node = new BinaryExpression;
+    common::AutoPtr node = new JSBinaryExpression;
     node->location = token->location;
     node->level = 9;
     node->opt = L"instanceof";
-    node->type = NodeType::EXPRESSION_BINARY;
+    node->type = JSNodeType::EXPRESSION_BINARY;
     node->right = readRValue(filename, source, current, 9);
     if (!node->right) {
       throw error::JSSyntaxError(
@@ -3299,16 +3320,16 @@ common::AutoPtr<JSParser::Node> JSParser::readInstanceOfExpression(
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readParameter(uint32_t filename, const std::wstring &source,
-                        Position &position) {
+                        JSSourceLocation::Position &position) {
   common::AutoPtr rest = readRestPattern(filename, source, position);
   if (rest != nullptr) {
     return rest;
   }
   auto current = position;
   skipInvisible(filename, source, current);
-  common::AutoPtr node = new Parameter;
+  common::AutoPtr node = new JSParameterDeclaration;
   auto identifier = readIdentifierLiteral(filename, source, current);
   if (!identifier) {
     identifier = readObjectPattern(filename, source, current);
@@ -3351,12 +3372,14 @@ JSParser::readParameter(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
-    uint32_t filename, const std::wstring &source, Position &position) {
+common::AutoPtr<JSNode>
+JSParser::readArrowFunctionDeclaration(uint32_t filename,
+                                       const std::wstring &source,
+                                       JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto async = readIdentifierToken(filename, source, current);
-  common::AutoPtr node = new ArrowFunctionDeclaration();
+  common::AutoPtr node = new JSArrowFunctionDeclaration();
   if (async == nullptr || !async->location.isEqual(source, L"async")) {
     async = nullptr;
     current = position;
@@ -3404,17 +3427,19 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
     skipInvisible(filename, source, current);
 
     auto parentScope = _currentScope;
-    node->scope = new Scope(parentScope);
+    node->scope = new JSSourceScope(parentScope);
     node->scope->node = node.getRawPointer();
     _currentScope = node->scope.getRawPointer();
 
     for (auto &param : node->arguments) {
-      if (param->type == NodeType::PATTERN_REST_ITEM) {
-        declareVariable(node, param.cast<RestPatternItem>()->identifier,
-                        Declaration::TYPE::ARGUMENT, false);
+      if (param->type == JSNodeType::PATTERN_REST_ITEM) {
+        declareVariable(filename, source, node,
+                        param.cast<JSRestPatternItem>()->identifier,
+                        JSSourceDeclaration::TYPE::ARGUMENT, false);
       } else {
-        declareVariable(node, param.cast<Parameter>()->identifier,
-                        Declaration::TYPE::ARGUMENT, false);
+        declareVariable(filename, source, node,
+                        param.cast<JSParameterDeclaration>()->identifier,
+                        JSSourceDeclaration::TYPE::ARGUMENT, false);
       }
     }
 
@@ -3443,12 +3468,13 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
     if (token != nullptr && token->location.isEqual(source, L"=>")) {
 
       auto parentScope = _currentScope;
-      node->scope = new Scope(parentScope);
+      node->scope = new JSSourceScope(parentScope);
       node->scope->node = node.getRawPointer();
       _currentScope = node->scope.getRawPointer();
 
-      declareVariable(node, param.cast<Parameter>()->identifier,
-                      Declaration::TYPE::ARGUMENT, false);
+      declareVariable(filename, source, node,
+                      param.cast<JSParameterDeclaration>()->identifier,
+                      JSSourceDeclaration::TYPE::ARGUMENT, false);
 
       param->addParent(node);
       node->arguments.push_back(param);
@@ -3480,14 +3506,14 @@ common::AutoPtr<JSParser::Node> JSParser::readArrowFunctionDeclaration(
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readFunctionBody(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"{")) {
-    common::AutoPtr node = new FunctionBodyDeclaration;
+    common::AutoPtr node = new JSFunctionBodyDeclaration;
     auto directive = readDirective(filename, source, current);
     while (directive != nullptr) {
       directive->addParent(node);
@@ -3516,9 +3542,9 @@ JSParser::readFunctionBody(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
-                                  Position &position) {
+                                  JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto next = current;
@@ -3537,7 +3563,7 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
       generator = nullptr;
       current = next;
     }
-    common::AutoPtr node = new FunctionDeclaration;
+    common::AutoPtr node = new JSFunctionDeclaration;
     if (async != nullptr) {
       node->async = true;
     } else {
@@ -3551,15 +3577,15 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
     node->identifier = readIdentifierLiteral(filename, source, current);
     if (node->identifier != nullptr) {
       node->identifier->addParent(node);
-      declareVariable(node, node->identifier, Declaration::TYPE::FUNCTION,
-                      false);
+      declareVariable(filename, source, node, node->identifier,
+                      JSSourceDeclaration::TYPE::FUNCTION, false);
     }
     skipInvisible(filename, source, current);
     auto token = readSymbolToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"(")) {
 
       auto parentScope = _currentScope;
-      node->scope = new Scope(parentScope);
+      node->scope = new JSSourceScope(parentScope);
       node->scope->node = node.getRawPointer();
       _currentScope = node->scope.getRawPointer();
 
@@ -3567,12 +3593,14 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
       while (param != nullptr) {
         param->addParent(node);
 
-        if (param->type == NodeType::PATTERN_REST_ITEM) {
-          declareVariable(node, param.cast<RestPatternItem>()->identifier,
-                          Declaration::TYPE::ARGUMENT, false);
+        if (param->type == JSNodeType::PATTERN_REST_ITEM) {
+          declareVariable(filename, source, node,
+                          param.cast<JSRestPatternItem>()->identifier,
+                          JSSourceDeclaration::TYPE::ARGUMENT, false);
         } else {
-          declareVariable(node, param.cast<Parameter>()->identifier,
-                          Declaration::TYPE::ARGUMENT, false);
+          declareVariable(filename, source, node,
+                          param.cast<JSParameterDeclaration>()->identifier,
+                          JSSourceDeclaration::TYPE::ARGUMENT, false);
         }
 
         node->arguments.push_back(param);
@@ -3623,14 +3651,14 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"[")) {
-    common::AutoPtr node = new ArrayDeclaration;
+    common::AutoPtr node = new JSArrayDeclaration;
     auto item = readRestExpression(filename, source, current);
     if (item == nullptr) {
       item = readExpression(filename, source, current);
@@ -3682,14 +3710,14 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
   }
   return nullptr;
 }
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
-                                Position &position) {
+                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"{")) {
-    common::AutoPtr node = new ObjectDeclaration;
+    common::AutoPtr node = new JSObjectDeclaration;
     auto item = readObjectProperty(filename, source, current);
     for (;;) {
       auto next = current;
@@ -3737,9 +3765,9 @@ JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto rest = readRestExpression(filename, source, position);
   if (rest != nullptr) {
     return rest;
@@ -3763,8 +3791,8 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
   if (!identifier) {
     identifier = readMemberExpression(filename, source, current);
     if (identifier != nullptr &&
-        identifier->type == NodeType::EXPRESSION_COMPUTED_MEMBER) {
-      identifier = identifier.cast<ComputedMemberExpression>()->right;
+        identifier->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+      identifier = identifier.cast<JSComputedMemberExpression>()->right;
     } else {
       current = position;
       identifier = nullptr;
@@ -3773,7 +3801,7 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
   if (!identifier) {
     return nullptr;
   }
-  common::AutoPtr node = new ObjectProperty;
+  common::AutoPtr node = new JSObjectProperty;
   node->identifier = identifier;
   if (identifier != nullptr) {
     identifier->addParent(node);
@@ -3808,9 +3836,9 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
       {filename, current.line, current.column});
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto current = position;
   auto next = current;
 
@@ -3843,8 +3871,8 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
   if (!identifier) {
     identifier = readMemberExpression(filename, source, current);
     if (identifier != nullptr &&
-        identifier->type == NodeType::EXPRESSION_COMPUTED_MEMBER) {
-      identifier = identifier.cast<ComputedMemberExpression>()->right;
+        identifier->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+      identifier = identifier.cast<JSComputedMemberExpression>()->right;
     } else {
       current = position;
       identifier = nullptr;
@@ -3862,14 +3890,14 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"(")) {
-    common::AutoPtr node = new ObjectMethod;
+    common::AutoPtr node = new JSObjectMethod;
     node->async = async != nullptr;
     node->generator = generator != nullptr;
     node->identifier = identifier;
     identifier->addParent(node);
 
     auto parentScope = _currentScope;
-    node->scope = new Scope(parentScope);
+    node->scope = new JSSourceScope(parentScope);
     node->scope->node = node.getRawPointer();
     _currentScope = node->scope.getRawPointer();
 
@@ -3877,12 +3905,14 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
     while (param != nullptr) {
       param->addParent(node);
 
-      if (param->type == NodeType::PATTERN_REST_ITEM) {
-        declareVariable(node, param.cast<RestPatternItem>()->identifier,
-                        Declaration::TYPE::ARGUMENT, false);
+      if (param->type == JSNodeType::PATTERN_REST_ITEM) {
+        declareVariable(filename, source, node,
+                        param.cast<JSRestPatternItem>()->identifier,
+                        JSSourceDeclaration::TYPE::ARGUMENT, false);
       } else {
-        declareVariable(node, param.cast<Parameter>()->identifier,
-                        Declaration::TYPE::ARGUMENT, false);
+        declareVariable(filename, source, node,
+                        param.cast<JSParameterDeclaration>()->identifier,
+                        JSSourceDeclaration::TYPE::ARGUMENT, false);
       }
 
       node->arguments.push_back(param);
@@ -3932,9 +3962,9 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
-                             Position &position) {
+                             JSSourceLocation::Position &position) {
   auto current = position;
 
   skipInvisible(filename, source, current);
@@ -3955,8 +3985,8 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
   if (!identifier) {
     identifier = readMemberExpression(filename, source, current);
     if (identifier != nullptr &&
-        identifier->type == NodeType::EXPRESSION_COMPUTED_MEMBER) {
-      identifier = identifier.cast<ComputedMemberExpression>()->right;
+        identifier->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+      identifier = identifier.cast<JSComputedMemberExpression>()->right;
     } else {
       current = position;
       identifier = nullptr;
@@ -3968,25 +3998,28 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"(")) {
-    common::AutoPtr node = new ObjectAccessor;
+    common::AutoPtr node = new JSObjectAccessor;
 
     auto parentScope = _currentScope;
-    node->scope = new Scope(parentScope);
+    node->scope = new JSSourceScope(parentScope);
     node->scope->node = node.getRawPointer();
     _currentScope = node->scope.getRawPointer();
 
-    node->kind = accessor->location.isEqual(source, L"get") ? AccessorKind::GET
-                                                            : AccessorKind::SET;
+    node->kind = accessor->location.isEqual(source, L"get")
+                     ? JSAccessorKind::GET
+                     : JSAccessorKind::SET;
     node->identifier = identifier;
     identifier->addParent(node);
     auto param = readParameter(filename, source, current);
     while (param != nullptr) {
-      if (param->type == NodeType::PATTERN_REST_ITEM) {
-        declareVariable(node, param.cast<RestPatternItem>()->identifier,
-                        Declaration::TYPE::ARGUMENT, false);
+      if (param->type == JSNodeType::PATTERN_REST_ITEM) {
+        declareVariable(filename, source, node,
+                        param.cast<JSRestPatternItem>()->identifier,
+                        JSSourceDeclaration::TYPE::ARGUMENT, false);
       } else {
-        declareVariable(node, param.cast<Parameter>()->identifier,
-                        Declaration::TYPE::ARGUMENT, false);
+        declareVariable(filename, source, node,
+                        param.cast<JSParameterDeclaration>()->identifier,
+                        JSSourceDeclaration::TYPE::ARGUMENT, false);
       }
       param->addParent(node);
       node->arguments.push_back(param);
@@ -4036,11 +4069,11 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto current = position;
-  common::AutoPtr node = new ClassDeclaration;
+  common::AutoPtr node = new JSClassDeclaration;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
     decorator->addParent(node);
@@ -4053,14 +4086,14 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
   if (token != nullptr && token->location.isEqual(source, L"export")) {
     current = backup;
     auto exportNode = readExportDeclaration(filename, source, current)
-                          .cast<ExportDeclaration>();
+                          .cast<JSExportDeclaration>();
     if (!exportNode || exportNode->items.size() == 0 ||
-        exportNode->items[0]->type != NodeType::DECLARATION_CLASS) {
+        exportNode->items[0]->type != JSNodeType::DECLARATION_CLASS) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    auto clazz = exportNode->items[0].cast<ClassDeclaration>();
+    auto clazz = exportNode->items[0].cast<JSClassDeclaration>();
     clazz->decorators = node->decorators;
     for (auto &dec : node->decorators) {
       dec->addParent(clazz);
@@ -4137,16 +4170,16 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readStaticBlock(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   auto current = position;
   skipNewLine(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"static")) {
     auto statement = readBlockStatement(filename, source, current);
     if (statement != nullptr) {
-      statement->type = NodeType::STATIC_BLOCK;
+      statement->type = JSNodeType::STATIC_BLOCK;
       statement->location = getLocation(source, position, current);
       position = current;
       return statement;
@@ -4155,11 +4188,11 @@ JSParser::readStaticBlock(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   auto current = position;
-  common::AutoPtr node = new ClassMethod;
+  common::AutoPtr node = new JSClassMethod;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
     decorator->addParent(node);
@@ -4208,8 +4241,8 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
     backup = current;
     identifier = readMemberExpression(filename, source, current);
     if (identifier != nullptr &&
-        identifier->type == NodeType::EXPRESSION_COMPUTED_MEMBER) {
-      identifier = identifier.cast<ComputedMemberExpression>()->right;
+        identifier->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+      identifier = identifier.cast<JSComputedMemberExpression>()->right;
     } else {
       identifier = nullptr;
       current = backup;
@@ -4232,18 +4265,20 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
       node->identifier = identifier;
 
       auto parentScope = _currentScope;
-      node->scope = new Scope(parentScope);
+      node->scope = new JSSourceScope(parentScope);
       node->scope->node = node.getRawPointer();
       _currentScope = node->scope.getRawPointer();
 
       auto param = readParameter(filename, source, current);
       while (param != nullptr) {
-        if (param->type == NodeType::PATTERN_REST_ITEM) {
-          declareVariable(node, param.cast<RestPatternItem>()->identifier,
-                          Declaration::TYPE::ARGUMENT, false);
+        if (param->type == JSNodeType::PATTERN_REST_ITEM) {
+          declareVariable(filename, source, node,
+                          param.cast<JSRestPatternItem>()->identifier,
+                          JSSourceDeclaration::TYPE::ARGUMENT, false);
         } else {
-          declareVariable(node, param.cast<Parameter>()->identifier,
-                          Declaration::TYPE::ARGUMENT, false);
+          declareVariable(filename, source, node,
+                          param.cast<JSParameterDeclaration>()->identifier,
+                          JSSourceDeclaration::TYPE::ARGUMENT, false);
         }
         param->addParent(node);
         node->arguments.push_back(param);
@@ -4297,11 +4332,11 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto current = position;
-  common::AutoPtr node = new ClassAccessor;
+  common::AutoPtr node = new JSClassAccessor;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
     decorator->addParent(node);
@@ -4334,8 +4369,8 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
       auto backup = current;
       identifier = readMemberExpression(filename, source, current);
       if (identifier != nullptr &&
-          identifier->type == NodeType::EXPRESSION_COMPUTED_MEMBER) {
-        identifier = identifier.cast<ComputedMemberExpression>()->right;
+          identifier->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+        identifier = identifier.cast<JSComputedMemberExpression>()->right;
       } else {
         identifier = nullptr;
         current = backup;
@@ -4348,23 +4383,25 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
       if (token != nullptr && token->location.isEqual(source, L"(")) {
 
         auto parentScope = _currentScope;
-        node->scope = new Scope(parentScope);
+        node->scope = new JSSourceScope(parentScope);
         node->scope->node = node.getRawPointer();
         _currentScope = node->scope.getRawPointer();
 
         node->static_ = static_ != nullptr;
         node->kind = accessor->location.isEqual(source, L"get")
-                         ? AccessorKind::GET
-                         : AccessorKind::SET;
+                         ? JSAccessorKind::GET
+                         : JSAccessorKind::SET;
         node->identifier = identifier;
         auto param = readParameter(filename, source, current);
         while (param != nullptr) {
-          if (param->type == NodeType::PATTERN_REST_ITEM) {
-            declareVariable(node, param.cast<RestPatternItem>()->identifier,
-                            Declaration::TYPE::ARGUMENT, false);
+          if (param->type == JSNodeType::PATTERN_REST_ITEM) {
+            declareVariable(filename, source, node,
+                            param.cast<JSRestPatternItem>()->identifier,
+                            JSSourceDeclaration::TYPE::ARGUMENT, false);
           } else {
-            declareVariable(node, param.cast<Parameter>()->identifier,
-                            Declaration::TYPE::ARGUMENT, false);
+            declareVariable(filename, source, node,
+                            param.cast<JSParameterDeclaration>()->identifier,
+                            JSSourceDeclaration::TYPE::ARGUMENT, false);
           }
           param->addParent(node);
           node->arguments.push_back(param);
@@ -4417,9 +4454,9 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto rest = readRestExpression(filename, source, position);
   if (rest != nullptr) {
     return rest;
@@ -4437,7 +4474,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
     return accessor;
   }
   auto current = position;
-  common::AutoPtr node = new ClassProperty;
+  common::AutoPtr node = new JSClassProperty;
   auto decorator = readDecorator(filename, source, current);
   while (decorator != nullptr) {
     decorator->addParent(node);
@@ -4468,9 +4505,9 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
     auto backup = current;
     node->identifier = readMemberExpression(filename, source, current);
     if (node->identifier != nullptr &&
-        node->identifier->type == NodeType::EXPRESSION_COMPUTED_MEMBER) {
+        node->identifier->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
       node->identifier =
-          node->identifier.cast<ComputedMemberExpression>()->right;
+          node->identifier.cast<JSComputedMemberExpression>()->right;
     } else {
       node->identifier = nullptr;
       current = backup;
@@ -4496,9 +4533,9 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
   return node;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
-                                 Position &position) {
+                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto identifier = readIdentifierLiteral(filename, source, current);
@@ -4511,7 +4548,7 @@ JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
   if (!identifier) {
     return nullptr;
   }
-  common::AutoPtr node = new VariableDeclarator;
+  common::AutoPtr node = new JSVariableDeclarator;
   node->identifier = identifier;
   identifier->addParent(node);
   auto next = current;
@@ -4537,23 +4574,23 @@ JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
   return node;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
-                                  Position &position) {
+                                  JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto kind = readKeywordToken(filename, source, current);
   if (kind != nullptr) {
-    common::AutoPtr node = new VariableDeclaration;
-    Declaration::TYPE type = Declaration::TYPE::UNINITIALIZED;
+    common::AutoPtr node = new JSVariableDeclaration;
+    JSSourceDeclaration::TYPE type = JSSourceDeclaration::TYPE::UNINITIALIZED;
     bool isConst = false;
     if (kind->location.isEqual(source, L"var")) {
-      node->kind = DeclarationKind::VAR;
-      type = Declaration::TYPE::UNDEFINED;
+      node->kind = JSDeclarationKind::VAR;
+      type = JSSourceDeclaration::TYPE::UNDEFINED;
     } else if (kind->location.isEqual(source, L"let")) {
-      node->kind = DeclarationKind::LET;
+      node->kind = JSDeclarationKind::LET;
     } else if (kind->location.isEqual(source, L"const")) {
-      node->kind = DeclarationKind::CONST;
+      node->kind = JSDeclarationKind::CONST;
       isConst = true;
     } else {
       return nullptr;
@@ -4566,8 +4603,8 @@ JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
     }
     while (declarator != nullptr) {
       declarator->addParent(node);
-      declareVariable(declarator,
-                      declarator.cast<VariableDeclarator>()->identifier, type,
+      declareVariable(filename, source, declarator,
+                      declarator.cast<JSVariableDeclarator>()->identifier, type,
                       isConst);
       node->declarations.push_back(declarator);
       auto next = current;
@@ -4590,9 +4627,9 @@ JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
-                          Position &position) {
+                          JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -4609,7 +4646,7 @@ JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    common::AutoPtr node = new RestPatternItem;
+    common::AutoPtr node = new JSRestPatternItem;
     node->identifier = identifier;
     identifier->addParent(node);
     node->location = getLocation(source, position, current);
@@ -4619,9 +4656,9 @@ JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
-                                Position &position) {
+                                JSSourceLocation::Position &position) {
   auto rest = readRestPattern(filename, source, position);
   if (rest != nullptr) {
     return rest;
@@ -4630,18 +4667,18 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
   skipInvisible(filename, source, current);
   auto next = current;
   auto identifier = readIdentifierLiteral(filename, source, current);
-  common::AutoPtr node = new ObjectPatternItem;
+  common::AutoPtr node = new JSObjectPatternItem;
   if (!identifier) {
     identifier = readStringLiteral(filename, source, current);
   }
   if (!identifier) {
     identifier = readMemberExpression(filename, source, current);
     if (!identifier ||
-        identifier->type != NodeType::EXPRESSION_COMPUTED_MEMBER) {
+        identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
       identifier = nullptr;
       current = next;
     } else {
-      identifier = identifier.cast<ComputedMemberExpression>()->right;
+      identifier = identifier.cast<JSComputedMemberExpression>()->right;
     }
   }
   if (!identifier) {
@@ -4705,14 +4742,14 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
       {filename, current.line, current.column});
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readObjectPattern(uint32_t filename, const std::wstring &source,
-                            Position &position) {
+                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"{")) {
-    common::AutoPtr node = new ObjectPattern;
+    common::AutoPtr node = new JSObjectPattern;
     auto item = readObjectPatternItem(filename, source, current);
     while (item != nullptr) {
       item->addParent(node);
@@ -4747,9 +4784,9 @@ JSParser::readObjectPattern(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
-                               Position &position) {
+                               JSSourceLocation::Position &position) {
   auto rest = readRestPattern(filename, source, position);
   if (rest != nullptr) {
     return rest;
@@ -4767,7 +4804,7 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
     identifier = readStringLiteral(filename, source, current);
   }
   if (identifier != nullptr) {
-    common::AutoPtr node = new ArrayPatternItem;
+    common::AutoPtr node = new JSArrayPatternItem;
     node->identifier = identifier;
     identifier->addParent(node);
     auto next = current;
@@ -4792,14 +4829,14 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
-                           Position &position) {
+                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"[")) {
-    common::AutoPtr node = new ArrayPattern;
+    common::AutoPtr node = new JSArrayPattern;
     auto item = readArrayPatternItem(filename, source, current);
     for (;;) {
       skipInvisible(filename, source, current);
@@ -4843,9 +4880,9 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readComment(uint32_t filename, const std::wstring &source,
-                      Position &position) {
+                      JSSourceLocation::Position &position) {
   auto current = position;
   while (skipWhiteSpace(filename, source, current) ||
          skipLineTerminatior(filename, source, current)) {
@@ -4853,19 +4890,19 @@ JSParser::readComment(uint32_t filename, const std::wstring &source,
   }
   auto token = readCommentToken(filename, source, current);
   if (token != nullptr) {
-    common::AutoPtr node = new Comment();
+    common::AutoPtr node = new JSComment();
     node->location = token->location;
     if (source[node->location.start.offset + 1] == L'*') {
-      node->type = NodeType::LITERAL_MULTILINE_COMMENT;
+      node->type = JSNodeType::LITERAL_MULTILINE_COMMENT;
     }
     return node;
   }
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto identifier = readIdentifierLiteral(filename, source, current);
@@ -4873,7 +4910,7 @@ JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
     identifier = readStringLiteral(filename, source, current);
   }
   if (identifier != nullptr) {
-    common::AutoPtr node = new ImportSpecifier;
+    common::AutoPtr node = new JSImportSpecifier;
     node->identifier = identifier;
     identifier->addParent(node);
     auto backup = current;
@@ -4889,7 +4926,7 @@ JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       node->alias->addParent(node);
-    } else if (identifier->type == NodeType::LITERAL_STRING) {
+    } else if (identifier->type == JSNodeType::LITERAL_STRING) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
@@ -4903,13 +4940,15 @@ JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node> JSParser::readImportDefaultSpecifier(
-    uint32_t filename, const std::wstring &source, Position &position) {
+common::AutoPtr<JSNode>
+JSParser::readImportDefaultSpecifier(uint32_t filename,
+                                     const std::wstring &source,
+                                     JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto identifier = readIdentifierLiteral(filename, source, current);
   if (identifier != nullptr) {
-    common::AutoPtr node = new ImportDefaultSpecifier;
+    common::AutoPtr node = new JSImportDefaultSpecifier;
     node->identifier = identifier;
     identifier->addParent(node);
     node->location = getLocation(source, position, current);
@@ -4919,8 +4958,10 @@ common::AutoPtr<JSParser::Node> JSParser::readImportDefaultSpecifier(
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node> JSParser::readImportNamespaceSpecifier(
-    uint32_t filename, const std::wstring &source, Position &position) {
+common::AutoPtr<JSNode>
+JSParser::readImportNamespaceSpecifier(uint32_t filename,
+                                       const std::wstring &source,
+                                       JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
@@ -4939,7 +4980,7 @@ common::AutoPtr<JSParser::Node> JSParser::readImportNamespaceSpecifier(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    common::AutoPtr node = new ImportNamespaceSpecifier;
+    common::AutoPtr node = new JSImportNamespaceSpecifier;
     node->alias = identifier;
     identifier->addParent(node);
     node->location = getLocation(source, position, current);
@@ -4948,9 +4989,9 @@ common::AutoPtr<JSParser::Node> JSParser::readImportNamespaceSpecifier(
   }
   return nullptr;
 }
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto key = readIdentifierLiteral(filename, source, current);
@@ -4958,8 +4999,8 @@ JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
     key = readStringLiteral(filename, source, current);
   }
   if (key != nullptr) {
-    common::AutoPtr node = new ImportAttribute;
-    node->type = NodeType::IMPORT_ATTARTUBE;
+    common::AutoPtr node = new JSImportAttribute;
+    node->type = JSNodeType::IMPORT_ATTARTUBE;
     node->key = key;
     key->addParent(node);
     skipInvisible(filename, source, current);
@@ -4983,14 +5024,14 @@ JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
-                                Position &position) {
+                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"import")) {
-    common::AutoPtr node = new ImportDeclaration;
+    common::AutoPtr node = new JSImportDeclaration;
     skipInvisible(filename, source, current);
     auto src = readStringLiteral(filename, source, current);
     if (src != nullptr) {
@@ -5000,17 +5041,18 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
       auto specifier = readImportNamespaceSpecifier(filename, source, current);
       if (specifier != nullptr) {
         specifier->addParent(node);
-        declareVariable(specifier,
-                        specifier.cast<ImportNamespaceSpecifier>()->alias,
-                        Declaration::TYPE::UNINITIALIZED, true);
+        declareVariable(filename, source, specifier,
+                        specifier.cast<JSImportNamespaceSpecifier>()->alias,
+                        JSSourceDeclaration::TYPE::UNINITIALIZED, true);
         node->items.push_back(specifier);
       } else {
         specifier = readImportDefaultSpecifier(filename, source, current);
         if (specifier != nullptr) {
           specifier->addParent(node);
-          declareVariable(specifier,
-                          specifier.cast<ImportDefaultSpecifier>()->identifier,
-                          Declaration::TYPE::UNINITIALIZED, true);
+          declareVariable(
+              filename, source, specifier,
+              specifier.cast<JSImportDefaultSpecifier>()->identifier,
+              JSSourceDeclaration::TYPE::UNINITIALIZED, true);
           node->items.push_back(specifier);
           skipInvisible(filename, source, current);
           token = readSymbolToken(filename, source, current);
@@ -5042,25 +5084,27 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
                     {filename, current.line, current.column});
               }
               specifier->addParent(node);
-              auto ispec = specifier.cast<ImportSpecifier>();
+              auto ispec = specifier.cast<JSImportSpecifier>();
               if (ispec->alias != nullptr) {
-                declareVariable(specifier, ispec->alias,
-                                Declaration::TYPE::UNINITIALIZED, true);
+                declareVariable(filename, source, specifier, ispec->alias,
+                                JSSourceDeclaration::TYPE::UNINITIALIZED, true);
               } else {
-                declareVariable(specifier, ispec->identifier,
-                                Declaration::TYPE::UNINITIALIZED, true);
+                declareVariable(filename, source, specifier, ispec->identifier,
+                                JSSourceDeclaration::TYPE::UNINITIALIZED, true);
               }
               node->items.push_back(specifier);
             } else if (token->location.isEqual(source, L"}")) {
               if (specifier != nullptr) {
                 specifier->addParent(node);
-                auto ispec = specifier.cast<ImportSpecifier>();
+                auto ispec = specifier.cast<JSImportSpecifier>();
                 if (ispec->alias != nullptr) {
-                  declareVariable(specifier, ispec->alias,
-                                  Declaration::TYPE::UNINITIALIZED, true);
+                  declareVariable(filename, source, specifier, ispec->alias,
+                                  JSSourceDeclaration::TYPE::UNINITIALIZED,
+                                  true);
                 } else {
-                  declareVariable(specifier, ispec->identifier,
-                                  Declaration::TYPE::UNINITIALIZED, true);
+                  declareVariable(
+                      filename, source, specifier, ispec->identifier,
+                      JSSourceDeclaration::TYPE::UNINITIALIZED, true);
                 }
                 node->items.push_back(specifier);
               }
@@ -5079,9 +5123,9 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
         }
         specifier = readImportNamespaceSpecifier(filename, source, current);
         if (specifier != nullptr) {
-          declareVariable(specifier,
-                          specifier.cast<ImportNamespaceSpecifier>()->alias,
-                          Declaration::TYPE::UNINITIALIZED, true);
+          declareVariable(filename, source, specifier,
+                          specifier.cast<JSImportNamespaceSpecifier>()->alias,
+                          JSSourceDeclaration::TYPE::UNINITIALIZED, true);
           specifier->addParent(node);
           node->items.push_back(specifier);
         }
@@ -5157,14 +5201,14 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readExportSpecifier(uint32_t filename, const std::wstring &source,
-                              Position &position) {
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto identifier = readIdentifierLiteral(filename, source, current);
   if (identifier != nullptr) {
-    common::AutoPtr node = new ExportSpecifier;
+    common::AutoPtr node = new JSExportSpecifier;
     node->identifier = identifier;
     identifier->addParent(node);
     auto backup = current;
@@ -5192,13 +5236,15 @@ JSParser::readExportSpecifier(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node> JSParser::readExportDefaultSpecifier(
-    uint32_t filename, const std::wstring &source, Position &position) {
+common::AutoPtr<JSNode>
+JSParser::readExportDefaultSpecifier(uint32_t filename,
+                                     const std::wstring &source,
+                                     JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"default")) {
-    common::AutoPtr node = new ExportDefaultSpecifier;
+    common::AutoPtr node = new JSExportDefaultSpecifier;
     node->value = readExpression(filename, source, current);
     if (!node->value) {
       throw error::JSSyntaxError(
@@ -5213,14 +5259,14 @@ common::AutoPtr<JSParser::Node> JSParser::readExportDefaultSpecifier(
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readExportAllSpecifier(uint32_t filename, const std::wstring &source,
-                                 Position &position) {
+                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"*")) {
-    common::AutoPtr node = new ExportAllSpecifier;
+    common::AutoPtr node = new JSExportAllSpecifier;
     auto backup = current;
     skipInvisible(filename, source, current);
     token = readIdentifierToken(filename, source, current);
@@ -5242,18 +5288,18 @@ JSParser::readExportAllSpecifier(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 
-common::AutoPtr<JSParser::Node>
+common::AutoPtr<JSNode>
 JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
-                                Position &position) {
+                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"export")) {
-    common::AutoPtr node = new ExportDeclaration;
+    common::AutoPtr node = new JSExportDeclaration;
     auto specifier = readExportDefaultSpecifier(filename, source, current);
     if (!specifier) {
       auto declaration = readClassDeclaration(filename, source, current)
-                             .cast<ClassDeclaration>();
+                             .cast<JSClassDeclaration>();
       if (declaration != nullptr && declaration->identifier == nullptr) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),
@@ -5263,7 +5309,7 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
     }
     if (!specifier) {
       auto declaration = readFunctionDeclaration(filename, source, current)
-                             .cast<FunctionDeclaration>();
+                             .cast<JSFunctionDeclaration>();
       if (declaration != nullptr && declaration->identifier == nullptr) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),
@@ -5385,7 +5431,7 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
           current = backup;
         }
       } else if (node->items.size() &&
-                 node->items[0]->type == NodeType::EXPORT_ALL) {
+                 node->items[0]->type == JSNodeType::EXPORT_ALL) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
@@ -5401,265 +5447,265 @@ JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
 }
 std::wstring JSParser::toJSON(const std::wstring &filename,
                               const std::wstring &source,
-                              common::AutoPtr<Node> node) {
+                              common::AutoPtr<JSNode> node) {
   std::wstring type;
   switch (node->type) {
-  case NodeType::PRIVATE_NAME:
+  case JSNodeType::PRIVATE_NAME:
     type = L"PRIVATE_NAME";
     break;
-  case NodeType::LITERAL_REGEX:
+  case JSNodeType::LITERAL_REGEX:
     type = L"LITERAL_REGEX";
     break;
-  case NodeType::LITERAL_NULL:
+  case JSNodeType::LITERAL_NULL:
     type = L"LITERAL_NULL";
     break;
-  case NodeType::LITERAL_STRING:
+  case JSNodeType::LITERAL_STRING:
     type = L"LITERAL_STRING";
     break;
-  case NodeType::LITERAL_BOOLEAN:
+  case JSNodeType::LITERAL_BOOLEAN:
     type = L"LITERAL_BOOLEAN";
     break;
-  case NodeType::LITERAL_NUMBER:
+  case JSNodeType::LITERAL_NUMBER:
     type = L"LITERAL_NUMBER";
     break;
-  case NodeType::LITERAL_COMMENT:
+  case JSNodeType::LITERAL_COMMENT:
     type = L"LITERAL_COMMENT";
     break;
-  case NodeType::LITERAL_MULTILINE_COMMENT:
+  case JSNodeType::LITERAL_MULTILINE_COMMENT:
     type = L"LITERAL_MULTILINE_COMMENT";
     break;
-  case NodeType::LITERAL_UNDEFINED:
+  case JSNodeType::LITERAL_UNDEFINED:
     type = L"LITERAL_UNDEFINED";
     break;
-  case NodeType::LITERAL_IDENTITY:
+  case JSNodeType::LITERAL_IDENTITY:
     type = L"LITERAL_IDENTITY";
     break;
-  case NodeType::LITERAL_TEMPLATE:
+  case JSNodeType::LITERAL_TEMPLATE:
     type = L"LITERAL_TEMPLATE";
     break;
-  case NodeType::LITERAL_BIGINT:
+  case JSNodeType::LITERAL_BIGINT:
     type = L"LITERAL_BIGINT";
     break;
-  case NodeType::THIS:
+  case JSNodeType::THIS:
     type = L"THIS";
     break;
-  case NodeType::SUPER:
+  case JSNodeType::SUPER:
     type = L"SUPER";
     break;
-  case NodeType::PROGRAM:
+  case JSNodeType::PROGRAM:
     type = L"PROGRAM";
     break;
-  case NodeType::STATEMENT_EMPTY:
+  case JSNodeType::STATEMENT_EMPTY:
     type = L"STATEMENT_EMPTY";
     break;
-  case NodeType::STATEMENT_BLOCK:
+  case JSNodeType::STATEMENT_BLOCK:
     type = L"STATEMENT_BLOCK";
     break;
-  case NodeType::STATEMENT_DEBUGGER:
+  case JSNodeType::STATEMENT_DEBUGGER:
     type = L"STATEMENT_DEBUGGER";
     break;
-  case NodeType::STATEMENT_RETURN:
+  case JSNodeType::STATEMENT_RETURN:
     type = L"STATEMENT_RETURN";
     break;
-  case NodeType::STATEMENT_YIELD:
+  case JSNodeType::STATEMENT_YIELD:
     type = L"STATEMENT_YIELD";
     break;
-  case NodeType::STATEMENT_LABEL:
+  case JSNodeType::STATEMENT_LABEL:
     type = L"STATEMENT_LABEL";
     break;
-  case NodeType::STATEMENT_BREAK:
+  case JSNodeType::STATEMENT_BREAK:
     type = L"STATEMENT_BREAK";
     break;
-  case NodeType::STATEMENT_CONTINUE:
+  case JSNodeType::STATEMENT_CONTINUE:
     type = L"STATEMENT_CONTINUE";
     break;
-  case NodeType::STATEMENT_IF:
+  case JSNodeType::STATEMENT_IF:
     type = L"STATEMENT_IF";
     break;
-  case NodeType::STATEMENT_SWITCH:
+  case JSNodeType::STATEMENT_SWITCH:
     type = L"STATEMENT_SWITCH";
     break;
-  case NodeType::STATEMENT_SWITCH_CASE:
+  case JSNodeType::STATEMENT_SWITCH_CASE:
     type = L"STATEMENT_SWITCH_CASE";
     break;
-  case NodeType::STATEMENT_THROW:
+  case JSNodeType::STATEMENT_THROW:
     type = L"STATEMENT_THROW";
     break;
-  case NodeType::STATEMENT_TRY:
+  case JSNodeType::STATEMENT_TRY:
     type = L"STATEMENT_TRY";
     break;
-  case NodeType::STATEMENT_TRY_CATCH:
+  case JSNodeType::STATEMENT_TRY_CATCH:
     type = L"STATEMENT_TRY_CATCH";
     break;
-  case NodeType::STATEMENT_WHILE:
+  case JSNodeType::STATEMENT_WHILE:
     type = L"STATEMENT_WHILE";
     break;
-  case NodeType::STATEMENT_DO_WHILE:
+  case JSNodeType::STATEMENT_DO_WHILE:
     type = L"STATEMENT_DO_WHILE";
     break;
-  case NodeType::STATEMENT_FOR:
+  case JSNodeType::STATEMENT_FOR:
     type = L"STATEMENT_FOR";
     break;
-  case NodeType::STATEMENT_FOR_IN:
+  case JSNodeType::STATEMENT_FOR_IN:
     type = L"STATEMENT_FOR_IN";
     break;
-  case NodeType::STATEMENT_FOR_OF:
+  case JSNodeType::STATEMENT_FOR_OF:
     type = L"STATEMENT_FOR_OF";
     break;
-  case NodeType::STATEMENT_FOR_AWAIT_OF:
+  case JSNodeType::STATEMENT_FOR_AWAIT_OF:
     type = L"STATEMENT_FOR_AWAIT_OF";
     break;
-  case NodeType::VARIABLE_DECLARATION:
+  case JSNodeType::VARIABLE_DECLARATION:
     type = L"VARIABLE_DECLARATION";
     break;
-  case NodeType::VARIABLE_DECLARATOR:
+  case JSNodeType::VARIABLE_DECLARATOR:
     type = L"VARIABLE_DECLARATOR";
     break;
-  case NodeType::DECORATOR:
+  case JSNodeType::DECORATOR:
     type = L"DECORATOR";
     break;
-  case NodeType::DIRECTIVE:
+  case JSNodeType::DIRECTIVE:
     type = L"DIRECTIVE";
     break;
-  case NodeType::INTERPRETER_DIRECTIVE:
+  case JSNodeType::INTERPRETER_DIRECTIVE:
     type = L"INTERPRETER_DIRECTIVE";
     break;
-  case NodeType::OBJECT_PROPERTY:
+  case JSNodeType::OBJECT_PROPERTY:
     type = L"OBJECT_PROPERTY";
     break;
-  case NodeType::OBJECT_METHOD:
+  case JSNodeType::OBJECT_METHOD:
     type = L"OBJECT_METHOD";
     break;
-  case NodeType::OBJECT_ACCESSOR:
+  case JSNodeType::OBJECT_ACCESSOR:
     type = L"OBJECT_ACCESSOR";
     break;
-  case NodeType::EXPRESSION_UNARY:
+  case JSNodeType::EXPRESSION_UNARY:
     type = L"EXPRESSION_UNARY";
     break;
-  case NodeType::EXPRESSION_UPDATE:
+  case JSNodeType::EXPRESSION_UPDATE:
     type = L"EXPRESSION_UPDATE";
     break;
-  case NodeType::EXPRESSION_BINARY:
+  case JSNodeType::EXPRESSION_BINARY:
     type = L"EXPRESSION_BINARY";
     break;
-  case NodeType::EXPRESSION_MEMBER:
+  case JSNodeType::EXPRESSION_MEMBER:
     type = L"EXPRESSION_MEMBER";
     break;
-  case NodeType::EXPRESSION_OPTIONAL_MEMBER:
+  case JSNodeType::EXPRESSION_OPTIONAL_MEMBER:
     type = L"EXPRESSION_OPTIONAL_MEMBER";
     break;
-  case NodeType::EXPRESSION_COMPUTED_MEMBER:
+  case JSNodeType::EXPRESSION_COMPUTED_MEMBER:
     type = L"EXPRESSION_COMPUTED_MEMBER";
     break;
-  case NodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER:
+  case JSNodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER:
     type = L"EXPRESSION_OPTIONAL_COMPUTED_MEMBER";
     break;
-  case NodeType::EXPRESSION_CONDITION:
+  case JSNodeType::EXPRESSION_CONDITION:
     type = L"EXPRESSION_CONDITION";
     break;
-  case NodeType::EXPRESSION_CALL:
+  case JSNodeType::EXPRESSION_CALL:
     type = L"EXPRESSION_CALL";
     break;
-  case NodeType::EXPRESSION_OPTIONAL_CALL:
+  case JSNodeType::EXPRESSION_OPTIONAL_CALL:
     type = L"EXPRESSION_OPTIONAL_CALL";
     break;
-  case NodeType::EXPRESSION_NEW:
+  case JSNodeType::EXPRESSION_NEW:
     type = L"EXPRESSION_NEW";
     break;
-  case NodeType::EXPRESSION_DELETE:
+  case JSNodeType::EXPRESSION_DELETE:
     type = L"EXPRESSION_DELETE";
     break;
-  case NodeType::EXPRESSION_AWAIT:
+  case JSNodeType::EXPRESSION_AWAIT:
     type = L"EXPRESSION_AWAIT";
     break;
-  case NodeType::EXPRESSION_VOID:
+  case JSNodeType::EXPRESSION_VOID:
     type = L"EXPRESSION_VOID";
     break;
-  case NodeType::EXPRESSION_TYPEOF:
+  case JSNodeType::EXPRESSION_TYPEOF:
     type = L"EXPRESSION_TYPEOF";
     break;
-  case NodeType::EXPRESSION_GROUP:
+  case JSNodeType::EXPRESSION_GROUP:
     type = L"EXPRESSION_GROUP";
     break;
-  case NodeType::EXPRESSION_ASSIGMENT:
+  case JSNodeType::EXPRESSION_ASSIGMENT:
     type = L"EXPRESSION_ASSIGMENT";
     break;
-  case NodeType::EXPRESSION_REST:
+  case JSNodeType::EXPRESSION_REST:
     type = L"EXPRESSION_REST";
     break;
-  case NodeType::PATTERN_REST_ITEM:
+  case JSNodeType::PATTERN_REST_ITEM:
     type = L"PATTERN_REST_ITEM";
     break;
-  case NodeType::PATTERN_OBJECT:
+  case JSNodeType::PATTERN_OBJECT:
     type = L"PATTERN_OBJECT";
     break;
-  case NodeType::PATTERN_OBJECT_ITEM:
+  case JSNodeType::PATTERN_OBJECT_ITEM:
     type = L"PATTERN_OBJECT_ITEM";
     break;
-  case NodeType::PATTERN_ARRAY:
+  case JSNodeType::PATTERN_ARRAY:
     type = L"PATTERN_ARRAY";
     break;
-  case NodeType::PATTERN_ARRAY_ITEM:
+  case JSNodeType::PATTERN_ARRAY_ITEM:
     type = L"PATTERN_ARRAY_ITEM";
     break;
-  case NodeType::CLASS_METHOD:
+  case JSNodeType::CLASS_METHOD:
     type = L"CLASS_METHOD";
     break;
-  case NodeType::CLASS_PROPERTY:
+  case JSNodeType::CLASS_PROPERTY:
     type = L"CLASS_PROPERTY";
     break;
-  case NodeType::CLASS_ACCESSOR:
+  case JSNodeType::CLASS_ACCESSOR:
     type = L"CLASS_ACCESSOR";
     break;
-  case NodeType::STATIC_BLOCK:
+  case JSNodeType::STATIC_BLOCK:
     type = L"STATIC_BLOCK";
     break;
-  case NodeType::IMPORT_DECLARATION:
+  case JSNodeType::IMPORT_DECLARATION:
     type = L"IMPORT_DECLARATION";
     break;
-  case NodeType::IMPORT_SPECIFIER:
+  case JSNodeType::IMPORT_SPECIFIER:
     type = L"IMPORT_SPECIFIER";
     break;
-  case NodeType::IMPORT_DEFAULT:
+  case JSNodeType::IMPORT_DEFAULT:
     type = L"IMPORT_DEFAULT";
     break;
-  case NodeType::IMPORT_NAMESPACE:
+  case JSNodeType::IMPORT_NAMESPACE:
     type = L"IMPORT_NAMESPACE";
     break;
-  case NodeType::IMPORT_ATTARTUBE:
+  case JSNodeType::IMPORT_ATTARTUBE:
     type = L"IMPORT_ATTARTUBE";
     break;
-  case NodeType::EXPORT_DECLARATION:
+  case JSNodeType::EXPORT_DECLARATION:
     type = L"EXPORT_DECLARATION";
     break;
-  case NodeType::EXPORT_DEFAULT:
+  case JSNodeType::EXPORT_DEFAULT:
     type = L"EXPORT_DEFAULT";
     break;
-  case NodeType::EXPORT_SPECIFIER:
+  case JSNodeType::EXPORT_SPECIFIER:
     type = L"EXPORT_SPECIFIER";
     break;
-  case NodeType::EXPORT_ALL:
+  case JSNodeType::EXPORT_ALL:
     type = L"EXPORT_ALL";
     break;
-  case NodeType::DECLARATION_ARROW_FUNCTION:
+  case JSNodeType::DECLARATION_ARROW_FUNCTION:
     type = L"DECLARATION_ARROW_FUNCTION";
     break;
-  case NodeType::DECLARATION_FUNCTION:
+  case JSNodeType::DECLARATION_FUNCTION:
     type = L"DECLARATION_FUNCTION";
     break;
-  case NodeType::DECLARATION_PARAMETER:
+  case JSNodeType::DECLARATION_PARAMETER:
     type = L"DECLARATION_PARAMETER";
     break;
-  case NodeType::DECLARATION_OBJECT:
+  case JSNodeType::DECLARATION_OBJECT:
     type = L"DECLARATION_OBJECT";
     break;
-  case NodeType::DECLARATION_ARRAY:
+  case JSNodeType::DECLARATION_ARRAY:
     type = L"DECLARATION_ARRAY";
     break;
-  case NodeType::DECLARATION_CLASS:
+  case JSNodeType::DECLARATION_CLASS:
     type = L"DECLARATION_CLASS";
     break;
-  case NodeType::DECLARATION_FUNCTION_BODY:
+  case JSNodeType::DECLARATION_FUNCTION_BODY:
     type = L"DECLARATION_FUNCTION_BODY";
     break;
   }
@@ -5684,19 +5730,19 @@ std::wstring JSParser::toJSON(const std::wstring &filename,
       result += L"{";
       std::wstring type;
       switch (declaration.type) {
-      case Declaration::TYPE::UNDEFINED:
+      case JSSourceDeclaration::TYPE::UNDEFINED:
         type = L"undefined";
         break;
-      case Declaration::TYPE::UNINITIALIZED:
+      case JSSourceDeclaration::TYPE::UNINITIALIZED:
         type = L"uninitialized";
         break;
-      case Declaration::TYPE::FUNCTION:
+      case JSSourceDeclaration::TYPE::FUNCTION:
         type = L"function";
         break;
-      case Declaration::TYPE::ARGUMENT:
+      case JSSourceDeclaration::TYPE::ARGUMENT:
         type = L"argument";
         break;
-      case Declaration::TYPE::CATCH:
+      case JSSourceDeclaration::TYPE::CATCH:
         type = L"catch";
         break;
       }

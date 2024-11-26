@@ -55,11 +55,11 @@ void JSObjectConstructor::initialize(common::AutoPtr<JSContext> ctx,
   auto proto = Object->getProperty(ctx, L"prototype");
   proto->setProperty(
       ctx, L"toString",
-      ctx->createFunction(&JSObjectConstructor::toString, L"toString"));
+      ctx->createNativeFunction(&JSObjectConstructor::toString, L"toString"));
 
   proto->setProperty(
       ctx, L"valueOf",
-      ctx->createFunction(&JSObjectConstructor::valueOf, L"valueOf"));
+      ctx->createNativeFunction(&JSObjectConstructor::valueOf, L"valueOf"));
 
   proto->setProperty(ctx, L"constructor", Object);
 }

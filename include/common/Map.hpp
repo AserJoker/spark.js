@@ -10,8 +10,8 @@ template <class K, class T> class Map {
 public:
   using KeyType = K;
   using ValueType = T;
-  using Iterator = std::unordered_map<K, T>::iterator;
-  using ConstIterator = std::unordered_map<K, T>::const_iterator;
+  using Iterator = typename std::unordered_map<K, T>::iterator;
+  using ConstIterator = typename std::unordered_map<K, T>::const_iterator;
   using Type = std::pair<K, T>;
 
 private:

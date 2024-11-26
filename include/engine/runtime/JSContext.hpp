@@ -46,6 +46,9 @@ private:
   common::AutoPtr<JSValue> _null;
   common::AutoPtr<JSValue> _undefined;
   common::AutoPtr<JSValue> _global;
+  common::AutoPtr<JSValue> _true;
+  common::AutoPtr<JSValue> _false;
+  common::AutoPtr<JSValue> _uninitialized;
 
   common::AutoPtr<JSValue> _Object;
   common::AutoPtr<JSValue> _Function;
@@ -57,9 +60,6 @@ private:
   common::AutoPtr<JSValue> _Boolean;
   common::AutoPtr<JSValue> _BigInt;
   common::AutoPtr<JSValue> _RegExp;
-
-  common::AutoPtr<JSValue> _true;
-  common::AutoPtr<JSValue> _false;
 
   // internal
   std::unordered_map<std::wstring, JSEntity *> _symbols;
@@ -133,15 +133,15 @@ public:
   common::AutoPtr<JSValue> createObject(const std::wstring &name = L"");
 
   common::AutoPtr<JSValue>
-  createFunction(const std::function<JSFunction> &value,
-                 const std::wstring &funcname = L"",
-                 const std::wstring &name = L"");
+  createNativeFunction(const std::function<JSFunction> &value,
+                       const std::wstring &funcname = L"",
+                       const std::wstring &name = L"");
 
   common::AutoPtr<JSValue>
-  createFunction(const std::function<JSFunction> &value,
-                 const common::Map<std::wstring, JSEntity *> closure,
-                 const std::wstring &funcname = L"",
-                 const std::wstring &name = L"");
+  createNativeFunction(const std::function<JSFunction> &value,
+                       const common::Map<std::wstring, JSEntity *> closure,
+                       const std::wstring &funcname = L"",
+                       const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createException(const std::wstring &type,
                                            const std::wstring &message,
@@ -159,8 +159,12 @@ public:
 
   common::AutoPtr<JSValue> falsely();
 
+  common::AutoPtr<JSValue> uninitialized();
+
   common::AutoPtr<JSValue> symbolValue();
 
   common::AutoPtr<JSValue> symbolPack();
+
+  common::AutoPtr<JSValue> load(const std::wstring &name);
 };
 } // namespace spark::engine

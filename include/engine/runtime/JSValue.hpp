@@ -117,6 +117,13 @@ public:
                                        const std::wstring &name,
                                        const common::AutoPtr<JSValue> &field);
 
+  common::AutoPtr<JSValue> getIndex(common::AutoPtr<JSContext> ctx,
+                                    const uint32_t &name);
+
+  common::AutoPtr<JSValue> setIndex(common::AutoPtr<JSContext> ctx,
+                                    const uint32_t &name,
+                                    const common::AutoPtr<JSValue> &field);
+
   common::AutoPtr<JSValue> removeProperty(common::AutoPtr<JSContext> ctx,
                                           const std::wstring &name);
 

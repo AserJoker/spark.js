@@ -1,41 +1,29 @@
 #pragma once
-#include "common/AutoPtr.hpp"
-#include "common/Map.hpp"
-#include "engine/base/JSValueType.hpp"
+#include "compiler/base/JSModule.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
-#include <functional>
 #include <string>
+#include <unordered_map>
 namespace spark::engine {
-
-struct JSNativeFunction {};
-
 class JSFunctionEntity : public JSObjectEntity {
 private:
-  std::wstring _name;
-  std::function<JSFunction> _callee;
-  JSEntity *_bind;
-  common::Map<std::wstring, JSEntity *> _closure;
+  bool _async;
+  uint32_t _address;
+  uint32_t _length;
+  std::unordered_map<std::wstring, JSEntity *> _closure;
+  common::AutoPtr<compiler::JSModule> _module;
 
 public:
-  JSFunctionEntity(JSEntity *funcProto, const std::wstring &name,
-                   const std::function<JSFunction> &callee,
-                   const common::Map<std::wstring, JSEntity *> &closure);
-
-  void bind(JSEntity *self);
-
-  const JSEntity *getBind(common::AutoPtr<JSContext> ctx) const;
-
-  JSEntity *getBind(common::AutoPtr<JSContext> ctx);
-
-  const std::function<JSFunction> &getCallee() const;
-
-  const common::Map<std::wstring, JSEntity *> &getClosure() const;
-
-  const std::wstring &getFunctionName() const;
-
-  std::wstring toString(common::AutoPtr<JSContext> ctx) const override;
-
-  bool toBoolean(common::AutoPtr<JSContext> ctx) const override;
+  JSFunctionEntity(JSEntity *prototype,
+                   const common::AutoPtr<compiler::JSModule> &module);
+  void setAsync(bool async);
+  void setAddress(uint32_t address);
+  void setLength(uint32_t length);
+  void setClosure(const std::wstring &name, JSEntity *entity);
+  bool getAsync();
+  uint32_t getAddress();
+  uint32_t getLength();
+  const common::AutoPtr<compiler::JSModule> &getModule() const;
+  const std::unordered_map<std::wstring, JSEntity *> &getClosure() const;
 };
 }; // namespace spark::engine

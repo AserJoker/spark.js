@@ -1,13 +1,14 @@
 #include "engine/runtime/JSContext.hpp"
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSLocation.hpp"
+#include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSBigIntEntity.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
-#include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
 #include "engine/entity/JSNaNEntity.hpp"
+#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNullEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
@@ -20,7 +21,6 @@
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSValue.hpp"
-#include <fstream>
 #include <string>
 
 using namespace spark;
@@ -55,6 +55,8 @@ void JSContext::initialize() {
   _NaN = _scope->createValue(new JSNaNEntity(), L"NaN");
   _true = createBoolean(true);
   _false = createBoolean(false);
+  _uninitialized =
+      _scope->createValue(new JSEntity(JSValueType::JS_UNINITIALIZED));
 
   auto objectPrototype = createValue(new JSObjectEntity(_null->getEntity()));
   auto functionPrototype =
@@ -76,57 +78,57 @@ void JSContext::initialize() {
   auto regexpPrototype =
       createValue(new JSObjectEntity(objectPrototype->getEntity()));
 
-  JSFunctionEntity *ObjectConstructorEntity =
-      new JSFunctionEntity(functionPrototype->getEntity(), L"Object",
-                           &JSObjectConstructor::constructor, {});
+  JSNativeFunctionEntity *ObjectConstructorEntity =
+      new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Object",
+                                 &JSObjectConstructor::constructor, {});
   _Object = _scope->createValue(ObjectConstructorEntity, L"Object");
   _Object->setProperty(this, L"prototype", objectPrototype);
 
-  JSFunctionEntity *FunctionConstructorEntity =
-      new JSFunctionEntity(functionPrototype->getEntity(), L"Function",
-                           &JSFunctionConstructor::constructor, {});
+  JSNativeFunctionEntity *FunctionConstructorEntity =
+      new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Function",
+                                 &JSFunctionConstructor::constructor, {});
   _Function = _scope->createValue(FunctionConstructorEntity, L"Function");
   _Function->setProperty(this, L"prototype", functionPrototype);
 
-  JSFunctionEntity *SymbolConstructorEntity =
-      new JSFunctionEntity(functionPrototype->getEntity(), L"Symbol",
-                           &JSSymbolConstructor::constructor, {});
+  JSNativeFunctionEntity *SymbolConstructorEntity =
+      new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Symbol",
+                                 &JSSymbolConstructor::constructor, {});
   _Symbol = _scope->createValue(SymbolConstructorEntity, L"Symbol");
   _Symbol->setProperty(this, L"prototype", symbolPrototype);
 
-  JSFunctionEntity *ArrayConstructorEntity = new JSFunctionEntity(
+  JSNativeFunctionEntity *ArrayConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"Array", &JSArrayConstructor, {});
   _Array = _scope->createValue(ArrayConstructorEntity, L"Array");
   _Array->setProperty(this, L"prototype", arrayPrototype);
 
-  JSFunctionEntity *ErrorConstructorEntity = new JSFunctionEntity(
+  JSNativeFunctionEntity *ErrorConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"Error", &JSErrorConstructor, {});
   _Error = _scope->createValue(ErrorConstructorEntity, L"Error");
   _Error->setProperty(this, L"prototype", errorPrototype);
 
-  JSFunctionEntity *NumberConstructorEntity = new JSFunctionEntity(
+  JSNativeFunctionEntity *NumberConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"Number", &JSNumberConstructor, {});
   _Number = _scope->createValue(NumberConstructorEntity, L"Number");
   _Number->setProperty(this, L"prototype", numberPrototype);
 
-  JSFunctionEntity *StringConstructorEntity = new JSFunctionEntity(
+  JSNativeFunctionEntity *StringConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"String", &JSStringConstructor, {});
   _String = _scope->createValue(StringConstructorEntity, L"String");
   _String->setProperty(this, L"prototype", stringPrototype);
 
-  JSFunctionEntity *BooleanConstructorEntity = new JSFunctionEntity(
+  JSNativeFunctionEntity *BooleanConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"Boolean", &JSBooleanConstructor, {});
   _Boolean = _scope->createValue(BooleanConstructorEntity, L"Boolean");
   _Boolean->setProperty(this, L"prototype", booleanPrototype);
 
-  JSFunctionEntity *BigIntConstructorEntity = new JSFunctionEntity(
+  JSNativeFunctionEntity *BigIntConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"BigInt", &JSBigIntConstructor, {});
   _BigInt = _scope->createValue(BigIntConstructorEntity, L"BigInt");
   _BigInt->setProperty(this, L"prototype", bigintPrototype);
 
-  JSFunctionEntity *RegExpConstructorEntity = new JSFunctionEntity(
+  JSNativeFunctionEntity *RegExpConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"RegExp", &JSBigIntConstructor, {});
-  _RegExp = _scope->createValue(BigIntConstructorEntity, L"RegExp");
+  _RegExp = _scope->createValue(RegExpConstructorEntity, L"RegExp");
   _RegExp->setProperty(this, L"prototype", regexpPrototype);
 
   _symbolValue = createSymbol();
@@ -145,11 +147,11 @@ common::AutoPtr<JSRuntime> &JSContext::getRuntime() { return _runtime; }
 common::AutoPtr<JSValue> JSContext::eval(const std::wstring &source,
                                          const std::wstring &filename) {
   auto parser = _runtime->getParser();
+  auto generator = _runtime->getGenerator();
   auto index = _runtime->setSourceFilename(filename);
   auto ast = parser->parse(index, source);
-  std::wofstream out("1.json");
-  out << parser->toJSON(filename, source, ast);
-  return _undefined;
+  auto module = generator->resolve(filename, ast);
+  return _runtime->getVirtualMachine()->run(this, module);
 }
 
 JSScope *JSContext::pushScope() {
@@ -284,23 +286,21 @@ common::AutoPtr<JSValue> JSContext::createObject(const std::wstring &name) {
 }
 
 common::AutoPtr<JSValue>
-JSContext::createFunction(const std::function<JSFunction> &value,
-                          const std::wstring &funcname,
-                          const std::wstring &name) {
-  return _scope->createValue(
-      new JSFunctionEntity(
-          _Function->getProperty(this, L"prototype")->getEntity(), funcname,
-          value, {}),
-      name);
+JSContext::createNativeFunction(const std::function<JSFunction> &value,
+                                const std::wstring &funcname,
+                                const std::wstring &name) {
+  auto entity = new JSNativeFunctionEntity(
+      _Function->getProperty(this, L"prototype")->getEntity(), funcname, value,
+      {});
+  return _scope->createValue(entity, name);
 }
 
-common::AutoPtr<JSValue>
-JSContext::createFunction(const std::function<JSFunction> &value,
-                          const common::Map<std::wstring, JSEntity *> closure,
-                          const std::wstring &funcname,
-                          const std::wstring &name) {
+common::AutoPtr<JSValue> JSContext::createNativeFunction(
+    const std::function<JSFunction> &value,
+    const common::Map<std::wstring, JSEntity *> closure,
+    const std::wstring &funcname, const std::wstring &name) {
   return _scope->createValue(
-      new JSFunctionEntity(
+      new JSNativeFunctionEntity(
           _Function->getProperty(this, L"prototype")->getEntity(), funcname,
           value, closure),
       name);
@@ -330,3 +330,13 @@ common::AutoPtr<JSValue> JSContext::falsely() { return _false; }
 common::AutoPtr<JSValue> JSContext::symbolValue() { return _symbolValue; }
 
 common::AutoPtr<JSValue> JSContext::symbolPack() { return _symbolPack; }
+
+common::AutoPtr<JSValue> JSContext::uninitialized() { return _uninitialized; }
+
+common::AutoPtr<JSValue> JSContext::load(const std::wstring &name) {
+  auto val = _scope->getValue(name);
+  if (!val) {
+    return undefined();
+  }
+  return val;
+}

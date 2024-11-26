@@ -8,10 +8,10 @@ namespace spark::common {
 template <class T> class Array {
 public:
   using Type = T;
-  using Iterator = std::vector<T>::iterator;
-  using ConstIterator = std::vector<T>::const_iterator;
-  using ReverseIterator = std::vector<T>::reverse_iterator;
-  using ConstReverseIterator = std::vector<T>::const_reverse_iterator;
+  using Iterator =typename std::vector<T>::iterator;
+  using ConstIterator =typename std::vector<T>::const_iterator;
+  using ReverseIterator = typename std::vector<T>::reverse_iterator;
+  using ConstReverseIterator =typename std::vector<T>::const_reverse_iterator;
 
 protected:
   std::vector<T> _data;

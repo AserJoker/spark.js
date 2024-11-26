@@ -19,6 +19,7 @@ enum class JSValueType {
   JS_EXCEPTION,
   JS_ARRAY,
   JS_REGEXP,
+  JS_NATIVE_FUNCTION,
   JS_FUNCTION,
   JS_CLASS
 };

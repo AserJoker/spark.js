@@ -1,6 +1,8 @@
 #include "engine/runtime/JSRuntime.hpp"
+#include "compiler/JSGenerator.hpp"
 #include "compiler/JSParser.hpp"
 #include "engine/runtime/JSScope.hpp"
+#include "vm/JSVirtualMachine.hpp"
 
 using namespace spark;
 using namespace spark::engine;
@@ -9,6 +11,8 @@ JSRuntime::JSRuntime() {
   _sources = {{0, L"<spark:internal>"}};
   _root = new JSScope(nullptr);
   _parser = new compiler::JSParser();
+  _generator = new compiler::JSGenerator();
+  _vm = new vm::JSVirtualMachine();
 };
 
 JSRuntime::~JSRuntime() { delete _root; };
@@ -32,3 +36,9 @@ uint32_t JSRuntime::setSourceFilename(const std::wstring &filename) {
 JSScope *JSRuntime::getRoot() { return _root; }
 
 common::AutoPtr<compiler::JSParser> &JSRuntime::getParser() { return _parser; }
+common::AutoPtr<compiler::JSGenerator> &JSRuntime::getGenerator() {
+  return _generator;
+}
+common::AutoPtr<vm::JSVirtualMachine> &JSRuntime::getVirtualMachine() {
+  return _vm;
+}

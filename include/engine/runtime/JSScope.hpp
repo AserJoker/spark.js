@@ -13,7 +13,9 @@ private:
   JSScope *_parent;
 
   std::vector<JSScope *> _children;
+
   common::Map<std::wstring, common::AutoPtr<JSValue>> _values;
+
   std::vector<common::AutoPtr<JSValue>> _anonymousValues;
 
 private:
@@ -21,6 +23,7 @@ private:
 
 public:
   JSScope(JSScope *parent);
+
   virtual ~JSScope();
 
   JSEntity *getRoot();

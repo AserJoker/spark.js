@@ -146,18 +146,19 @@ void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
 
   proto->setProperty(
       ctx, L"toString",
-      ctx->createFunction(&JSSymbolConstructor::toString, L"toString"));
+      ctx->createNativeFunction(&JSSymbolConstructor::toString, L"toString"));
 
   proto->setProperty(
       ctx, L"valueOf",
-      ctx->createFunction(&JSSymbolConstructor::valueOf, L"valueOf"));
+      ctx->createNativeFunction(&JSSymbolConstructor::valueOf, L"valueOf"));
 
-  proto->setProperty(ctx, L"for",
-                     ctx->createFunction(&JSSymbolConstructor::_for, L"for"));
+  proto->setProperty(
+      ctx, L"for",
+      ctx->createNativeFunction(&JSSymbolConstructor::_for, L"for"));
 
   proto->setProperty(
       ctx, L"forKey",
-      ctx->createFunction(&JSSymbolConstructor::forKey, L"forKey"));
+      ctx->createNativeFunction(&JSSymbolConstructor::forKey, L"forKey"));
 
   proto->setPropertyDescriptor(
       ctx, L"description",
@@ -166,13 +167,14 @@ void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
           .enumable = false,
           .value = nullptr,
           .writable = false,
-          .get = ctx->createFunction(&JSSymbolConstructor::description)
+          .get = ctx->createNativeFunction(&JSSymbolConstructor::description)
                      ->getEntity(),
           .set = nullptr});
 
-  proto->setProperty(ctx, toPrimitive,
-                     ctx->createFunction(&JSSymbolConstructor::toPrimitive,
-                                         L"[Symbol.toPrimitive]"));
+  proto->setProperty(
+      ctx, toPrimitive,
+      ctx->createNativeFunction(&JSSymbolConstructor::toPrimitive,
+                                L"[Symbol.toPrimitive]"));
   proto->setProperty(ctx, toStringTag, ctx->createString(L"Symbol"));
 
   Symbol->setOpaque<common::AutoPtr<JSSymbolOpaque>>(new JSSymbolOpaque);

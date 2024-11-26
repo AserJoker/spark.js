@@ -7,6 +7,7 @@
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
+#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
@@ -142,36 +143,62 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
                std::vector<common::AutoPtr<JSValue>> args,
                const JSLocation &location) {
   common::AutoPtr<JSValue> func = this;
-  if (getType() != JSValueType::JS_FUNCTION) {
+  if (getType() == JSValueType::JS_OBJECT) {
     func = self->toPrimitive(ctx);
   }
-  if (func->getType() != JSValueType::JS_FUNCTION) {
-    throw error::JSTypeError(fmt::format(L"{} is not a function", getName()),
-                             location);
-  }
-  auto entity = (JSFunctionEntity *)_entity;
-  ctx->pushCallStack(entity->getFunctionName(), location);
-  auto scope = ctx->pushScope();
-  JSEntity *result = nullptr;
-  try {
-    auto closure = entity->getClosure();
-    auto callee = entity->getCallee();
-    for (auto &[name, entity] : closure) {
-      ctx->createValue(entity, name);
+  if (func->getType() == JSValueType::JS_NATIVE_FUNCTION) {
+    auto entity = (JSNativeFunctionEntity *)_entity;
+    ctx->pushCallStack(entity->getFunctionName(), location);
+    auto scope = ctx->pushScope();
+    JSEntity *result = nullptr;
+    try {
+      auto closure = entity->getClosure();
+      auto callee = entity->getCallee();
+      for (auto &[name, entity] : closure) {
+        ctx->createValue(entity, name);
+      }
+      result = callee(ctx, self, args)->getEntity();
+    } catch (error::JSError &e) {
+      result = ctx->createException(e.getType(), e.getMessage())->getEntity();
+    } catch (std::exception &e) {
+      static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+      result = ctx->createException(L"InternalError",
+                                    converter.from_bytes(e.what()), location)
+                   ->getEntity();
     }
-    result = callee(ctx, self, args)->getEntity();
-  } catch (error::JSError &e) {
-    result = ctx->createException(e.getType(), e.getMessage())->getEntity();
-  } catch (std::exception &e) {
-    static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    result = ctx->createException(L"InternalError",
-                                  converter.from_bytes(e.what()), location)
-                 ->getEntity();
+    scope->getRoot()->appendChild(result);
+    ctx->popScope(scope);
+    ctx->popCallStack();
+    return ctx->createValue(result);
+  } else if (func->getType() == JSValueType::JS_FUNCTION) {
+    auto entity = func->getEntity<JSFunctionEntity>();
+    ctx->pushCallStack(func->getProperty(ctx, L"name")->convertToString(ctx),
+                       location);
+    auto scope = ctx->pushScope();
+    JSEntity *result = nullptr;
+    try {
+      auto closure = entity->getClosure();
+      for (auto &[name, entity] : closure) {
+        ctx->createValue(entity, name);
+      }
+      result = ctx->getRuntime()
+                   ->getVirtualMachine()
+                   ->run(ctx, entity->getModule(), entity->getAddress())
+                   ->getEntity();
+    } catch (error::JSError &e) {
+      result = ctx->createException(e.getType(), e.getMessage())->getEntity();
+    } catch (std::exception &e) {
+      static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+      result = ctx->createException(L"InternalError",
+                                    converter.from_bytes(e.what()), location)
+                   ->getEntity();
+    }
+    scope->getRoot()->appendChild(result);
+    ctx->popScope(scope);
+    ctx->popCallStack();
   }
-  scope->getRoot()->appendChild(result);
-  ctx->popScope(scope);
-  ctx->popCallStack();
-  return ctx->createValue(result);
+  throw error::JSTypeError(fmt::format(L"{} is not a function", getName()),
+                           location);
 }
 
 common::AutoPtr<JSValue> JSValue::toPrimitive(common::AutoPtr<JSContext> ctx,
@@ -181,21 +208,21 @@ common::AutoPtr<JSValue> JSValue::toPrimitive(common::AutoPtr<JSContext> ctx,
   }
   auto toPrimitive =
       getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"toPrimitive"));
-  if (toPrimitive->getType() == JSValueType::JS_FUNCTION) {
+  if (toPrimitive->getType() == JSValueType::JS_NATIVE_FUNCTION) {
     auto res = toPrimitive->apply(ctx, this, {ctx->createString(L"default")});
     if (res->getType() < JSValueType::JS_OBJECT) {
       return res;
     }
   }
   auto getter = getProperty(ctx, L"valueOf");
-  if (getter->getType() == JSValueType::JS_FUNCTION) {
+  if (getter->getType() == JSValueType::JS_NATIVE_FUNCTION) {
     auto res = getter->apply(ctx, this);
     if (res->getType() < JSValueType::JS_OBJECT) {
       return res;
     }
   }
   getter = getProperty(ctx, L"toString");
-  if (getter->getType() == JSValueType::JS_FUNCTION) {
+  if (getter->getType() == JSValueType::JS_NATIVE_FUNCTION) {
     auto res = getter->apply(ctx, this);
     if (res->getType() < JSValueType::JS_OBJECT) {
       return res;
@@ -258,7 +285,7 @@ std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
   case JSValueType::JS_BOOLEAN:
     return getEntity<JSBooleanEntity>()->getValue() ? L"true" : L"false";
   case JSValueType::JS_OBJECT:
-  case JSValueType::JS_FUNCTION:
+  case JSValueType::JS_NATIVE_FUNCTION:
   case JSValueType::JS_EXCEPTION:
   case JSValueType::JS_CLASS:
     return toPrimitive(ctx)->convertToString(ctx);
@@ -396,7 +423,7 @@ std::optional<double> JSValue::convertToNumber(common::AutoPtr<JSContext> ctx) {
   case JSValueType::JS_SYMBOL:
     throw error::JSTypeError(L"Cannot convert a Symbol value to a number");
   case JSValueType::JS_OBJECT:
-  case JSValueType::JS_FUNCTION:
+  case JSValueType::JS_NATIVE_FUNCTION:
   case JSValueType::JS_EXCEPTION:
   case JSValueType::JS_CLASS:
     return toPrimitive(ctx)->convertToNumber(ctx);
@@ -421,7 +448,7 @@ bool JSValue::convertToBoolean(common::AutoPtr<JSContext> ctx) {
   case JSValueType::JS_SYMBOL:
     return true;
   case JSValueType::JS_OBJECT:
-  case JSValueType::JS_FUNCTION:
+  case JSValueType::JS_NATIVE_FUNCTION:
   case JSValueType::JS_EXCEPTION:
   case JSValueType::JS_CLASS:
     return toPrimitive(ctx)->convertToBoolean(ctx);
@@ -459,6 +486,7 @@ std::wstring JSValue::getTypeName() {
   case JSValueType::JS_SYMBOL:
     return L"symbol";
   case JSValueType::JS_CLASS:
+  case JSValueType::JS_NATIVE_FUNCTION:
   case JSValueType::JS_FUNCTION:
     return L"function";
   case JSValueType::JS_UNINITIALIZED:
@@ -679,6 +707,17 @@ common::AutoPtr<JSValue> JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
   }
   entity->getProperties().erase(name);
   return ctx->truly();
+}
+
+common::AutoPtr<JSValue> JSValue::getIndex(common::AutoPtr<JSContext> ctx,
+                                           const uint32_t &index) {
+  return ctx->undefined();
+}
+
+common::AutoPtr<JSValue>
+JSValue::setIndex(common::AutoPtr<JSContext> ctx, const uint32_t &index,
+                  const common::AutoPtr<JSValue> &field) {
+  return ctx->undefined();
 }
 
 JSObjectEntity::JSField *
@@ -1237,7 +1276,7 @@ common::AutoPtr<JSValue> JSValue::equal(common::AutoPtr<JSContext> ctx,
                                 another->getBoolean().value());
     case JSValueType::JS_SYMBOL:
     case JSValueType::JS_OBJECT:
-    case JSValueType::JS_FUNCTION:
+    case JSValueType::JS_NATIVE_FUNCTION:
     case JSValueType::JS_EXCEPTION:
     case JSValueType::JS_CLASS:
       return ctx->createBoolean(getEntity() == another->getEntity());
@@ -1336,7 +1375,7 @@ JSValue::strictEqual(common::AutoPtr<JSContext> ctx,
                                 another->getBoolean().value());
     case JSValueType::JS_SYMBOL:
     case JSValueType::JS_OBJECT:
-    case JSValueType::JS_FUNCTION:
+    case JSValueType::JS_NATIVE_FUNCTION:
     case JSValueType::JS_EXCEPTION:
     case JSValueType::JS_CLASS:
       return ctx->createBoolean(getEntity() == another->getEntity());
