@@ -12,8 +12,11 @@ JSFunctionEntity::JSFunctionEntity(
   _module = module;
 }
 void JSFunctionEntity::setAsync(bool async) { _async = async; }
+
 void JSFunctionEntity::setAddress(uint32_t address) { _address = address; }
+
 void JSFunctionEntity::setLength(uint32_t length) { _length = length; }
+
 void JSFunctionEntity::setClosure(const std::wstring &name, JSEntity *entity) {
   if (_closure.contains(name)) {
     if (_closure.at(name) == entity) {
@@ -26,9 +29,12 @@ void JSFunctionEntity::setClosure(const std::wstring &name, JSEntity *entity) {
   }
   _closure[name] = entity;
 }
-bool JSFunctionEntity::getAsync() { return _async; }
-uint32_t JSFunctionEntity::getAddress() { return _address; }
-uint32_t JSFunctionEntity::getLength() { return _length; }
+void JSFunctionEntity::setFuncName(const std::wstring &name) { _name = name; }
+bool JSFunctionEntity::getAsync() const { return _async; }
+uint32_t JSFunctionEntity::getAddress() const { return _address; }
+uint32_t JSFunctionEntity::getLength() const { return _length; }
+const std::wstring &JSFunctionEntity::getFuncName() const { return _name; }
+
 const std::unordered_map<std::wstring, JSEntity *> &
 JSFunctionEntity::getClosure() const {
   return _closure;

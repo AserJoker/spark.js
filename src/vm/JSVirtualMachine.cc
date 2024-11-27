@@ -2,6 +2,8 @@
 #include "common/AutoPtr.hpp"
 #include "compiler/base/JSAsmOperator.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/entity/JSEntity.hpp"
+#include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 using namespace spark;
 using namespace spark::vm;
@@ -31,171 +33,111 @@ JSVirtualMachine::args(const common::AutoPtr<compiler::JSModule> &module) {
   return module->constants.at(index);
 }
 
-void JSVirtualMachine::pushNull(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
-  _stack.push_back(ctx->null());
-}
+JS_OPT(JSVirtualMachine::pushNull) { _stack.push_back(ctx->null()); }
 
-void JSVirtualMachine::pushUndefined(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
-  _stack.push_back(ctx->undefined());
-}
+JS_OPT(JSVirtualMachine::pushUndefined) { _stack.push_back(ctx->undefined()); }
 
-void JSVirtualMachine::pushTrue(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
-  _stack.push_back(ctx->truly());
-}
+JS_OPT(JSVirtualMachine::pushTrue) { _stack.push_back(ctx->truly()); }
 
-void JSVirtualMachine::pushFalse(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
-  _stack.push_back(ctx->falsely());
-}
+JS_OPT(JSVirtualMachine::pushFalse) { _stack.push_back(ctx->falsely()); }
 
-void JSVirtualMachine::pushUninitialized(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::pushUninitialized) {
   _stack.push_back(ctx->uninitialized());
 }
 
-void JSVirtualMachine::push(common::AutoPtr<engine::JSContext> ctx,
-                            const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::push) {
   auto value = argf(module);
   _stack.push_back(ctx->createNumber(value));
 }
 
-void JSVirtualMachine::pushObject(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
-  _stack.push_back(ctx->createObject());
+JS_OPT(JSVirtualMachine::pushObject) { _stack.push_back(ctx->createObject()); }
+
+JS_OPT(JSVirtualMachine::pushArray) {}
+
+JS_OPT(JSVirtualMachine::pushFunction) {
+  _stack.push_back(ctx->createFunction(module));
 }
 
-void JSVirtualMachine::pushArray(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::pushGenerator) {}
 
-void JSVirtualMachine::pushFunction(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::pushArrow) {}
 
-void JSVirtualMachine::pushGenerator(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::pushThis) { _stack.push_back(ctx->load(L"this")); }
 
-void JSVirtualMachine::pushArrow(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::pushSuper) {}
 
-void JSVirtualMachine::pushThis(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
-  _stack.push_back(ctx->load(L"this"));
-}
-
-void JSVirtualMachine::pushSuper(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
-
-void JSVirtualMachine::pushArgument(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::pushArgument) {
   auto arguments = ctx->load(L"arguments");
   auto index = argi(module);
   _stack.push_back(arguments->getIndex(ctx, index));
 }
 
-void JSVirtualMachine::pushBigint(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::pushBigint) {
   auto s = args(module);
   _stack.push_back(ctx->createBigInt(s));
 }
 
-void JSVirtualMachine::pushRegex(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::pushRegex) {}
 
-void JSVirtualMachine::setAddress(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setAddress) {
+  auto addr = argi(module);
+  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  func->setAddress(addr);
+}
 
-void JSVirtualMachine::setAsync(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setAsync) {
+  auto async = argi(module);
+  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  func->setAsync(async);
+}
 
-void JSVirtualMachine::setFuncName(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setFuncName) {
+  auto name = args(module);
+  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  func->setFuncName(name);
+}
 
-void JSVirtualMachine::setFuncLen(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setFuncLen) {
+  auto len = argi(module);
+  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  func->setAsync(len);
+}
 
-void JSVirtualMachine::setClosure(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setClosure) {
+  auto name = args(module);
+  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  func->setClosure(name, ctx->load(name)->getEntity());
+}
 
-void JSVirtualMachine::setField(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setField) {}
 
-void JSVirtualMachine::getField(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::getField) {}
 
-void JSVirtualMachine::setAccessor(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setAccessor) {}
 
-void JSVirtualMachine::getAccessor(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::getAccessor) {}
 
-void JSVirtualMachine::setMethod(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setMethod) {}
 
-void JSVirtualMachine::getMethod(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::getMethod) {}
 
-void JSVirtualMachine::setIndex(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setIndex) {}
 
-void JSVirtualMachine::getIndex(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::getIndex) {}
 
-void JSVirtualMachine::setRegexHasIndices(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setRegexHasIndices) {}
 
-void JSVirtualMachine::setRegexGlobal(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setRegexGlobal) {}
 
-void JSVirtualMachine::setRegexIgnoreCases(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setRegexIgnoreCases) {}
 
-void JSVirtualMachine::setRegexMultiline(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setRegexMultiline) {}
 
-void JSVirtualMachine::setRegexDotAll(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setRegexDotAll) {}
 
-void JSVirtualMachine::setRegexSticky(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::setRegexSticky) {}
 
-void JSVirtualMachine::pop(common::AutoPtr<engine::JSContext> ctx,
-                           const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::pop) {
   auto size = argi(module);
   while (size > 0) {
     _stack.pop_back();
@@ -203,9 +145,7 @@ void JSVirtualMachine::pop(common::AutoPtr<engine::JSContext> ctx,
   }
 }
 
-void JSVirtualMachine::storeConst(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::storeConst) {
   auto name = args(module);
   auto value = _stack[_stack.size() - 1];
   if (!ctx->getScope()->getValues().contains(name)) {
@@ -216,9 +156,7 @@ void JSVirtualMachine::storeConst(
   }
 }
 
-void JSVirtualMachine::store(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::store) {
   auto name = args(module);
   auto value = _stack[_stack.size() - 1];
   if (!ctx->getScope()->getValues().contains(name)) {
@@ -227,36 +165,27 @@ void JSVirtualMachine::store(
     auto current = ctx->load(name);
     current->setEntity(value->getEntity());
   }
+  _stack.pop_back();
 }
 
-void JSVirtualMachine::load(common::AutoPtr<engine::JSContext> ctx,
-                            const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::load) {
   auto name = args(module);
   auto value = ctx->load(name);
   _stack.push_back(value);
 }
 
-void JSVirtualMachine::loadConst(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::loadConst) {
   auto val = args(module);
   _stack.push_back(ctx->createString(val));
 }
 
-void JSVirtualMachine::ret(common::AutoPtr<engine::JSContext> ctx,
-                           const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::ret) { _pc = module->codes.size(); }
 
-void JSVirtualMachine::yield(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::yield) {}
 
-void JSVirtualMachine::await(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {}
+JS_OPT(JSVirtualMachine::await) {}
 
-void JSVirtualMachine::nullishCoalescing(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::nullishCoalescing) {
   auto arg2 = *_stack.rbegin();
   _stack.pop_back();
   auto arg1 = *_stack.rbegin();
@@ -268,16 +197,12 @@ void JSVirtualMachine::nullishCoalescing(
   }
 }
 
-void JSVirtualMachine::pushScope(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::pushScope) {
   _scopeChain.push_back(ctx->pushScope());
   _stackTops.push_back(_stack.size());
 }
 
-void JSVirtualMachine::popScope(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module) {
+JS_OPT(JSVirtualMachine::popScope) {
   auto size = *_stackTops.rbegin();
   _stackTops.pop_back();
   _stack.resize(size);
@@ -285,22 +210,31 @@ void JSVirtualMachine::popScope(
   _scopeChain.pop_back();
   ctx->popScope(scope);
 }
-void JSVirtualMachine::call(common::AutoPtr<engine::JSContext> ctx,
-                            const common::AutoPtr<compiler::JSModule> &module) {
+
+JS_OPT(JSVirtualMachine::call) {
   auto size = argi(module);
-  auto func = _stack[_stack.size() - 1 - size];
+  auto now = _stack.size();
+  auto func = _stack[now - 1 - size];
   auto self = ctx->load(L"this");
   std::vector<common::AutoPtr<engine::JSValue>> args;
   args.resize(size, nullptr);
   for (auto i = 0; i < size; i++) {
     args[i] = _stack[_stack.size() - size + i];
   }
+  auto name = func->getProperty(ctx, L"name")->getString().value();
+  auto pc = _pc;
+  auto scope = ctx->getScope();
   auto res = func->apply(ctx, self, args);
+  scope->getRoot()->appendChild(res->getEntity());
+  while (ctx->getScope() != scope) {
+    popScope(ctx, module);
+  }
+  _stack.resize(now - 1 - size);
   _stack.push_back(res);
-  _stack.resize(_stack.size() - 1 - size);
+  _pc = pc;
 }
-void JSVirtualMachine::add(common::AutoPtr<engine::JSContext> ctx,
-                           const common::AutoPtr<compiler::JSModule> &module) {
+
+JS_OPT(JSVirtualMachine::add) {
   auto arg2 = *_stack.rbegin();
   _stack.pop_back();
   auto arg1 = *_stack.rbegin();
@@ -308,13 +242,26 @@ void JSVirtualMachine::add(common::AutoPtr<engine::JSContext> ctx,
   _stack.push_back(arg1->add(ctx, arg2));
 }
 
-common::AutoPtr<engine::JSValue>
-JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
-                      const common::AutoPtr<compiler::JSModule> &module,
-                      size_t offset) {
+JS_OPT(JSVirtualMachine::tryStart) {}
+
+JS_OPT(JSVirtualMachine::tryEnd) {}
+
+JS_OPT(JSVirtualMachine::defer) {}
+
+JS_OPT(JSVirtualMachine::back) {}
+
+JS_OPT(JSVirtualMachine::jmp) {
+  auto offset = argi(module);
   _pc = offset;
-  auto code = next(module);
+}
+
+common::AutoPtr<engine::JSValue>
+JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
+                       const common::AutoPtr<compiler::JSModule> &module,
+                       size_t offset) {
+  _pc = offset;
   while (_pc != module->codes.size()) {
+    auto code = next(module);
     switch (code) {
     case compiler::JSAsmOperator::PUSH_NULL:
       pushNull(ctx, module);
@@ -460,8 +407,27 @@ JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
     case compiler::JSAsmOperator::ADD:
       add(ctx, module);
       break;
+    case compiler::JSAsmOperator::JMP:
+      jmp(ctx, module);
+      break;
+    case compiler::JSAsmOperator::TRY:
+      tryStart(ctx, module);
+      break;
+    case compiler::JSAsmOperator::DEFER:
+      defer(ctx, module);
+      break;
+    case compiler::JSAsmOperator::ENDTRY:
+      tryEnd(ctx, module);
+      break;
+    case compiler::JSAsmOperator::BACK:
+      back(ctx, module);
+      break;
     }
-    code = next(module);
   }
-  return ctx->undefined();
+  if (!_stack.empty()) {
+    auto value = _stack[_stack.size() - 1];
+    return value;
+  } else {
+    return ctx->undefined();
+  }
 }

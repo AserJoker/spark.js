@@ -8,7 +8,9 @@ using namespace spark::engine;
 JSNumberEntity::JSNumberEntity(double value)
     : JSEntity(JSValueType::JS_NUMBER), _value(value){};
 
-double &JSNumberEntity::getValue() { return _value; }
+double &JSNumberEntity::getValue() {
+  return _value;
+}
 
 const double JSNumberEntity::getValue() const { return _value; }
 

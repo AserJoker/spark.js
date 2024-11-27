@@ -79,8 +79,7 @@ void JSGenerator::resolveClosure(JSGeneratorContext &ctx,
         }
       }
       if (it == item->declarations.end()) {
-        closure.push_back(
-            resolveConstant(ctx, module, binding.declaration->name));
+        closure.push_back(resolveConstant(ctx, module, binding.name));
       }
     }
     for (auto &child : item->children) {
@@ -241,7 +240,6 @@ void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
   for (auto &item : n->body) {
     resolveNode(ctx, module, item);
   }
-  generate(module, JSAsmOperator::PUSH_UNDEFINED);
   generate(module, JSAsmOperator::RET);
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
@@ -321,11 +319,41 @@ void JSGenerator::resolveStatementThrow(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveStatementTry(JSGeneratorContext &ctx,
                                       common::AutoPtr<JSModule> &module,
-                                      const common::AutoPtr<JSNode> &node) {}
+                                      const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSTryStatement>();
+  uint32_t *catchStart = (uint32_t *)(module->codes.data() + sizeof(uint16_t));
+  generate(module, JSAsmOperator::TRY, 0U);
+  uint32_t *finallyStart =
+      (uint32_t *)(module->codes.data() + sizeof(uint16_t));
+  generate(module, JSAsmOperator::DEFER, 0U);
+  resolveNode(ctx, module, n->try_);
+  generate(module, JSAsmOperator::ENDTRY);
+  uint32_t *catchEnd = (uint32_t *)(module->codes.data() + sizeof(uint16_t));
+  *catchStart = (uint32_t)(module->codes.size());
+  if (n->catch_ != nullptr) {
+    resolveNode(ctx, module, n->catch_);
+  }
+  *catchEnd = (uint32_t)(module->codes.size());
+  uint32_t *finallyEnd = (uint32_t *)(module->codes.data() + sizeof(uint16_t));
+  generate(module, JSAsmOperator::JMP, 0U);
+  *finallyStart = (uint32_t)(module->codes.size());
+  if (n->finally != nullptr) {
+    resolveNode(ctx, module, n->finally);
+  }
+  *finallyEnd = (uint32_t)(module->codes.size());
+}
 
 void JSGenerator::resolveStatementTryCatch(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSTryCatchStatement>();
+  if (n->binding != nullptr) {
+    generate(module, JSAsmOperator::STORE,
+             resolveConstant(ctx, module,
+                             n->binding.cast<JSIdentifierLiteral>()->value));
+  }
+  resolveNode(ctx, module, n->statement);
+}
 
 void JSGenerator::resolveStatementWhile(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
@@ -591,6 +619,7 @@ void JSGenerator::resolveDeclarationFunction(
     } else {
       generate(module, JSAsmOperator::POP, 1U);
     }
+    index++;
   }
   resolveNode(ctx, module, n->body);
   popLexScope(ctx, module);
@@ -648,7 +677,6 @@ void JSGenerator::resolveDeclarationFunctionBody(
   for (auto &item : n->statements) {
     resolveNode(ctx, module, item);
   }
-  generate(module, JSAsmOperator::PUSH_UNDEFINED);
   generate(module, JSAsmOperator::RET);
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
@@ -676,7 +704,6 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
 void JSGenerator::resolveNode(JSGeneratorContext &ctx,
                               common::AutoPtr<JSModule> &module,
                               const common::AutoPtr<JSNode> &node) {
-  module->sourceMap[module->codes.size() - 1] = node->location.start;
   switch (node->type) {
   case JSNodeType::PRIVATE_NAME:
     resolvePrivateName(ctx, module, node);

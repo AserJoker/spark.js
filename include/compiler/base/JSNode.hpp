@@ -52,6 +52,7 @@ struct JSSourceDeclaration {
 struct JSSourceBinding {
   JSSourceDeclaration *declaration;
   std::vector<JSNode *> references;
+  std::wstring name;
   JSSourceBinding() : declaration(nullptr) {}
 };
 

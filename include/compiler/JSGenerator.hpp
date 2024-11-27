@@ -398,16 +398,6 @@ private:
   void resolveNode(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
                    const common::AutoPtr<JSNode> &node);
 
-  void writeCode(common::AutoPtr<JSModule> &module) {}
-
-  void writeCode(common::AutoPtr<JSModule> &module, auto &&code,
-                 auto &&...next) {
-    using T = decltype(code);
-    auto buffer = module->codes.data() + module->codes.size();
-    module->codes.resize(module->codes.size() + sizeof(T), 0);
-    *(T *)buffer = code;
-    writeCode(module, std::forward<decltype(next)>(next)...);
-  }
   void generate(common::AutoPtr<JSModule> &module, const JSAsmOperator &opt,
                 uint32_t arg) {
     auto size = module->codes.size();

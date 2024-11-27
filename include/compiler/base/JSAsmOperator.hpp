@@ -48,6 +48,11 @@ enum class JSAsmOperator {
   PUSH_SCOPE,
   POP_SCOPE,
   CALL,
+  JMP,
+  TRY,
+  DEFER,
+  BACK,
+  ENDTRY,
   ADD
 };
 }

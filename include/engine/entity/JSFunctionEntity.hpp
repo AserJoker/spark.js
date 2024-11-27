@@ -12,6 +12,7 @@ private:
   uint32_t _length;
   std::unordered_map<std::wstring, JSEntity *> _closure;
   common::AutoPtr<compiler::JSModule> _module;
+  std::wstring _name;
 
 public:
   JSFunctionEntity(JSEntity *prototype,
@@ -20,9 +21,11 @@ public:
   void setAddress(uint32_t address);
   void setLength(uint32_t length);
   void setClosure(const std::wstring &name, JSEntity *entity);
-  bool getAsync();
-  uint32_t getAddress();
-  uint32_t getLength();
+  void setFuncName(const std::wstring &name);
+  bool getAsync() const;
+  uint32_t getAddress() const;
+  uint32_t getLength() const;
+  const std::wstring &getFuncName() const;
   const common::AutoPtr<compiler::JSModule> &getModule() const;
   const std::unordered_map<std::wstring, JSEntity *> &getClosure() const;
 };

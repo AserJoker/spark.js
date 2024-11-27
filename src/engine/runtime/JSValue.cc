@@ -2,6 +2,7 @@
 #include "common/AutoPtr.hpp"
 #include "common/BigInt.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/entity/JSArgumentEntity.hpp"
 #include "engine/entity/JSBigIntEntity.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
@@ -148,7 +149,7 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
   }
   if (func->getType() == JSValueType::JS_NATIVE_FUNCTION) {
     auto entity = (JSNativeFunctionEntity *)_entity;
-    ctx->pushCallStack(entity->getFunctionName(), location);
+    ctx->pushCallStack(location);
     auto scope = ctx->pushScope();
     JSEntity *result = nullptr;
     try {
@@ -172,30 +173,27 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
     return ctx->createValue(result);
   } else if (func->getType() == JSValueType::JS_FUNCTION) {
     auto entity = func->getEntity<JSFunctionEntity>();
-    ctx->pushCallStack(func->getProperty(ctx, L"name")->convertToString(ctx),
-                       location);
+    ctx->pushCallStack(location);
     auto scope = ctx->pushScope();
     JSEntity *result = nullptr;
-    try {
-      auto closure = entity->getClosure();
-      for (auto &[name, entity] : closure) {
-        ctx->createValue(entity, name);
-      }
-      result = ctx->getRuntime()
-                   ->getVirtualMachine()
-                   ->run(ctx, entity->getModule(), entity->getAddress())
-                   ->getEntity();
-    } catch (error::JSError &e) {
-      result = ctx->createException(e.getType(), e.getMessage())->getEntity();
-    } catch (std::exception &e) {
-      static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-      result = ctx->createException(L"InternalError",
-                                    converter.from_bytes(e.what()), location)
-                   ->getEntity();
+    auto closure = entity->getClosure();
+    for (auto &[name, entity] : closure) {
+      ctx->createValue(entity, name);
     }
+    std::vector<JSEntity *> arguments;
+    for (auto &arg : args) {
+      arguments.push_back(arg->getEntity());
+    }
+    ctx->createValue(new JSArgumentEntity(ctx->null()->getEntity(), arguments),
+                     L"arguments");
+    result = ctx->getRuntime()
+                 ->getVirtualMachine()
+                 ->eval(ctx, entity->getModule(), entity->getAddress())
+                 ->getEntity();
     scope->getRoot()->appendChild(result);
     ctx->popScope(scope);
     ctx->popCallStack();
+    return ctx->createValue(result);
   }
   throw error::JSTypeError(fmt::format(L"{} is not a function", getName()),
                            location);
@@ -469,6 +467,7 @@ std::wstring JSValue::getTypeName() {
   case JSValueType::JS_INTERNAL:
   case JSValueType::JS_EXCEPTION:
   case JSValueType::JS_OBJECT:
+  case JSValueType::JS_ARGUMENT:
   case JSValueType::JS_NULL:
   case JSValueType::JS_ARRAY:
   case JSValueType::JS_REGEXP:
@@ -711,6 +710,13 @@ common::AutoPtr<JSValue> JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
 
 common::AutoPtr<JSValue> JSValue::getIndex(common::AutoPtr<JSContext> ctx,
                                            const uint32_t &index) {
+  if (getType() == JSValueType::JS_ARGUMENT) {
+    auto entity = getEntity<JSArgumentEntity>();
+    auto &arguments = entity->getArguments();
+    if (index < arguments.size()) {
+      return ctx->createValue(arguments[index]);
+    }
+  }
   return ctx->undefined();
 }
 

@@ -1,5 +1,6 @@
 #include "engine/lib/JSFunctionConstructor.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "error/JSTypeError.hpp"
@@ -9,20 +10,34 @@ using namespace spark::engine;
 JS_FUNC(JSFunctionConstructor::constructor) { return self; }
 
 JS_FUNC(JSFunctionConstructor::toString) {
-  if (self->getType() != JSValueType::JS_NATIVE_FUNCTION) {
-    throw error::JSTypeError(
-        L"Function.prototype.toString called on incompatible object");
+  if (self->getType() == JSValueType::JS_NATIVE_FUNCTION) {
+    auto entity = self->getEntity<JSNativeFunctionEntity>();
+
+    return ctx->createString(fmt::format(L"function {}(){{ [native code] }}",
+                                         entity->getFunctionName()));
+  }
+  if (self->getType() == JSValueType::JS_FUNCTION) {
+    auto entity = self->getEntity<JSFunctionEntity>();
+
+    return ctx->createString(fmt::format(L"function {}(){{ [native code] }}",
+                                         entity->getFuncName()));
   }
 
-  auto entity = self->getEntity<JSNativeFunctionEntity>();
-
-  return ctx->createString(fmt::format(L"function {}(){{ [native code] }}",
-                                       entity->getFunctionName()));
+  throw error::JSTypeError(
+      L"Function.prototype.toString called on incompatible object");
 }
 
 JS_FUNC(JSFunctionConstructor::name) {
-  auto entity = self->getEntity<JSNativeFunctionEntity>();
-  return ctx->createString(entity->getFunctionName());
+  if (self->getType() == JSValueType::JS_NATIVE_FUNCTION) {
+    auto entity = self->getEntity<JSNativeFunctionEntity>();
+    return ctx->createString(entity->getFunctionName());
+  }
+  if (self->getType() == JSValueType::JS_FUNCTION) {
+    auto entity = self->getEntity<JSFunctionEntity>();
+    return ctx->createString(entity->getFuncName());
+  }
+  throw error::JSTypeError(
+      L"Function.prototype.toString called on incompatible object");
 }
 
 void JSFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx,

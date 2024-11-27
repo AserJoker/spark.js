@@ -6,6 +6,7 @@
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
+#include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
 #include "engine/entity/JSNaNEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
@@ -21,6 +22,7 @@
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSValue.hpp"
+#include "error/JSSyntaxError.hpp"
 #include <string>
 
 using namespace spark;
@@ -39,6 +41,7 @@ JSContext::JSContext(const common::AutoPtr<JSRuntime> &runtime)
   _root = _scope;
   _callStack = new JSFrame();
   initialize();
+  createValue(_undefined, L"this");
 }
 
 JSContext::~JSContext() {
@@ -151,7 +154,7 @@ common::AutoPtr<JSValue> JSContext::eval(const std::wstring &source,
   auto index = _runtime->setSourceFilename(filename);
   auto ast = parser->parse(index, source);
   auto module = generator->resolve(filename, ast);
-  return _runtime->getVirtualMachine()->run(this, module);
+  return _runtime->getVirtualMachine()->eval(this, module);
 }
 
 JSScope *JSContext::pushScope() {
@@ -173,13 +176,12 @@ void JSContext::setScope(JSScope *scope) { _scope = scope; }
 JSScope *JSContext::getScope() { return _scope; }
 JSScope *JSContext::getRoot() { return _root; }
 
-void JSContext::pushCallStack(const std::wstring &funcname,
-                              const JSLocation &location) {
+void JSContext::pushCallStack(const JSLocation &location) {
   auto frame = new JSFrame;
   _callStack->location.filename = location.filename;
   _callStack->location.line = location.line;
   _callStack->location.column = location.column;
-  frame->location.funcname = funcname;
+  frame->location.funcname = location.funcname;
   frame->parent = _callStack;
   _callStack = frame;
 }
@@ -305,6 +307,14 @@ common::AutoPtr<JSValue> JSContext::createNativeFunction(
           value, closure),
       name);
 }
+common::AutoPtr<JSValue>
+JSContext::createFunction(const common::AutoPtr<compiler::JSModule> &module,
+                          const std::wstring &name) {
+  return _scope->createValue(
+      new JSFunctionEntity(
+          _Function->getProperty(this, L"prototype")->getEntity(), module),
+      name);
+}
 
 common::AutoPtr<JSValue>
 JSContext::createException(const std::wstring &type,
@@ -336,7 +346,7 @@ common::AutoPtr<JSValue> JSContext::uninitialized() { return _uninitialized; }
 common::AutoPtr<JSValue> JSContext::load(const std::wstring &name) {
   auto val = _scope->getValue(name);
   if (!val) {
-    return undefined();
+    throw error::JSSyntaxError(fmt::format(L"'{}' is not defined", name));
   }
   return val;
 }

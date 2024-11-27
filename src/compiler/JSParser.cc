@@ -1,5 +1,6 @@
 #include "compiler/JSParser.hpp"
 #include "common/AutoPtr.hpp"
+#include "compiler/base/JSNode.hpp"
 #include "error/JSSyntaxError.hpp"
 #include <algorithm>
 #include <array>
@@ -54,6 +55,7 @@ void JSParser::bindDeclaration(
     _currentScope->bindings.push_back({});
     binding = &*_currentScope->bindings.rbegin();
     binding->declaration = declar;
+    binding->name = identifier.cast<JSIdentifierLiteral>()->value;
   }
   binding->references.push_back(identifier.getRawPointer());
 }

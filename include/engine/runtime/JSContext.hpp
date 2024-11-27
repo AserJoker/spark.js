@@ -3,6 +3,7 @@
 #include "common/BigInt.hpp"
 #include "common/Map.hpp"
 #include "common/Object.hpp"
+#include "compiler/base/JSModule.hpp"
 #include "engine/base/JSLocation.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
@@ -95,7 +96,7 @@ public:
 
   JSScope *getRoot();
 
-  void pushCallStack(const std::wstring &funcname, const JSLocation &location);
+  void pushCallStack(const JSLocation &location);
 
   void popCallStack();
 
@@ -142,6 +143,10 @@ public:
                        const common::Map<std::wstring, JSEntity *> closure,
                        const std::wstring &funcname = L"",
                        const std::wstring &name = L"");
+
+  common::AutoPtr<JSValue>
+  createFunction(const common::AutoPtr<compiler::JSModule> &module,
+                 const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createException(const std::wstring &type,
                                            const std::wstring &message,

@@ -6,15 +6,25 @@
 #include "engine/runtime/JSValue.hpp"
 #include <string>
 #include <vector>
+#define JS_OPT(name)                                                           \
+  void name(common::AutoPtr<engine::JSContext> ctx,                            \
+            const common::AutoPtr<compiler::JSModule> &module)
 namespace spark::engine {
 class JSContext;
 };
 namespace spark::vm {
 class JSVirtualMachine : public common::Object {
 private:
+  struct ErrFrame {
+    uint32_t defer;
+    uint32_t handle;
+  };
+
+private:
   std::vector<common::AutoPtr<engine::JSValue>> _stack;
   std::vector<size_t> _stackTops;
   std::vector<engine::JSScope *> _scopeChain;
+  std::vector<ErrFrame> _tryStacks;
   size_t _pc;
 
 private:
@@ -26,108 +36,65 @@ private:
   const std::wstring &args(const common::AutoPtr<compiler::JSModule> &module);
 
 private:
-  void pushNull(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void pushUndefined(common::AutoPtr<engine::JSContext> ctx,
-                     const common::AutoPtr<compiler::JSModule> &module);
-  void pushTrue(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void pushFalse(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void pushUninitialized(common::AutoPtr<engine::JSContext> ctx,
-                         const common::AutoPtr<compiler::JSModule> &module);
-  void push(common::AutoPtr<engine::JSContext> ctx,
-            const common::AutoPtr<compiler::JSModule> &module);
-  void pushObject(common::AutoPtr<engine::JSContext> ctx,
-                  const common::AutoPtr<compiler::JSModule> &module);
-  void pushArray(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void pushFunction(common::AutoPtr<engine::JSContext> ctx,
-                    const common::AutoPtr<compiler::JSModule> &module);
-  void pushGenerator(common::AutoPtr<engine::JSContext> ctx,
-                     const common::AutoPtr<compiler::JSModule> &module);
-  void pushArrow(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void pushThis(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void pushSuper(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void pushArgument(common::AutoPtr<engine::JSContext> ctx,
-                    const common::AutoPtr<compiler::JSModule> &module);
-  void pushBigint(common::AutoPtr<engine::JSContext> ctx,
-                  const common::AutoPtr<compiler::JSModule> &module);
-  void pushRegex(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void setAddress(common::AutoPtr<engine::JSContext> ctx,
-                  const common::AutoPtr<compiler::JSModule> &module);
-  void setAsync(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void setFuncName(common::AutoPtr<engine::JSContext> ctx,
-                   const common::AutoPtr<compiler::JSModule> &module);
-  void setFuncLen(common::AutoPtr<engine::JSContext> ctx,
-                  const common::AutoPtr<compiler::JSModule> &module);
-  void setClosure(common::AutoPtr<engine::JSContext> ctx,
-                  const common::AutoPtr<compiler::JSModule> &module);
-  void setField(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void getField(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void setAccessor(common::AutoPtr<engine::JSContext> ctx,
-                   const common::AutoPtr<compiler::JSModule> &module);
-  void getAccessor(common::AutoPtr<engine::JSContext> ctx,
-                   const common::AutoPtr<compiler::JSModule> &module);
-  void setMethod(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void getMethod(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void setIndex(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void getIndex(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void setRegexHasIndices(common::AutoPtr<engine::JSContext> ctx,
-                          const common::AutoPtr<compiler::JSModule> &module);
-  void setRegexGlobal(common::AutoPtr<engine::JSContext> ctx,
-                      const common::AutoPtr<compiler::JSModule> &module);
-  void setRegexIgnoreCases(common::AutoPtr<engine::JSContext> ctx,
-                           const common::AutoPtr<compiler::JSModule> &module);
-  void setRegexMultiline(common::AutoPtr<engine::JSContext> ctx,
-                         const common::AutoPtr<compiler::JSModule> &module);
-  void setRegexDotAll(common::AutoPtr<engine::JSContext> ctx,
-                      const common::AutoPtr<compiler::JSModule> &module);
-  void setRegexSticky(common::AutoPtr<engine::JSContext> ctx,
-                      const common::AutoPtr<compiler::JSModule> &module);
-  void pop(common::AutoPtr<engine::JSContext> ctx,
-           const common::AutoPtr<compiler::JSModule> &module);
-  void storeConst(common::AutoPtr<engine::JSContext> ctx,
-                  const common::AutoPtr<compiler::JSModule> &module);
-  void store(common::AutoPtr<engine::JSContext> ctx,
-             const common::AutoPtr<compiler::JSModule> &module);
-  void load(common::AutoPtr<engine::JSContext> ctx,
-            const common::AutoPtr<compiler::JSModule> &module);
-  void loadConst(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void ret(common::AutoPtr<engine::JSContext> ctx,
-           const common::AutoPtr<compiler::JSModule> &module);
-  void yield(common::AutoPtr<engine::JSContext> ctx,
-             const common::AutoPtr<compiler::JSModule> &module);
-  void await(common::AutoPtr<engine::JSContext> ctx,
-             const common::AutoPtr<compiler::JSModule> &module);
-  void nullishCoalescing(common::AutoPtr<engine::JSContext> ctx,
-                         const common::AutoPtr<compiler::JSModule> &module);
-  void pushScope(common::AutoPtr<engine::JSContext> ctx,
-                 const common::AutoPtr<compiler::JSModule> &module);
-  void popScope(common::AutoPtr<engine::JSContext> ctx,
-                const common::AutoPtr<compiler::JSModule> &module);
-  void call(common::AutoPtr<engine::JSContext> ctx,
-            const common::AutoPtr<compiler::JSModule> &module);
-  void add(common::AutoPtr<engine::JSContext> ctx,
-           const common::AutoPtr<compiler::JSModule> &module);
+  JS_OPT(pushNull);
+  JS_OPT(pushUndefined);
+  JS_OPT(pushTrue);
+  JS_OPT(pushFalse);
+  JS_OPT(pushUninitialized);
+  JS_OPT(push);
+  JS_OPT(pushObject);
+  JS_OPT(pushArray);
+  JS_OPT(pushFunction);
+  JS_OPT(pushGenerator);
+  JS_OPT(pushArrow);
+  JS_OPT(pushThis);
+  JS_OPT(pushSuper);
+  JS_OPT(pushArgument);
+  JS_OPT(pushBigint);
+  JS_OPT(pushRegex);
+  JS_OPT(setAddress);
+  JS_OPT(setAsync);
+  JS_OPT(setFuncName);
+  JS_OPT(setFuncLen);
+  JS_OPT(setClosure);
+  JS_OPT(setField);
+  JS_OPT(getField);
+  JS_OPT(setAccessor);
+  JS_OPT(getAccessor);
+  JS_OPT(setMethod);
+  JS_OPT(getMethod);
+  JS_OPT(setIndex);
+  JS_OPT(getIndex);
+  JS_OPT(setRegexHasIndices);
+  JS_OPT(setRegexGlobal);
+  JS_OPT(setRegexIgnoreCases);
+  JS_OPT(setRegexMultiline);
+  JS_OPT(setRegexDotAll);
+  JS_OPT(setRegexSticky);
+  JS_OPT(pop);
+  JS_OPT(storeConst);
+  JS_OPT(store);
+  JS_OPT(load);
+  JS_OPT(loadConst);
+  JS_OPT(ret);
+  JS_OPT(yield);
+  JS_OPT(await);
+  JS_OPT(nullishCoalescing);
+  JS_OPT(pushScope);
+  JS_OPT(popScope);
+  JS_OPT(call);
+  JS_OPT(tryStart);
+  JS_OPT(tryEnd);
+  JS_OPT(defer);
+  JS_OPT(back);
+  JS_OPT(jmp);
+  JS_OPT(add);
 
 public:
   JSVirtualMachine();
 
   common::AutoPtr<engine::JSValue>
-  run(common::AutoPtr<engine::JSContext> ctx,
-      const common::AutoPtr<compiler::JSModule> &module, size_t offset = 0);
+  eval(common::AutoPtr<engine::JSContext> ctx,
+       const common::AutoPtr<compiler::JSModule> &module, size_t offset = 0);
 };
 }; // namespace spark::vm
