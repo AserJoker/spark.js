@@ -19,4 +19,4 @@ add_executable(${PROJECT_NAME}
     ${ENGINE_RUNTIME_SOURCES}
     ${ENGINE_LIB_SOURCES}
     ${VM_SOURCES})
-target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
+target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt-header-only)

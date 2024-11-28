@@ -241,6 +241,11 @@ void JSParser::bindScope(common::AutoPtr<JSNode> node) {
       bindScope(dec->identifier);
     }
   } break;
+
+  case JSNodeType::STATEMENT_TRY_CATCH: {
+    auto n = node.cast<JSTryCatchStatement>();
+    bindScope(n->statement);
+  } break;
   case JSNodeType::DECLARATION_FUNCTION_BODY:
   case JSNodeType::EXPORT_DEFAULT:
   case JSNodeType::EXPORT_DECLARATION:
@@ -273,7 +278,6 @@ void JSParser::bindScope(common::AutoPtr<JSNode> node) {
   case JSNodeType::STATEMENT_SWITCH_CASE:
   case JSNodeType::STATEMENT_THROW:
   case JSNodeType::STATEMENT_TRY:
-  case JSNodeType::STATEMENT_TRY_CATCH:
   case JSNodeType::STATEMENT_WHILE:
   case JSNodeType::STATEMENT_DO_WHILE:
   case JSNodeType::STATEMENT_FOR:
@@ -1507,11 +1511,6 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
   if (token != nullptr && token->location.isEqual(source, L"for")) {
     common::AutoPtr node = new JSForStatement;
 
-    auto parentScope = _currentScope;
-    node->scope = new JSSourceScope(parentScope);
-    node->scope->node = node.getRawPointer();
-    _currentScope = node->scope.getRawPointer();
-
     node->type = JSNodeType::STATEMENT_FOR;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -1565,7 +1564,6 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
     if (node->body != nullptr) {
       node->body->addParent(node);
     }
-    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1621,11 +1619,6 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
       token = readKeywordToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"in")) {
 
-        auto parentScope = _currentScope;
-        node->scope = new JSSourceScope(parentScope);
-        node->scope->node = node.getRawPointer();
-        _currentScope = node->scope.getRawPointer();
-
         if (node->kind != JSDeclarationKind::UNKNOWN) {
           declareVariable(filename, source, node, node->declaration, type,
                           isConst);
@@ -1652,7 +1645,6 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
               {filename, current.line, current.column});
         }
         node->body->addParent(node);
-        _currentScope = parentScope;
 
         node->location = getLocation(source, position, current);
         position = current;
@@ -1721,9 +1713,6 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
       token = readIdentifierToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"of")) {
 
-        auto parentScope = _currentScope;
-        node->scope = new JSSourceScope(parentScope);
-        node->scope->node = node.getRawPointer();
         _currentScope = node->scope.getRawPointer();
         if (node->kind != JSDeclarationKind::UNKNOWN) {
           declareVariable(filename, source, node, node->declaration, type,
@@ -1750,7 +1739,6 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
               {filename, current.line, current.column});
         }
         node->body->addParent(node);
-        _currentScope = parentScope;
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -2012,10 +2000,6 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    auto parentScope = _currentScope;
-    node->scope = new JSSourceScope(parentScope);
-    node->scope->node = node.getRawPointer();
-    _currentScope = node->scope.getRawPointer();
 
     auto case_ = readSwitchCaseStatement(filename, source, current);
     while (case_ != nullptr) {
@@ -2030,7 +2014,6 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    _currentScope = parentScope;
 
     node->location = getLocation(source, position, current);
     position = current;
@@ -2158,11 +2141,6 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
   if (token != nullptr && token->location.isEqual(source, L"catch")) {
     common::AutoPtr node = new JSTryCatchStatement;
 
-    auto parentScope = _currentScope;
-    node->scope = new JSSourceScope(parentScope);
-    node->scope->node = node.getRawPointer();
-    _currentScope = node->scope.getRawPointer();
-
     auto backup = current;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -2205,7 +2183,6 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->statement->addParent(node);
-    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -2427,10 +2404,6 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"{")) {
     common::AutoPtr node = new JSBlockStatement;
-    auto parentScope = _currentScope;
-    node->scope = new JSSourceScope(parentScope);
-    node->scope->node = node.getRawPointer();
-    _currentScope = node->scope.getRawPointer();
     skipNewLine(filename, source, current);
     auto statement = readStatement(filename, source, current);
     while (statement != nullptr) {
@@ -2446,7 +2419,6 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;

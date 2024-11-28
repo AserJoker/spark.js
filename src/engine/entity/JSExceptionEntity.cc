@@ -12,9 +12,17 @@ JSExceptionEntity::JSExceptionEntity(JSEntity *prototype,
                                      const std::wstring &message,
                                      const std::vector<JSLocation> &stack)
     : JSObjectEntity(prototype), _errorType(type), _message(message),
-      _stack(stack) {
+      _stack(stack), _target(nullptr) {
   _type = JSValueType::JS_EXCEPTION;
 }
+
+JSExceptionEntity::JSExceptionEntity(JSEntity *prototype, JSEntity *target)
+    : JSObjectEntity(prototype), _target(target) {
+  appendChild(target);
+  _type = JSValueType::JS_EXCEPTION;
+}
+
+JSEntity *JSExceptionEntity::getTarget() { return _target; }
 
 const std::wstring &JSExceptionEntity::getMessage() const { return _message; }
 
@@ -27,12 +35,11 @@ const std::vector<JSLocation> &JSExceptionEntity::getStack() const {
 }
 
 std::wstring JSExceptionEntity::toString(common::AutoPtr<JSContext> ctx) const {
-  std::wstring result;
-  if (getExceptionType().empty()) {
-    result = getMessage();
-  } else {
-    result = fmt::format(L"{}: {}", getExceptionType(), getMessage());
+  if (_target) {
+    return fmt::format(L"Uncaught {}", _target->toString(ctx));
   }
+  std::wstring result =
+      fmt::format(L"{}: {}", getExceptionType(), getMessage());
   for (auto &[fnindex, line, column, funcname] : getStack()) {
     auto &filename = ctx->getRuntime()->getSourceFilename(fnindex);
     if (fnindex != 0) {

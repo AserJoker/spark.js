@@ -3,6 +3,7 @@
 #include "compiler/base/JSAsmOperator.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
+#include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "error/JSError.hpp"
@@ -48,17 +49,25 @@ void JSVirtualMachine::handleError(
     common::AutoPtr<engine::JSContext> ctx,
     const common::AutoPtr<compiler::JSModule> &module,
     common::AutoPtr<engine::JSValue> exception) {
-  if (!_errorStacks.empty()) {
+  if (_errorStacks.size() > _errorFrames[_errorFrames.size() - 1]) {
     auto frame = *_errorStacks.rbegin();
     _errorStacks.pop_back();
-    frame.scope->getRoot()->appendChild(exception->getEntity());
+    auto entity = exception->getEntity<engine::JSExceptionEntity>();
+    frame.scope->getRoot()->appendChild(entity);
     while (ctx->getScope() != frame.scope) {
       popScope(ctx, module);
     }
     if (frame.defer != 0) {
-      eval(ctx, module, frame.defer);
+      auto res = eval(ctx, module, frame.defer);
+      if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+        return handleError(ctx, module, res);
+      }
     }
-    _stack.push_back(exception);
+    if (entity->getTarget()) {
+      _stack.push_back(ctx->createValue(entity->getTarget()));
+    } else {
+      _stack.push_back(exception);
+    }
     _pc = frame.handle;
   } else {
     _stack.push_back(exception);
@@ -213,23 +222,26 @@ JS_OPT(JSVirtualMachine::loadConst) {
 }
 
 JS_OPT(JSVirtualMachine::ret) {
-  if (!_errorStacks.empty()) {
+  if (_errorStacks.size() > _errorFrames[_errorFrames.size() - 1]) {
     auto frame = *_errorStacks.rbegin();
     _errorStacks.pop_back();
     if (frame.defer) {
-      eval(ctx, module, frame.defer);
+      auto res = eval(ctx, module, frame.defer);
+      if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+        return handleError(ctx, module, res);
+      }
     }
   }
   _pc = module->codes.size();
 }
+
 JS_OPT(JSVirtualMachine::throw_) {
   auto value = *_stack.rbegin();
   _stack.pop_back();
   if (value->getType() != engine::JSValueType::JS_EXCEPTION) {
-    value = ctx->createException(L"", value->convertToString(ctx));
+    value = ctx->createException(value);
   }
-  _stack.push_back(value);
-  _pc = module->codes.size();
+  handleError(ctx, module, value);
 }
 
 JS_OPT(JSVirtualMachine::yield) {}
@@ -250,12 +262,12 @@ JS_OPT(JSVirtualMachine::nullishCoalescing) {
 
 JS_OPT(JSVirtualMachine::pushScope) {
   _scopeChain.push_back(ctx->pushScope());
-  _stackTops.push_back(_stack.size());
+  _frames.push_back(_stack.size());
 }
 
 JS_OPT(JSVirtualMachine::popScope) {
-  auto size = *_stackTops.rbegin();
-  _stackTops.pop_back();
+  auto size = *_frames.rbegin();
+  _frames.pop_back();
   _stack.resize(size);
   auto scope = *_scopeChain.rbegin();
   _scopeChain.pop_back();
@@ -308,7 +320,10 @@ JS_OPT(JSVirtualMachine::tryEnd) {
   _errorStacks.pop_back();
   auto pc = _pc;
   if (frame.defer) {
-    eval(ctx, module, frame.defer);
+    auto res = eval(ctx, module, frame.defer);
+    if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+      return handleError(ctx, module, res);
+    }
   }
   _pc = pc;
 }
@@ -331,6 +346,8 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
   _pc = offset;
   auto scope = ctx->getScope();
   auto frame = ctx->getCallStack();
+  auto top = _stack.size();
+  _errorFrames.push_back(_errorStacks.size());
   while (_pc != module->codes.size()) {
     try {
       auto code = next(module);
@@ -505,12 +522,13 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
     }
   }
   auto value = ctx->undefined();
-  if (!_stack.empty()) {
+  if (_stack.size() != top) {
     value = _stack[_stack.size() - 1];
     if (ctx->getScope() != scope) {
       auto entity = value->getEntity();
       value = scope->createValue(entity);
     }
+    _stack.resize(top);
   }
   while (ctx->getScope() != scope) {
     popScope(ctx, module);
@@ -518,5 +536,6 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
   while (ctx->getCallStack() != frame) {
     ctx->popCallStack();
   }
+  _errorFrames.pop_back();
   return value;
 }

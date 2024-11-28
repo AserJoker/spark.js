@@ -329,6 +329,12 @@ JSContext::createException(const std::wstring &type,
       _Error->getProperty(this, L"prototype")->getEntity(), type, message,
       trace(location)));
 }
+common::AutoPtr<JSValue>
+JSContext::createException(common::AutoPtr<JSValue> target) {
+  return _scope->createValue(new JSExceptionEntity(
+      _Error->getProperty(this, L"prototype")->getEntity(),
+      target->getEntity()));
+}
 
 common::AutoPtr<JSValue> JSContext::undefined() { return _undefined; }
 

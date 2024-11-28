@@ -24,9 +24,10 @@ private:
 
 private:
   std::vector<common::AutoPtr<engine::JSValue>> _stack;
-  std::vector<size_t> _stackTops;
-  std::vector<engine::JSScope *> _scopeChain;
+  std::vector<size_t> _frames;
   std::vector<ErrFrame> _errorStacks;
+  std::vector<size_t> _errorFrames;
+  std::vector<engine::JSScope *> _scopeChain;
   size_t _pc;
 
 private:

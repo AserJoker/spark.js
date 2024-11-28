@@ -11,15 +11,14 @@ using namespace spark::compiler;
 uint32_t JSGenerator::resolveConstant(JSGeneratorContext &ctx,
                                       common::AutoPtr<JSModule> &module,
                                       const std::wstring &source) {
-  uint32_t name = 0;
-  if (ctx.constantsCache.contains(source)) {
-    name = ctx.constantsCache.at(source);
+  auto it =
+      std::find(module->constants.begin(), module->constants.end(), source);
+  if (it != module->constants.end()) {
+    return it - module->constants.begin();
   } else {
     module->constants.push_back(source);
-    ctx.constantsCache[source] = module->constants.size() - 1;
-    name = module->constants.size() - 1;
+    return module->constants.size() - 1;
   }
-  return name;
 }
 void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
@@ -329,39 +328,45 @@ void JSGenerator::resolveStatementTry(JSGeneratorContext &ctx,
                                       common::AutoPtr<JSModule> &module,
                                       const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSTryStatement>();
-  uint32_t *catchStart = (uint32_t *)(module->codes.data() + sizeof(uint16_t));
+  auto catchStart = (module->codes.size() + sizeof(uint16_t));
   generate(module, JSAsmOperator::TRY, 0U);
-  uint32_t *finallyStart =
-      (uint32_t *)(module->codes.data() + sizeof(uint16_t));
+  auto finallyStart = (module->codes.size() + sizeof(uint16_t));
   generate(module, JSAsmOperator::DEFER, 0U);
   resolveNode(ctx, module, n->try_);
   generate(module, JSAsmOperator::ENDTRY);
-  uint32_t *catchEnd = (uint32_t *)(module->codes.data() + sizeof(uint16_t));
-  *catchStart = (uint32_t)(module->codes.size());
+  auto catchEnd = (module->codes.size() + sizeof(uint16_t));
+  generate(module, JSAsmOperator::JMP, 0U);
+  *(uint32_t *)(module->codes.data() + catchStart) =
+      (uint32_t)(module->codes.size());
   if (n->catch_ != nullptr) {
     resolveNode(ctx, module, n->catch_);
   }
-  *catchEnd = (uint32_t)(module->codes.size());
-  uint32_t *finallyEnd = (uint32_t *)(module->codes.data() + sizeof(uint16_t));
+  *(uint32_t *)(module->codes.data() + catchEnd) =
+      (uint32_t)(module->codes.size());
+  auto finallyEnd = (module->codes.size() + sizeof(uint16_t));
   generate(module, JSAsmOperator::JMP, 0U);
-  *finallyStart = (uint32_t)(module->codes.size());
+  *(uint32_t *)(module->codes.data() + finallyStart) =
+      (uint32_t)(module->codes.size());
   if (n->finally != nullptr) {
     resolveNode(ctx, module, n->finally);
     generate(module, JSAsmOperator::HLT);
   }
-  *finallyEnd = (uint32_t)(module->codes.size());
+  *(uint32_t *)(module->codes.data() + finallyEnd) =
+      (uint32_t)(module->codes.size());
 }
 
 void JSGenerator::resolveStatementTryCatch(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSTryCatchStatement>();
+  generate(module, JSAsmOperator::PUSH_SCOPE);
   if (n->binding != nullptr) {
     generate(module, JSAsmOperator::STORE,
              resolveConstant(ctx, module,
                              n->binding.cast<JSIdentifierLiteral>()->value));
   }
   resolveNode(ctx, module, n->statement);
+  generate(module, JSAsmOperator::POP_SCOPE);
 }
 
 void JSGenerator::resolveStatementWhile(JSGeneratorContext &ctx,

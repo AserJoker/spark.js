@@ -154,6 +154,7 @@ public:
   common::AutoPtr<JSValue> createException(const std::wstring &type,
                                            const std::wstring &message,
                                            const JSLocation &location = {});
+  common::AutoPtr<JSValue> createException(common::AutoPtr<JSValue> target);
 
   common::AutoPtr<JSValue> undefined();
 

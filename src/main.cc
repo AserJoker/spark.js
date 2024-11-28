@@ -17,8 +17,17 @@
 using namespace spark;
 using namespace spark::engine;
 
+JS_FUNC(print) {
+  if (args.empty()) {
+    fmt::print(L"{}", ctx->undefined()->convertToString(ctx));
+  } else {
+    fmt::print(L"{}\n", args[0]->convertToString(ctx));
+  }
+  return ctx->undefined();
+}
+
 std::wstring read(const std::wstring &filename) {
-  std::wifstream in(filename.c_str(), std::ios::binary);
+  std::wifstream in("index.js", std::ios::binary);
   if (in.is_open()) {
     in.seekg(0, std::ios::end);
     size_t len = in.tellg();
@@ -39,6 +48,7 @@ int main(int argc, char *argv[]) {
   try {
     common::AutoPtr runtime = new engine::JSRuntime();
     common::AutoPtr ctx = new engine::JSContext(runtime);
+    ctx->createNativeFunction(print, L"print", L"print");
     auto source = read(L"index.js");
     auto module = ctx->compile(source, L"index.js");
     std::wofstream out("1.asm");
@@ -223,10 +233,12 @@ int main(int argc, char *argv[]) {
         offset += sizeof(uint32_t);
         break;
       case compiler::JSAsmOperator::TRY:
-        out << L"try";
+        out << L"try " << *(uint32_t *)(buffer + offset);
+        offset += sizeof(uint32_t);
         break;
       case compiler::JSAsmOperator::DEFER:
-        out << L"defer";
+        out << L"defer " << *(uint32_t *)(buffer + offset);
+        offset += sizeof(uint32_t);
         break;
       case compiler::JSAsmOperator::ENDTRY:
         out << L"endtry";

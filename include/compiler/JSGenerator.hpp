@@ -19,7 +19,6 @@ private:
 
   struct JSGeneratorContext {
     JSLexScope *currentScope;
-    std::unordered_map<std::wstring, uint32_t> constantsCache;
     JSGeneratorContext() { currentScope = nullptr; }
     ~JSGeneratorContext() {
       while (currentScope) {
@@ -42,6 +41,9 @@ private:
   uint32_t resolveConstant(JSGeneratorContext &ctx,
                            common::AutoPtr<JSModule> &module,
                            const std::wstring &source);
+
+  void reset(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
+             common::AutoPtr<JSNode> node);
 
   void pushLexScope(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
                     const common::AutoPtr<JSSourceScope> &scope);
@@ -401,7 +403,14 @@ private:
   void generate(common::AutoPtr<JSModule> &module, const JSAsmOperator &opt,
                 uint32_t arg) {
     auto size = module->codes.size();
-    module->codes.resize(size + sizeof(uint32_t) + sizeof(uint16_t), 0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+
     auto buffer = module->codes.data() + size;
     uint16_t code = (uint16_t)opt;
     *(uint16_t *)buffer = code;
@@ -412,7 +421,16 @@ private:
   void generate(common::AutoPtr<JSModule> &module, const JSAsmOperator &opt,
                 double arg) {
     auto size = module->codes.size();
-    module->codes.resize(size + sizeof(uint64_t) + sizeof(uint16_t), 0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
+    module->codes.push_back(0);
     auto buffer = module->codes.data() + size;
     uint16_t code = (uint16_t)opt;
     *(uint16_t *)buffer = code;
