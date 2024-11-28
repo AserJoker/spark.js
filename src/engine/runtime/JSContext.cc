@@ -39,7 +39,7 @@ JSContext::JSContext(const common::AutoPtr<JSRuntime> &runtime)
     : _runtime(runtime) {
   _scope = new JSScope(_runtime->getRoot());
   _root = _scope;
-  _callStack = new JSFrame();
+  _callStack = new JSCallFrame();
   initialize();
   createValue(_undefined, L"this");
 }
@@ -149,12 +149,17 @@ common::AutoPtr<JSRuntime> &JSContext::getRuntime() { return _runtime; }
 
 common::AutoPtr<JSValue> JSContext::eval(const std::wstring &source,
                                          const std::wstring &filename) {
+  auto module = compile(source, filename);
+  return _runtime->getVirtualMachine()->eval(this, module);
+}
+
+common::AutoPtr<compiler::JSModule>
+JSContext::compile(const std::wstring &source, const std::wstring &filename) {
   auto parser = _runtime->getParser();
   auto generator = _runtime->getGenerator();
   auto index = _runtime->setSourceFilename(filename);
   auto ast = parser->parse(index, source);
-  auto module = generator->resolve(filename, ast);
-  return _runtime->getVirtualMachine()->eval(this, module);
+  return generator->resolve(filename, ast);
 }
 
 JSScope *JSContext::pushScope() {
@@ -177,7 +182,7 @@ JSScope *JSContext::getScope() { return _scope; }
 JSScope *JSContext::getRoot() { return _root; }
 
 void JSContext::pushCallStack(const JSLocation &location) {
-  auto frame = new JSFrame;
+  auto frame = new JSCallFrame;
   _callStack->location.filename = location.filename;
   _callStack->location.line = location.line;
   _callStack->location.column = location.column;
@@ -192,7 +197,7 @@ void JSContext::popCallStack() {
   delete frame;
 }
 
-JSContext::JSFrame *JSContext::getCallStack() { return _callStack; }
+JSContext::JSCallFrame *JSContext::getCallStack() { return _callStack; }
 
 std::vector<JSLocation> JSContext::trace(const JSLocation &location) {
   std::vector<JSLocation> stack;

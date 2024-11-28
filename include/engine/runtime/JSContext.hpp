@@ -17,10 +17,10 @@
 namespace spark::engine {
 class JSContext : public common::Object {
 public:
-  struct JSFrame {
-    JSFrame *parent;
+  struct JSCallFrame {
+    JSCallFrame *parent;
     JSLocation location;
-    JSFrame() {
+    JSCallFrame() {
       parent = nullptr;
       location.funcname = L"<internal>";
       location.filename = 0;
@@ -74,7 +74,7 @@ private:
   JSScope *_root;
   JSScope *_scope;
   common::AutoPtr<JSRuntime> _runtime;
-  JSFrame *_callStack;
+  JSCallFrame *_callStack;
 
 public:
   JSContext(const common::AutoPtr<JSRuntime> &runtime);
@@ -85,6 +85,9 @@ public:
 
   common::AutoPtr<JSValue> eval(const std::wstring &source,
                                 const std::wstring &filename);
+
+  common::AutoPtr<compiler::JSModule> compile(const std::wstring &source,
+                                              const std::wstring &filename);
 
   JSScope *pushScope();
 
@@ -100,7 +103,7 @@ public:
 
   void popCallStack();
 
-  JSFrame *getCallStack();
+  JSCallFrame *getCallStack();
 
   std::vector<JSLocation> trace(const JSLocation &location);
 

@@ -42,6 +42,8 @@ enum class JSAsmOperator {
   LOAD,
   LOAD_CONST,
   RET,
+  HLT,
+  THROW,
   YIELD,
   AWAIT,
   NULLISH_COALESCING,
@@ -51,7 +53,6 @@ enum class JSAsmOperator {
   JMP,
   TRY,
   DEFER,
-  BACK,
   ENDTRY,
   ADD
 };

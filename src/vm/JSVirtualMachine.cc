@@ -5,6 +5,7 @@
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
+#include "error/JSError.hpp"
 using namespace spark;
 using namespace spark::vm;
 JSVirtualMachine::JSVirtualMachine() : _pc(0) {}
@@ -27,10 +28,42 @@ JSVirtualMachine::argf(const common::AutoPtr<compiler::JSModule> &module) {
   _pc += sizeof(double);
   return *(double *)codes;
 }
+
 const std::wstring &
 JSVirtualMachine::args(const common::AutoPtr<compiler::JSModule> &module) {
   auto index = argi(module);
   return module->constants.at(index);
+}
+
+void JSVirtualMachine::handleError(
+    common::AutoPtr<engine::JSContext> ctx,
+    const common::AutoPtr<compiler::JSModule> &module,
+    const error::JSError &e) {
+  auto exception =
+      ctx->createException(e.getType(), e.getMessage(), e.getLocation());
+  handleError(ctx, module, exception);
+}
+
+void JSVirtualMachine::handleError(
+    common::AutoPtr<engine::JSContext> ctx,
+    const common::AutoPtr<compiler::JSModule> &module,
+    common::AutoPtr<engine::JSValue> exception) {
+  if (!_errorStacks.empty()) {
+    auto frame = *_errorStacks.rbegin();
+    _errorStacks.pop_back();
+    frame.scope->getRoot()->appendChild(exception->getEntity());
+    while (ctx->getScope() != frame.scope) {
+      popScope(ctx, module);
+    }
+    if (frame.defer != 0) {
+      eval(ctx, module, frame.defer);
+    }
+    _stack.push_back(exception);
+    _pc = frame.handle;
+  } else {
+    _stack.push_back(exception);
+    _pc = module->codes.size();
+  }
 }
 
 JS_OPT(JSVirtualMachine::pushNull) { _stack.push_back(ctx->null()); }
@@ -179,7 +212,25 @@ JS_OPT(JSVirtualMachine::loadConst) {
   _stack.push_back(ctx->createString(val));
 }
 
-JS_OPT(JSVirtualMachine::ret) { _pc = module->codes.size(); }
+JS_OPT(JSVirtualMachine::ret) {
+  if (!_errorStacks.empty()) {
+    auto frame = *_errorStacks.rbegin();
+    _errorStacks.pop_back();
+    if (frame.defer) {
+      eval(ctx, module, frame.defer);
+    }
+  }
+  _pc = module->codes.size();
+}
+JS_OPT(JSVirtualMachine::throw_) {
+  auto value = *_stack.rbegin();
+  _stack.pop_back();
+  if (value->getType() != engine::JSValueType::JS_EXCEPTION) {
+    value = ctx->createException(L"", value->convertToString(ctx));
+  }
+  _stack.push_back(value);
+  _pc = module->codes.size();
+}
 
 JS_OPT(JSVirtualMachine::yield) {}
 
@@ -225,13 +276,13 @@ JS_OPT(JSVirtualMachine::call) {
   auto pc = _pc;
   auto scope = ctx->getScope();
   auto res = func->apply(ctx, self, args);
-  scope->getRoot()->appendChild(res->getEntity());
-  while (ctx->getScope() != scope) {
-    popScope(ctx, module);
-  }
   _stack.resize(now - 1 - size);
   _stack.push_back(res);
-  _pc = pc;
+  if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+    handleError(ctx, module, res);
+  } else {
+    _pc = pc;
+  }
 }
 
 JS_OPT(JSVirtualMachine::add) {
@@ -242,13 +293,31 @@ JS_OPT(JSVirtualMachine::add) {
   _stack.push_back(arg1->add(ctx, arg2));
 }
 
-JS_OPT(JSVirtualMachine::tryStart) {}
+JS_OPT(JSVirtualMachine::tryStart) {
+  auto handle = argi(module);
+  ErrFrame frame = {
+      .scope = ctx->getScope(),
+      .defer = 0,
+      .handle = handle,
+  };
+  _errorStacks.push_back(frame);
+}
 
-JS_OPT(JSVirtualMachine::tryEnd) {}
+JS_OPT(JSVirtualMachine::tryEnd) {
+  auto frame = *_errorStacks.rbegin();
+  _errorStacks.pop_back();
+  auto pc = _pc;
+  if (frame.defer) {
+    eval(ctx, module, frame.defer);
+  }
+  _pc = pc;
+}
 
-JS_OPT(JSVirtualMachine::defer) {}
-
-JS_OPT(JSVirtualMachine::back) {}
+JS_OPT(JSVirtualMachine::defer) {
+  auto addr = argi(module);
+  auto &frame = *_errorStacks.rbegin();
+  frame.defer = addr;
+}
 
 JS_OPT(JSVirtualMachine::jmp) {
   auto offset = argi(module);
@@ -260,174 +329,194 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
                        const common::AutoPtr<compiler::JSModule> &module,
                        size_t offset) {
   _pc = offset;
+  auto scope = ctx->getScope();
+  auto frame = ctx->getCallStack();
   while (_pc != module->codes.size()) {
-    auto code = next(module);
-    switch (code) {
-    case compiler::JSAsmOperator::PUSH_NULL:
-      pushNull(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_UNDEFINED:
-      pushUndefined(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_TRUE:
-      pushTrue(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_FALSE:
-      pushFalse(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_UNINITIALIZED:
-      pushUninitialized(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH:
-      push(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_OBJECT:
-      pushObject(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_ARRAY:
-      pushArray(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_FUNCTION:
-      pushFunction(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_GENERATOR:
-      pushGenerator(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_ARROW:
-      pushArrow(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_THIS:
-      pushThis(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_SUPER:
-      pushSuper(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_ARGUMENT:
-      pushArgument(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_BIGINT:
-      pushBigint(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_REGEX:
-      pushRegex(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_ADDRESS:
-      setAddress(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_ASYNC:
-      setAsync(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_FUNC_NAME:
-      setFuncName(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_FUNC_LEN:
-      setFuncLen(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_CLOSURE:
-      setClosure(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_FIELD:
-      setField(ctx, module);
-      break;
-    case compiler::JSAsmOperator::GET_FIELD:
-      getField(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_ACCESSOR:
-      setAccessor(ctx, module);
-      break;
-    case compiler::JSAsmOperator::GET_ACCESSOR:
-      getAccessor(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_METHOD:
-      setMethod(ctx, module);
-      break;
-    case compiler::JSAsmOperator::GET_METHOD:
-      getMethod(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_INDEX:
-      setIndex(ctx, module);
-      break;
-    case compiler::JSAsmOperator::GET_INDEX:
-      getIndex(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_REGEX_HAS_INDICES:
-      setRegexHasIndices(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_REGEX_GLOBAL:
-      setRegexGlobal(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_REGEX_IGNORE_CASES:
-      setRegexIgnoreCases(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_REGEX_MULTILINE:
-      setRegexMultiline(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_REGEX_DOT_ALL:
-      setRegexDotAll(ctx, module);
-      break;
-    case compiler::JSAsmOperator::SET_REGEX_STICKY:
-      setRegexSticky(ctx, module);
-      break;
-    case compiler::JSAsmOperator::POP:
-      pop(ctx, module);
-      break;
-    case compiler::JSAsmOperator::STORE_CONST:
-      storeConst(ctx, module);
-      break;
-    case compiler::JSAsmOperator::STORE:
-      store(ctx, module);
-      break;
-    case compiler::JSAsmOperator::LOAD:
-      load(ctx, module);
-      break;
-    case compiler::JSAsmOperator::LOAD_CONST:
-      loadConst(ctx, module);
-      break;
-    case compiler::JSAsmOperator::RET:
-      ret(ctx, module);
-      break;
-    case compiler::JSAsmOperator::YIELD:
-      yield(ctx, module);
-      break;
-    case compiler::JSAsmOperator::AWAIT:
-      await(ctx, module);
-      break;
-    case compiler::JSAsmOperator::NULLISH_COALESCING:
-      nullishCoalescing(ctx, module);
-      break;
-    case compiler::JSAsmOperator::PUSH_SCOPE:
-      pushScope(ctx, module);
-      break;
-    case compiler::JSAsmOperator::POP_SCOPE:
-      popScope(ctx, module);
-      break;
-    case compiler::JSAsmOperator::CALL:
-      call(ctx, module);
-      break;
-    case compiler::JSAsmOperator::ADD:
-      add(ctx, module);
-      break;
-    case compiler::JSAsmOperator::JMP:
-      jmp(ctx, module);
-      break;
-    case compiler::JSAsmOperator::TRY:
-      tryStart(ctx, module);
-      break;
-    case compiler::JSAsmOperator::DEFER:
-      defer(ctx, module);
-      break;
-    case compiler::JSAsmOperator::ENDTRY:
-      tryEnd(ctx, module);
-      break;
-    case compiler::JSAsmOperator::BACK:
-      back(ctx, module);
-      break;
+    try {
+      auto code = next(module);
+      if (code == compiler::JSAsmOperator::HLT) {
+        break;
+      }
+      switch (code) {
+      case compiler::JSAsmOperator::HLT:
+        break;
+      case compiler::JSAsmOperator::PUSH_NULL:
+        pushNull(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_UNDEFINED:
+        pushUndefined(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_TRUE:
+        pushTrue(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_FALSE:
+        pushFalse(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_UNINITIALIZED:
+        pushUninitialized(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH:
+        push(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_OBJECT:
+        pushObject(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_ARRAY:
+        pushArray(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_FUNCTION:
+        pushFunction(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_GENERATOR:
+        pushGenerator(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_ARROW:
+        pushArrow(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_THIS:
+        pushThis(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_SUPER:
+        pushSuper(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_ARGUMENT:
+        pushArgument(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_BIGINT:
+        pushBigint(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_REGEX:
+        pushRegex(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_ADDRESS:
+        setAddress(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_ASYNC:
+        setAsync(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_FUNC_NAME:
+        setFuncName(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_FUNC_LEN:
+        setFuncLen(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_CLOSURE:
+        setClosure(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_FIELD:
+        setField(ctx, module);
+        break;
+      case compiler::JSAsmOperator::GET_FIELD:
+        getField(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_ACCESSOR:
+        setAccessor(ctx, module);
+        break;
+      case compiler::JSAsmOperator::GET_ACCESSOR:
+        getAccessor(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_METHOD:
+        setMethod(ctx, module);
+        break;
+      case compiler::JSAsmOperator::GET_METHOD:
+        getMethod(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_INDEX:
+        setIndex(ctx, module);
+        break;
+      case compiler::JSAsmOperator::GET_INDEX:
+        getIndex(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_REGEX_HAS_INDICES:
+        setRegexHasIndices(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_REGEX_GLOBAL:
+        setRegexGlobal(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_REGEX_IGNORE_CASES:
+        setRegexIgnoreCases(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_REGEX_MULTILINE:
+        setRegexMultiline(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_REGEX_DOT_ALL:
+        setRegexDotAll(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_REGEX_STICKY:
+        setRegexSticky(ctx, module);
+        break;
+      case compiler::JSAsmOperator::POP:
+        pop(ctx, module);
+        break;
+      case compiler::JSAsmOperator::STORE_CONST:
+        storeConst(ctx, module);
+        break;
+      case compiler::JSAsmOperator::STORE:
+        store(ctx, module);
+        break;
+      case compiler::JSAsmOperator::LOAD:
+        load(ctx, module);
+        break;
+      case compiler::JSAsmOperator::LOAD_CONST:
+        loadConst(ctx, module);
+        break;
+      case compiler::JSAsmOperator::RET:
+        ret(ctx, module);
+        break;
+      case compiler::JSAsmOperator::THROW:
+        throw_(ctx, module);
+        break;
+      case compiler::JSAsmOperator::YIELD:
+        yield(ctx, module);
+        break;
+      case compiler::JSAsmOperator::AWAIT:
+        await(ctx, module);
+        break;
+      case compiler::JSAsmOperator::NULLISH_COALESCING:
+        nullishCoalescing(ctx, module);
+        break;
+      case compiler::JSAsmOperator::PUSH_SCOPE:
+        pushScope(ctx, module);
+        break;
+      case compiler::JSAsmOperator::POP_SCOPE:
+        popScope(ctx, module);
+        break;
+      case compiler::JSAsmOperator::CALL:
+        call(ctx, module);
+        break;
+      case compiler::JSAsmOperator::ADD:
+        add(ctx, module);
+        break;
+      case compiler::JSAsmOperator::JMP:
+        jmp(ctx, module);
+        break;
+      case compiler::JSAsmOperator::TRY:
+        tryStart(ctx, module);
+        break;
+      case compiler::JSAsmOperator::DEFER:
+        defer(ctx, module);
+        break;
+      case compiler::JSAsmOperator::ENDTRY:
+        tryEnd(ctx, module);
+        break;
+      }
+    } catch (error::JSError &e) {
+      handleError(ctx, module, e);
     }
   }
+  auto value = ctx->undefined();
   if (!_stack.empty()) {
-    auto value = _stack[_stack.size() - 1];
-    return value;
-  } else {
-    return ctx->undefined();
+    value = _stack[_stack.size() - 1];
+    if (ctx->getScope() != scope) {
+      auto entity = value->getEntity();
+      value = scope->createValue(entity);
+    }
   }
+  while (ctx->getScope() != scope) {
+    popScope(ctx, module);
+  }
+  while (ctx->getCallStack() != frame) {
+    ctx->popCallStack();
+  }
+  return value;
 }

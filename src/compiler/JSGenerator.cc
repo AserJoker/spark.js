@@ -315,7 +315,15 @@ void JSGenerator::resolveStatementSwitchCase(
 
 void JSGenerator::resolveStatementThrow(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
+                                        const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSThrowStatement>();
+  if (n->value != nullptr) {
+    resolveNode(ctx, module, n->value);
+  } else {
+    generate(module, JSAsmOperator::PUSH_UNDEFINED);
+  }
+  generate(module, JSAsmOperator::THROW);
+}
 
 void JSGenerator::resolveStatementTry(JSGeneratorContext &ctx,
                                       common::AutoPtr<JSModule> &module,
@@ -339,6 +347,7 @@ void JSGenerator::resolveStatementTry(JSGeneratorContext &ctx,
   *finallyStart = (uint32_t)(module->codes.size());
   if (n->finally != nullptr) {
     resolveNode(ctx, module, n->finally);
+    generate(module, JSAsmOperator::HLT);
   }
   *finallyEnd = (uint32_t)(module->codes.size());
 }
@@ -631,11 +640,7 @@ void JSGenerator::resolveFunction(JSGeneratorContext &ctx,
   auto n = node.cast<JSFunctionDeclaration>();
   ctx.currentScope->functionDeclarations.push_back(
       (JSNode *)node.getRawPointer());
-  if (n->identifier != nullptr) {
-    generate(module, JSAsmOperator::LOAD,
-             resolveConstant(ctx, module,
-                             n->identifier.cast<JSIdentifierLiteral>()->value));
-  } else {
+  if (n->identifier == nullptr) {
     if (n->generator) {
       generate(module, JSAsmOperator::PUSH_GENERATOR);
     } else {

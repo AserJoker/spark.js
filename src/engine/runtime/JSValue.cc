@@ -6,6 +6,7 @@
 #include "engine/entity/JSBigIntEntity.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
+#include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
@@ -15,6 +16,7 @@
 #include "engine/entity/JSSymbolEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "engine/runtime/JSScope.hpp"
+#include "error/JSError.hpp"
 #include "error/JSInternalError.hpp"
 #include "error/JSRangeError.hpp"
 #include "error/JSReferenceError.hpp"
@@ -147,56 +149,51 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
   if (getType() == JSValueType::JS_OBJECT) {
     func = self->toPrimitive(ctx);
   }
-  if (func->getType() == JSValueType::JS_NATIVE_FUNCTION) {
-    auto entity = (JSNativeFunctionEntity *)_entity;
-    ctx->pushCallStack(location);
-    auto scope = ctx->pushScope();
-    JSEntity *result = nullptr;
-    try {
+  if (func->getType() != JSValueType::JS_NATIVE_FUNCTION &&
+      func->getType() != JSValueType::JS_FUNCTION) {
+
+    throw error::JSTypeError(fmt::format(L"{} is not a function", getName()),
+                             location);
+  }
+  ctx->pushCallStack(location);
+  auto scope = ctx->pushScope();
+  JSEntity *result = nullptr;
+  try {
+    if (func->getType() == JSValueType::JS_NATIVE_FUNCTION) {
+      auto entity = (JSNativeFunctionEntity *)_entity;
       auto closure = entity->getClosure();
       auto callee = entity->getCallee();
       for (auto &[name, entity] : closure) {
         ctx->createValue(entity, name);
       }
       result = callee(ctx, self, args)->getEntity();
-    } catch (error::JSError &e) {
-      result = ctx->createException(e.getType(), e.getMessage())->getEntity();
-    } catch (std::exception &e) {
-      static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-      result = ctx->createException(L"InternalError",
-                                    converter.from_bytes(e.what()), location)
+    } else {
+      auto entity = func->getEntity<JSFunctionEntity>();
+      std::vector<JSEntity *> arguments;
+      for (auto &arg : args) {
+        arguments.push_back(arg->getEntity());
+      }
+      ctx->createValue(
+          new JSArgumentEntity(ctx->null()->getEntity(), arguments),
+          L"arguments");
+      result = ctx->getRuntime()
+                   ->getVirtualMachine()
+                   ->eval(ctx, entity->getModule(), entity->getAddress())
                    ->getEntity();
     }
-    scope->getRoot()->appendChild(result);
-    ctx->popScope(scope);
-    ctx->popCallStack();
-    return ctx->createValue(result);
-  } else if (func->getType() == JSValueType::JS_FUNCTION) {
-    auto entity = func->getEntity<JSFunctionEntity>();
-    ctx->pushCallStack(location);
-    auto scope = ctx->pushScope();
-    JSEntity *result = nullptr;
-    auto closure = entity->getClosure();
-    for (auto &[name, entity] : closure) {
-      ctx->createValue(entity, name);
-    }
-    std::vector<JSEntity *> arguments;
-    for (auto &arg : args) {
-      arguments.push_back(arg->getEntity());
-    }
-    ctx->createValue(new JSArgumentEntity(ctx->null()->getEntity(), arguments),
-                     L"arguments");
-    result = ctx->getRuntime()
-                 ->getVirtualMachine()
-                 ->eval(ctx, entity->getModule(), entity->getAddress())
+  } catch (error::JSError &e) {
+    result = ctx->createException(e.getType(), e.getMessage(), location)
                  ->getEntity();
-    scope->getRoot()->appendChild(result);
-    ctx->popScope(scope);
-    ctx->popCallStack();
-    return ctx->createValue(result);
+  } catch (std::exception &e) {
+    static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    result = ctx->createException(L"InternalError",
+                                  converter.from_bytes(e.what()), location)
+                 ->getEntity();
   }
-  throw error::JSTypeError(fmt::format(L"{} is not a function", getName()),
-                           location);
+  scope->getRoot()->appendChild(result);
+  ctx->popScope(scope);
+  ctx->popCallStack();
+  return ctx->createValue(result);
 }
 
 common::AutoPtr<JSValue> JSValue::toPrimitive(common::AutoPtr<JSContext> ctx,
@@ -284,9 +281,10 @@ std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
     return getEntity<JSBooleanEntity>()->getValue() ? L"true" : L"false";
   case JSValueType::JS_OBJECT:
   case JSValueType::JS_NATIVE_FUNCTION:
-  case JSValueType::JS_EXCEPTION:
   case JSValueType::JS_CLASS:
     return toPrimitive(ctx)->convertToString(ctx);
+  case JSValueType::JS_EXCEPTION:
+    return getEntity<JSExceptionEntity>()->toString(ctx);
   case JSValueType::JS_SYMBOL:
     throw error::JSTypeError(L"Cannot convert a Symbol value to a string");
   default:

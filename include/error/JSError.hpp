@@ -19,6 +19,9 @@ private:
 
   std::string format(const std::wstring &type, const std::wstring &message) {
     static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    if (type.empty()) {
+      return converter.to_bytes(message);
+    }
     std::wstring msg = fmt::format(L"{}: {}", type, message);
     return converter.to_bytes(msg);
   }
@@ -29,10 +32,10 @@ public:
       : std::runtime_error(format(type, message)), _type(type),
         _message(message), _location(location){};
 
-  const std::wstring &getType() { return _type; }
+  const std::wstring &getType() const { return _type; }
 
-  const std::wstring &getMessage() { return _message; }
+  const std::wstring &getMessage() const { return _message; }
 
-  const engine::JSLocation &getLocation() { return _location; }
+  const engine::JSLocation &getLocation() const { return _location; }
 };
 } // namespace spark::error

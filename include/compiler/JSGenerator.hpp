@@ -408,6 +408,7 @@ private:
     buffer += sizeof(uint16_t);
     *(uint32_t *)buffer = arg;
   }
+
   void generate(common::AutoPtr<JSModule> &module, const JSAsmOperator &opt,
                 double arg) {
     auto size = module->codes.size();
@@ -418,6 +419,7 @@ private:
     buffer += sizeof(uint16_t);
     *(uint64_t *)buffer = *(uint64_t *)&arg;
   }
+
   void generate(common::AutoPtr<JSModule> &module, const JSAsmOperator &opt) {
     auto size = module->codes.size();
     module->codes.resize(size + sizeof(uint16_t), 0);

@@ -4,6 +4,7 @@
 #include "compiler/base/JSAsmOperator.hpp"
 #include "compiler/base/JSModule.hpp"
 #include "engine/runtime/JSValue.hpp"
+#include "error/JSError.hpp"
 #include <string>
 #include <vector>
 #define JS_OPT(name)                                                           \
@@ -16,6 +17,7 @@ namespace spark::vm {
 class JSVirtualMachine : public common::Object {
 private:
   struct ErrFrame {
+    engine::JSScope *scope;
     uint32_t defer;
     uint32_t handle;
   };
@@ -24,7 +26,7 @@ private:
   std::vector<common::AutoPtr<engine::JSValue>> _stack;
   std::vector<size_t> _stackTops;
   std::vector<engine::JSScope *> _scopeChain;
-  std::vector<ErrFrame> _tryStacks;
+  std::vector<ErrFrame> _errorStacks;
   size_t _pc;
 
 private:
@@ -32,8 +34,18 @@ private:
   next(const common::AutoPtr<compiler::JSModule> &module);
 
   uint32_t argi(const common::AutoPtr<compiler::JSModule> &module);
+
   double argf(const common::AutoPtr<compiler::JSModule> &module);
+
   const std::wstring &args(const common::AutoPtr<compiler::JSModule> &module);
+
+  void handleError(common::AutoPtr<engine::JSContext> ctx,
+                   const common::AutoPtr<compiler::JSModule> &module,
+                   const error::JSError &e);
+
+  void handleError(common::AutoPtr<engine::JSContext> ctx,
+                   const common::AutoPtr<compiler::JSModule> &module,
+                   common::AutoPtr<engine::JSValue> e);
 
 private:
   JS_OPT(pushNull);
@@ -77,6 +89,7 @@ private:
   JS_OPT(load);
   JS_OPT(loadConst);
   JS_OPT(ret);
+  JS_OPT(throw_);
   JS_OPT(yield);
   JS_OPT(await);
   JS_OPT(nullishCoalescing);
@@ -86,7 +99,6 @@ private:
   JS_OPT(tryStart);
   JS_OPT(tryEnd);
   JS_OPT(defer);
-  JS_OPT(back);
   JS_OPT(jmp);
   JS_OPT(add);
 
