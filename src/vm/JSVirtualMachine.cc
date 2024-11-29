@@ -232,6 +232,7 @@ JS_OPT(JSVirtualMachine::throw_) {
   if (value->getType() != engine::JSValueType::JS_EXCEPTION) {
     value = ctx->createException(value);
   }
+  _stack.push_back(value);
   _ctx->pc = module->codes.size();
 }
 
