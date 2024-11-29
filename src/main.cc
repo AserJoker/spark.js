@@ -246,6 +246,10 @@ int main(int argc, char *argv[]) {
       case compiler::JSAsmOperator::ADD:
         out << L"add";
         break;
+      case compiler::JSAsmOperator::NEW:
+        out << L"new " << *(uint32_t *)(buffer + offset);
+        offset += sizeof(uint32_t);
+        break;
       }
       out << std::endl;
     }

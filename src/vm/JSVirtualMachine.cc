@@ -235,6 +235,24 @@ JS_OPT(JSVirtualMachine::throw_) {
   _stack.push_back(value);
   _ctx->pc = module->codes.size();
 }
+JS_OPT(JSVirtualMachine::new_) {
+  auto size = argi(module);
+  auto now = _stack.size();
+  auto func = _stack[now - 1 - size];
+  std::vector<common::AutoPtr<engine::JSValue>> args;
+  args.resize(size, nullptr);
+  for (auto i = 0; i < size; i++) {
+    args[i] = _stack[_stack.size() - size + i];
+  }
+  _stack.push_back(ctx->constructObject(
+      func, args,
+      {
+          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .line = 0,
+          .column = 0,
+          .funcname = func->getName(),
+      }));
+};
 
 JS_OPT(JSVirtualMachine::yield) {}
 
@@ -279,7 +297,12 @@ JS_OPT(JSVirtualMachine::call) {
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _ctx->pc;
   auto scope = ctx->getScope();
-  auto res = func->apply(ctx, self, args);
+  auto res = func->apply(
+      ctx, self, args,
+      {
+          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .funcname = name,
+      });
   _stack.resize(now - 1 - size);
   _stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
@@ -507,6 +530,9 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
         break;
       case compiler::JSAsmOperator::ENDTRY:
         tryEnd(ctx, module);
+        break;
+      case compiler::JSAsmOperator::NEW:
+        new_(ctx, module);
         break;
       }
       if (_ctx->pc == module->codes.size()) {

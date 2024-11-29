@@ -46,6 +46,7 @@ enum class JSAsmOperator {
   THROW,
   YIELD,
   AWAIT,
+  NEW,
   NULLISH_COALESCING,
   PUSH_SCOPE,
   POP_SCOPE,

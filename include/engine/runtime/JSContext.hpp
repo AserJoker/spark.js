@@ -32,8 +32,6 @@ public:
 private:
   static JS_FUNC(JSArrayConstructor);
 
-  static JS_FUNC(JSErrorConstructor);
-
   static JS_FUNC(JSNumberConstructor);
 
   static JS_FUNC(JSStringConstructor);
@@ -137,6 +135,11 @@ public:
   common::AutoPtr<JSValue> createObject(const std::wstring &name = L"");
 
   common::AutoPtr<JSValue>
+  constructObject(common::AutoPtr<JSValue> constructor,
+                  const std::vector<common::AutoPtr<JSValue>> &args,
+                  const JSLocation &loc, const std::wstring &name = L"");
+
+  common::AutoPtr<JSValue>
   createNativeFunction(const std::function<JSFunction> &value,
                        const std::wstring &funcname = L"",
                        const std::wstring &name = L"");
@@ -154,6 +157,7 @@ public:
   common::AutoPtr<JSValue> createException(const std::wstring &type,
                                            const std::wstring &message,
                                            const JSLocation &location = {});
+
   common::AutoPtr<JSValue> createException(common::AutoPtr<JSValue> target);
 
   common::AutoPtr<JSValue> undefined();

@@ -16,6 +16,7 @@
 #include "engine/entity/JSStringEntity.hpp"
 #include "engine/entity/JSSymbolEntity.hpp"
 #include "engine/entity/JSUndefinedEntity.hpp"
+#include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/lib/JSFunctionConstructor.hpp"
 #include "engine/lib/JSObjectConstructor.hpp"
 #include "engine/lib/JSSymbolConstructor.hpp"
@@ -29,7 +30,6 @@ using namespace spark;
 using namespace spark::engine;
 
 JS_FUNC(JSContext::JSArrayConstructor) { return ctx->undefined(); }
-JS_FUNC(JSContext::JSErrorConstructor) { return ctx->undefined(); }
 JS_FUNC(JSContext::JSNumberConstructor) { return ctx->undefined(); }
 JS_FUNC(JSContext::JSStringConstructor) { return ctx->undefined(); }
 JS_FUNC(JSContext::JSBooleanConstructor) { return ctx->undefined(); }
@@ -104,8 +104,9 @@ void JSContext::initialize() {
   _Array = _scope->createValue(ArrayConstructorEntity, L"Array");
   _Array->setProperty(this, L"prototype", arrayPrototype);
 
-  JSNativeFunctionEntity *ErrorConstructorEntity = new JSNativeFunctionEntity(
-      functionPrototype->getEntity(), L"Error", &JSErrorConstructor, {});
+  JSNativeFunctionEntity *ErrorConstructorEntity =
+      new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Error",
+                                 &JSErrorConstructor::constructor, {});
   _Error = _scope->createValue(ErrorConstructorEntity, L"Error");
   _Error->setProperty(this, L"prototype", errorPrototype);
 
@@ -141,6 +142,7 @@ void JSContext::initialize() {
   JSSymbolConstructor::initialize(this, _Symbol);
   JSObjectConstructor::initialize(this, _Object);
   JSFunctionConstructor::initialize(this, _Function);
+  JSErrorConstructor::initialize(this, _Error);
   popScope(scope);
   subRef();
 }
@@ -290,6 +292,22 @@ JSContext::createObject(common::AutoPtr<JSValue> prototype,
 }
 common::AutoPtr<JSValue> JSContext::createObject(const std::wstring &name) {
   return createObject(nullptr, name);
+}
+
+common::AutoPtr<JSValue>
+JSContext::constructObject(common::AutoPtr<JSValue> constructor,
+                           const std::vector<common::AutoPtr<JSValue>> &args,
+                           const JSLocation &loc, const std::wstring &name) {
+  if (constructor->getType() != JSValueType::JS_FUNCTION &&
+      constructor->getType() != JSValueType::JS_NATIVE_FUNCTION &&
+      constructor->getType() != JSValueType::JS_CLASS) {
+    throw error::JSSyntaxError(
+        fmt::format(L"'{}' is not a constructor", constructor->getName()));
+  }
+  auto prototype = constructor->getProperty(this, L"prototype");
+  auto result = createObject(prototype, name);
+  constructor->apply(this, result, args, loc);
+  return result;
 }
 
 common::AutoPtr<JSValue>

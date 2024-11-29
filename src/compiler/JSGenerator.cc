@@ -501,7 +501,20 @@ void JSGenerator::resolveExpressionOptionalCall(
 
 void JSGenerator::resolveExpressionNew(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
-                                       const common::AutoPtr<JSNode> &node) {}
+                                       const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSNewExpression>();
+  if (n->right->type == JSNodeType::EXPRESSION_CALL) {
+    auto c = n->right.cast<JSCallExpression>();
+    resolveNode(ctx, module, c->left);
+    for (auto &arg : c->arguments) {
+      resolveNode(ctx, module, arg);
+    }
+    generate(module, JSAsmOperator::NEW, (uint32_t)c->arguments.size());
+  } else {
+    resolveNode(ctx, module, n->right);
+    generate(module, JSAsmOperator::NEW, 0U);
+  }
+}
 
 void JSGenerator::resolveExpressionDelete(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,

@@ -80,6 +80,7 @@ private:
   JS_OPT(loadConst);
   JS_OPT(ret);
   JS_OPT(throw_);
+  JS_OPT(new_);
   JS_OPT(yield);
   JS_OPT(await);
   JS_OPT(nullishCoalescing);
