@@ -1,4 +1,5 @@
 #pragma once
+#include "JSEvalContext.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/Object.hpp"
 #include "compiler/base/JSAsmOperator.hpp"
@@ -6,7 +7,6 @@
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
 #include <string>
-#include <vector>
 #define JS_OPT(name)                                                           \
   void name(common::AutoPtr<engine::JSContext> ctx,                            \
             const common::AutoPtr<compiler::JSModule> &module)
@@ -16,19 +16,7 @@ class JSContext;
 namespace spark::vm {
 class JSVirtualMachine : public common::Object {
 private:
-  struct ErrFrame {
-    engine::JSScope *scope;
-    uint32_t defer;
-    uint32_t handle;
-  };
-
-private:
-  std::vector<common::AutoPtr<engine::JSValue>> _stack;
-  std::vector<size_t> _frames;
-  std::vector<ErrFrame> _errorStacks;
-  std::vector<size_t> _errorFrames;
-  std::vector<engine::JSScope *> _scopeChain;
-  size_t _pc;
+  JSEvalContext *_ctx;
 
 private:
   compiler::JSAsmOperator
