@@ -253,6 +253,11 @@ int main(int argc, char *argv[]) {
       }
       out << std::endl;
     }
+    out << L"[section .map]" << std::endl;
+    for (auto &[offset, mapping] : module->sourceMap) {
+      out << L"." << offset << " " << mapping.column << "," << mapping.line
+          << std::endl;
+    }
     out.close();
     auto res = ctx->getRuntime()->getVirtualMachine()->eval(ctx, module);
     fmt::print(L"{}\n", res->convertToString(ctx));

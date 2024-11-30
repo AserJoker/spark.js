@@ -9,6 +9,7 @@
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
 #include "vm/JSErrorFrame.hpp"
+#include <cstdint>
 using namespace spark;
 using namespace spark::vm;
 JSVirtualMachine::JSVirtualMachine() { _ctx = nullptr; }
@@ -80,7 +81,9 @@ void JSVirtualMachine::handleError(
 
 JS_OPT(JSVirtualMachine::pushNull) { _ctx->stack.push_back(ctx->null()); }
 
-JS_OPT(JSVirtualMachine::pushUndefined) { _ctx->stack.push_back(ctx->undefined()); }
+JS_OPT(JSVirtualMachine::pushUndefined) {
+  _ctx->stack.push_back(ctx->undefined());
+}
 
 JS_OPT(JSVirtualMachine::pushTrue) { _ctx->stack.push_back(ctx->truly()); }
 
@@ -95,7 +98,9 @@ JS_OPT(JSVirtualMachine::push) {
   _ctx->stack.push_back(ctx->createNumber(value));
 }
 
-JS_OPT(JSVirtualMachine::pushObject) { _ctx->stack.push_back(ctx->createObject()); }
+JS_OPT(JSVirtualMachine::pushObject) {
+  _ctx->stack.push_back(ctx->createObject());
+}
 
 JS_OPT(JSVirtualMachine::pushArray) {}
 
@@ -107,7 +112,9 @@ JS_OPT(JSVirtualMachine::pushGenerator) {}
 
 JS_OPT(JSVirtualMachine::pushArrow) {}
 
-JS_OPT(JSVirtualMachine::pushThis) { _ctx->stack.push_back(ctx->load(L"this")); }
+JS_OPT(JSVirtualMachine::pushThis) {
+  _ctx->stack.push_back(ctx->load(L"this"));
+}
 
 JS_OPT(JSVirtualMachine::pushSuper) {}
 
@@ -126,31 +133,36 @@ JS_OPT(JSVirtualMachine::pushRegex) {}
 
 JS_OPT(JSVirtualMachine::setAddress) {
   auto addr = argi(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]
+                  ->getEntity<engine::JSFunctionEntity>();
   func->setAddress(addr);
 }
 
 JS_OPT(JSVirtualMachine::setAsync) {
   auto async = argi(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]
+                  ->getEntity<engine::JSFunctionEntity>();
   func->setAsync(async);
 }
 
 JS_OPT(JSVirtualMachine::setFuncName) {
   auto name = args(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]
+                  ->getEntity<engine::JSFunctionEntity>();
   func->setFuncName(name);
 }
 
 JS_OPT(JSVirtualMachine::setFuncLen) {
   auto len = argi(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]
+                  ->getEntity<engine::JSFunctionEntity>();
   func->setAsync(len);
 }
 
 JS_OPT(JSVirtualMachine::setClosure) {
   auto name = args(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]
+                  ->getEntity<engine::JSFunctionEntity>();
   func->setClosure(name, ctx->load(name)->getEntity());
 }
 
@@ -236,6 +248,7 @@ JS_OPT(JSVirtualMachine::throw_) {
   _ctx->pc = module->codes.size();
 }
 JS_OPT(JSVirtualMachine::new_) {
+  auto offset = _ctx->pc - sizeof(uint16_t);
   auto size = argi(module);
   auto now = _ctx->stack.size();
   auto func = _ctx->stack[now - 1 - size];
@@ -244,12 +257,13 @@ JS_OPT(JSVirtualMachine::new_) {
   for (auto i = 0; i < size; i++) {
     args[i] = _ctx->stack[_ctx->stack.size() - size + i];
   }
+  auto loc = module->sourceMap.at(offset);
   _ctx->stack.push_back(ctx->constructObject(
       func, args,
       {
           .filename = ctx->getRuntime()->setSourceFilename(module->filename),
-          .line = 0,
-          .column = 0,
+          .line = loc.line + 1,
+          .column = loc.column + 1,
           .funcname = func->getName(),
       }));
 };
@@ -281,6 +295,7 @@ JS_OPT(JSVirtualMachine::popScope) {
 }
 
 JS_OPT(JSVirtualMachine::call) {
+  auto offset = _ctx->pc - sizeof(uint16_t);
   auto size = argi(module);
   auto now = _ctx->stack.size();
   auto func = _ctx->stack[now - 1 - size];
@@ -293,10 +308,13 @@ JS_OPT(JSVirtualMachine::call) {
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _ctx->pc;
   auto scope = ctx->getScope();
+  auto loc = module->sourceMap.at(offset);
   auto res = func->apply(
       ctx, self, args,
       {
           .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .line = loc.line + 1,
+          .column = loc.column + 1,
           .funcname = name,
       });
   _ctx->stack.resize(now - 1 - size);

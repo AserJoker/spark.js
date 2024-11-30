@@ -492,6 +492,7 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
   for (auto &arg : n->arguments) {
     resolveNode(ctx, module, arg);
   }
+  module->sourceMap[module->codes.size()] = node->location.start;
   generate(module, JSAsmOperator::CALL, (uint32_t)n->arguments.size());
 }
 
@@ -509,9 +510,11 @@ void JSGenerator::resolveExpressionNew(JSGeneratorContext &ctx,
     for (auto &arg : c->arguments) {
       resolveNode(ctx, module, arg);
     }
+    module->sourceMap[module->codes.size()] = node->location.start;
     generate(module, JSAsmOperator::NEW, (uint32_t)c->arguments.size());
   } else {
     resolveNode(ctx, module, n->right);
+    module->sourceMap[module->codes.size()] = node->location.start;
     generate(module, JSAsmOperator::NEW, 0U);
   }
 }
