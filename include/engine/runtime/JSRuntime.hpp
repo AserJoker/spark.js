@@ -12,7 +12,7 @@
 namespace spark::engine {
 class JSRuntime : public common::Object {
 private:
-  JSScope *_root;
+  common::AutoPtr<JSScope> _root;
 
   std::unordered_map<uint32_t, std::wstring> _sources;
 
@@ -31,7 +31,7 @@ public:
 
   uint32_t setSourceFilename(const std::wstring &filename);
 
-  JSScope *getRoot();
+  common::AutoPtr<JSScope> getRoot();
 
   common::AutoPtr<compiler::JSParser> &getParser();
   common::AutoPtr<compiler::JSGenerator> &getGenerator();

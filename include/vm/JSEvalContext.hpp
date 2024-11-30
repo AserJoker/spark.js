@@ -6,7 +6,7 @@
 namespace spark::vm {
 struct JSEvalContext : public common::Object {
   std::vector<common::AutoPtr<engine::JSValue>> stack;
-  std::vector<engine::JSScope *> scopeChain;
+  std::vector<common::AutoPtr<engine::JSScope>> scopeChain;
   size_t pc;
   JSErrorFrame *errorStacks;
   JSEvalContext(size_t pc) {

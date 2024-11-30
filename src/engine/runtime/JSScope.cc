@@ -8,8 +8,8 @@
 
 using namespace spark;
 using namespace spark::engine;
-JSScope::JSScope(JSScope *parent) {
-  _parent = parent;
+JSScope::JSScope(const common::AutoPtr<JSScope> &parent) {
+  _parent = (JSScope *)parent.getRawPointer();
   _root = new JSEntity();
   if (_parent) {
     _parent->_root->appendChild(_root);
@@ -18,9 +18,6 @@ JSScope::JSScope(JSScope *parent) {
 }
 
 JSScope::~JSScope() {
-  for (auto &child : _children) {
-    delete child;
-  }
   _children.clear();
   for (auto &[_, value] : _values) {
     value->setEntity(nullptr);
@@ -96,14 +93,21 @@ bool JSScope::isEntityAlived(JSEntity *entity,
 
 JSEntity *JSScope::getRoot() { return _root; }
 
-JSScope *JSScope::getRootScope() {
+common::AutoPtr<JSScope> JSScope::getRootScope() {
   auto root = this;
   while (root->_parent) {
     root = root->_parent;
   }
   return root;
 }
-JSScope *JSScope::getParent() { return _parent; }
+common::AutoPtr<JSScope> JSScope::getParent() { return _parent; }
+
+void JSScope::removeChild(const common::AutoPtr<JSScope> &child) {
+  auto it = std::find(_children.begin(), _children.end(), child);
+  if (it != _children.end()) {
+    _children.erase(it);
+  }
+}
 
 common::AutoPtr<JSValue> JSScope::createValue(JSEntity *entity,
                                               const std::wstring &name) {

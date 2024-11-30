@@ -15,7 +15,7 @@ JSRuntime::JSRuntime() {
   _vm = new vm::JSVirtualMachine();
 };
 
-JSRuntime::~JSRuntime() { delete _root; };
+JSRuntime::~JSRuntime(){};
 
 const std::wstring &JSRuntime::getSourceFilename(uint32_t index) {
   return _sources.at(index);
@@ -33,7 +33,7 @@ uint32_t JSRuntime::setSourceFilename(const std::wstring &filename) {
   return (uint32_t)(_sources.size() - 1);
 }
 
-JSScope *JSRuntime::getRoot() { return _root; }
+common::AutoPtr<JSScope> JSRuntime::getRoot() { return _root; }
 
 common::AutoPtr<compiler::JSParser> &JSRuntime::getParser() { return _parser; }
 common::AutoPtr<compiler::JSGenerator> &JSRuntime::getGenerator() {

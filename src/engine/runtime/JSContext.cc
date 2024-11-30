@@ -48,7 +48,6 @@ JSContext::~JSContext() {
   while (_callStack) {
     popCallStack();
   }
-  delete _root;
 }
 
 void JSContext::initialize() {
@@ -174,24 +173,28 @@ JSContext::compile(const std::wstring &source, const std::wstring &filename) {
   return generator->resolve(filename, ast);
 }
 
-JSScope *JSContext::pushScope() {
+common::AutoPtr<JSScope> JSContext::pushScope() {
   auto scope = _scope;
   _scope = new JSScope(scope);
   return scope;
 }
 
-void JSContext::popScope(JSScope *scope) {
-  while (_scope != scope) {
-    auto now = _scope;
-    _scope = _scope->getParent();
-    delete now;
+void JSContext::popScope(common::AutoPtr<JSScope> scope) {
+  if (_scope != scope) {
+    while (_scope->getParent() != scope) {
+      auto parent = _scope->getParent();
+      _scope = parent;
+    }
+    auto parent = _scope->getParent();
+    parent->removeChild(_scope);
+    _scope = scope;
   }
 }
 
 void JSContext::setScope(JSScope *scope) { _scope = scope; }
 
-JSScope *JSContext::getScope() { return _scope; }
-JSScope *JSContext::getRoot() { return _root; }
+common::AutoPtr<JSScope> JSContext::getScope() { return _scope; }
+common::AutoPtr<JSScope> JSContext::getRoot() { return _root; }
 
 void JSContext::pushCallStack(const JSLocation &location) {
   auto frame = new JSCallFrame;

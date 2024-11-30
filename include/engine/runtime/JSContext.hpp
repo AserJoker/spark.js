@@ -69,8 +69,8 @@ private:
   void initialize();
 
 private:
-  JSScope *_root;
-  JSScope *_scope;
+  common::AutoPtr<JSScope> _root;
+  common::AutoPtr<JSScope> _scope;
   common::AutoPtr<JSRuntime> _runtime;
   JSCallFrame *_callStack;
 
@@ -87,15 +87,15 @@ public:
   common::AutoPtr<compiler::JSModule> compile(const std::wstring &source,
                                               const std::wstring &filename);
 
-  JSScope *pushScope();
+  common::AutoPtr<JSScope> pushScope();
 
-  void popScope(JSScope *scope);
+  void popScope(common::AutoPtr<JSScope> scope);
 
   void setScope(JSScope *scope);
 
-  JSScope *getScope();
+  common::AutoPtr<JSScope> getScope();
 
-  JSScope *getRoot();
+  common::AutoPtr<JSScope> getRoot();
 
   void pushCallStack(const JSLocation &location);
 

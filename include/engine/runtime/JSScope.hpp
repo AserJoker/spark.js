@@ -7,12 +7,12 @@
 #include <string>
 
 namespace spark::engine {
-class JSScope {
+class JSScope : public common::Object {
 private:
   JSEntity *_root;
   JSScope *_parent;
 
-  std::vector<JSScope *> _children;
+  std::vector<common::AutoPtr<JSScope>> _children;
 
   common::Map<std::wstring, common::AutoPtr<JSValue>> _values;
 
@@ -22,15 +22,17 @@ private:
   bool isEntityAlived(JSEntity *entity, common::Map<JSEntity *, bool> &cache);
 
 public:
-  JSScope(JSScope *parent);
+  JSScope(const common::AutoPtr<JSScope>& parent);
 
   virtual ~JSScope();
 
   JSEntity *getRoot();
 
-  JSScope *getRootScope();
+  common::AutoPtr<JSScope> getRootScope();
 
-  JSScope *getParent();
+  common::AutoPtr<JSScope> getParent();
+  
+  void removeChild(const common::AutoPtr<JSScope>& child);
 
   common::AutoPtr<JSValue> createValue(JSEntity *entity,
                                        const std::wstring &name = L"");
