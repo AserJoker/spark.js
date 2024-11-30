@@ -86,54 +86,64 @@ void JSContext::initialize() {
                                  &JSObjectConstructor::constructor, {});
   _Object = _scope->createValue(ObjectConstructorEntity, L"Object");
   _Object->setProperty(this, L"prototype", objectPrototype);
+  objectPrototype->setProperty(this, L"constructor", _Object);
 
   JSNativeFunctionEntity *FunctionConstructorEntity =
       new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Function",
                                  &JSFunctionConstructor::constructor, {});
   _Function = _scope->createValue(FunctionConstructorEntity, L"Function");
   _Function->setProperty(this, L"prototype", functionPrototype);
+  functionPrototype->setProperty(this, L"constructor", _Function);
 
   JSNativeFunctionEntity *SymbolConstructorEntity =
       new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Symbol",
                                  &JSSymbolConstructor::constructor, {});
   _Symbol = _scope->createValue(SymbolConstructorEntity, L"Symbol");
   _Symbol->setProperty(this, L"prototype", symbolPrototype);
+  symbolPrototype->setProperty(this, L"constructor", _Symbol);
 
   JSNativeFunctionEntity *ArrayConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"Array", &JSArrayConstructor, {});
   _Array = _scope->createValue(ArrayConstructorEntity, L"Array");
   _Array->setProperty(this, L"prototype", arrayPrototype);
+  arrayPrototype->setProperty(this, L"constructor", _Array);
 
   JSNativeFunctionEntity *ErrorConstructorEntity =
       new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Error",
                                  &JSErrorConstructor::constructor, {});
   _Error = _scope->createValue(ErrorConstructorEntity, L"Error");
   _Error->setProperty(this, L"prototype", errorPrototype);
+  errorPrototype->setProperty(this, L"constructor", _Error);
 
   JSNativeFunctionEntity *NumberConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"Number", &JSNumberConstructor, {});
   _Number = _scope->createValue(NumberConstructorEntity, L"Number");
   _Number->setProperty(this, L"prototype", numberPrototype);
+  numberPrototype->setProperty(this, L"constructor", _Number);
 
   JSNativeFunctionEntity *StringConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"String", &JSStringConstructor, {});
   _String = _scope->createValue(StringConstructorEntity, L"String");
   _String->setProperty(this, L"prototype", stringPrototype);
+  stringPrototype->setProperty(this, L"constructor", _String);
 
   JSNativeFunctionEntity *BooleanConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"Boolean", &JSBooleanConstructor, {});
   _Boolean = _scope->createValue(BooleanConstructorEntity, L"Boolean");
   _Boolean->setProperty(this, L"prototype", booleanPrototype);
+  booleanPrototype->setProperty(this, L"constructor", _Boolean);
 
   JSNativeFunctionEntity *BigIntConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"BigInt", &JSBigIntConstructor, {});
   _BigInt = _scope->createValue(BigIntConstructorEntity, L"BigInt");
   _BigInt->setProperty(this, L"prototype", bigintPrototype);
+  bigintPrototype->setProperty(this, L"constructor", _BigInt);
 
   JSNativeFunctionEntity *RegExpConstructorEntity = new JSNativeFunctionEntity(
       functionPrototype->getEntity(), L"RegExp", &JSBigIntConstructor, {});
   _RegExp = _scope->createValue(RegExpConstructorEntity, L"RegExp");
   _RegExp->setProperty(this, L"prototype", regexpPrototype);
+  regexpPrototype->setProperty(this, L"constructor", _RegExp);
 
   _symbolValue = createSymbol();
   _symbolPack = createSymbol();
@@ -306,6 +316,7 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
   }
   auto prototype = constructor->getProperty(this, L"prototype");
   auto result = createObject(prototype, name);
+  result->setProperty(this, L"constructor", constructor);
   constructor->apply(this, result, args, loc);
   return result;
 }

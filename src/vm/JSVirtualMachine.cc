@@ -67,90 +67,90 @@ void JSVirtualMachine::handleError(
       }
     }
     if (entity->getTarget()) {
-      _stack.push_back(ctx->createValue(entity->getTarget()));
+      _ctx->stack.push_back(ctx->createValue(entity->getTarget()));
     } else {
-      _stack.push_back(exception);
+      _ctx->stack.push_back(exception);
     }
     _ctx->pc = frame.handle;
   } else {
-    _stack.push_back(exception);
+    _ctx->stack.push_back(exception);
     _ctx->pc = module->codes.size();
   }
 }
 
-JS_OPT(JSVirtualMachine::pushNull) { _stack.push_back(ctx->null()); }
+JS_OPT(JSVirtualMachine::pushNull) { _ctx->stack.push_back(ctx->null()); }
 
-JS_OPT(JSVirtualMachine::pushUndefined) { _stack.push_back(ctx->undefined()); }
+JS_OPT(JSVirtualMachine::pushUndefined) { _ctx->stack.push_back(ctx->undefined()); }
 
-JS_OPT(JSVirtualMachine::pushTrue) { _stack.push_back(ctx->truly()); }
+JS_OPT(JSVirtualMachine::pushTrue) { _ctx->stack.push_back(ctx->truly()); }
 
-JS_OPT(JSVirtualMachine::pushFalse) { _stack.push_back(ctx->falsely()); }
+JS_OPT(JSVirtualMachine::pushFalse) { _ctx->stack.push_back(ctx->falsely()); }
 
 JS_OPT(JSVirtualMachine::pushUninitialized) {
-  _stack.push_back(ctx->uninitialized());
+  _ctx->stack.push_back(ctx->uninitialized());
 }
 
 JS_OPT(JSVirtualMachine::push) {
   auto value = argf(module);
-  _stack.push_back(ctx->createNumber(value));
+  _ctx->stack.push_back(ctx->createNumber(value));
 }
 
-JS_OPT(JSVirtualMachine::pushObject) { _stack.push_back(ctx->createObject()); }
+JS_OPT(JSVirtualMachine::pushObject) { _ctx->stack.push_back(ctx->createObject()); }
 
 JS_OPT(JSVirtualMachine::pushArray) {}
 
 JS_OPT(JSVirtualMachine::pushFunction) {
-  _stack.push_back(ctx->createFunction(module));
+  _ctx->stack.push_back(ctx->createFunction(module));
 }
 
 JS_OPT(JSVirtualMachine::pushGenerator) {}
 
 JS_OPT(JSVirtualMachine::pushArrow) {}
 
-JS_OPT(JSVirtualMachine::pushThis) { _stack.push_back(ctx->load(L"this")); }
+JS_OPT(JSVirtualMachine::pushThis) { _ctx->stack.push_back(ctx->load(L"this")); }
 
 JS_OPT(JSVirtualMachine::pushSuper) {}
 
 JS_OPT(JSVirtualMachine::pushArgument) {
   auto arguments = ctx->load(L"arguments");
   auto index = argi(module);
-  _stack.push_back(arguments->getIndex(ctx, index));
+  _ctx->stack.push_back(arguments->getIndex(ctx, index));
 }
 
 JS_OPT(JSVirtualMachine::pushBigint) {
   auto s = args(module);
-  _stack.push_back(ctx->createBigInt(s));
+  _ctx->stack.push_back(ctx->createBigInt(s));
 }
 
 JS_OPT(JSVirtualMachine::pushRegex) {}
 
 JS_OPT(JSVirtualMachine::setAddress) {
   auto addr = argi(module);
-  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
   func->setAddress(addr);
 }
 
 JS_OPT(JSVirtualMachine::setAsync) {
   auto async = argi(module);
-  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
   func->setAsync(async);
 }
 
 JS_OPT(JSVirtualMachine::setFuncName) {
   auto name = args(module);
-  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
   func->setFuncName(name);
 }
 
 JS_OPT(JSVirtualMachine::setFuncLen) {
   auto len = argi(module);
-  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
   func->setAsync(len);
 }
 
 JS_OPT(JSVirtualMachine::setClosure) {
   auto name = args(module);
-  auto func = _stack[_stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
+  auto func = _ctx->stack[_ctx->stack.size() - 1]->getEntity<engine::JSFunctionEntity>();
   func->setClosure(name, ctx->load(name)->getEntity());
 }
 
@@ -185,14 +185,14 @@ JS_OPT(JSVirtualMachine::setRegexSticky) {}
 JS_OPT(JSVirtualMachine::pop) {
   auto size = argi(module);
   while (size > 0) {
-    _stack.pop_back();
+    _ctx->stack.pop_back();
     size--;
   }
 }
 
 JS_OPT(JSVirtualMachine::storeConst) {
   auto name = args(module);
-  auto value = _stack[_stack.size() - 1];
+  auto value = _ctx->stack[_ctx->stack.size() - 1];
   if (!ctx->getScope()->getValues().contains(name)) {
     ctx->createValue(value, name);
   } else {
@@ -203,48 +203,48 @@ JS_OPT(JSVirtualMachine::storeConst) {
 
 JS_OPT(JSVirtualMachine::store) {
   auto name = args(module);
-  auto value = _stack[_stack.size() - 1];
+  auto value = _ctx->stack[_ctx->stack.size() - 1];
   if (!ctx->getScope()->getValues().contains(name)) {
     ctx->createValue(value, name);
   } else {
     auto current = ctx->load(name);
     current->setEntity(value->getEntity());
   }
-  _stack.pop_back();
+  _ctx->stack.pop_back();
 }
 
 JS_OPT(JSVirtualMachine::load) {
   auto name = args(module);
   auto value = ctx->load(name);
-  _stack.push_back(value);
+  _ctx->stack.push_back(value);
 }
 
 JS_OPT(JSVirtualMachine::loadConst) {
   auto val = args(module);
-  _stack.push_back(ctx->createString(val));
+  _ctx->stack.push_back(ctx->createString(val));
 }
 
 JS_OPT(JSVirtualMachine::ret) { _ctx->pc = module->codes.size(); }
 
 JS_OPT(JSVirtualMachine::throw_) {
-  auto value = *_stack.rbegin();
-  _stack.pop_back();
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   if (value->getType() != engine::JSValueType::JS_EXCEPTION) {
     value = ctx->createException(value);
   }
-  _stack.push_back(value);
+  _ctx->stack.push_back(value);
   _ctx->pc = module->codes.size();
 }
 JS_OPT(JSVirtualMachine::new_) {
   auto size = argi(module);
-  auto now = _stack.size();
-  auto func = _stack[now - 1 - size];
+  auto now = _ctx->stack.size();
+  auto func = _ctx->stack[now - 1 - size];
   std::vector<common::AutoPtr<engine::JSValue>> args;
   args.resize(size, nullptr);
   for (auto i = 0; i < size; i++) {
-    args[i] = _stack[_stack.size() - size + i];
+    args[i] = _ctx->stack[_ctx->stack.size() - size + i];
   }
-  _stack.push_back(ctx->constructObject(
+  _ctx->stack.push_back(ctx->constructObject(
       func, args,
       {
           .filename = ctx->getRuntime()->setSourceFilename(module->filename),
@@ -259,26 +259,22 @@ JS_OPT(JSVirtualMachine::yield) {}
 JS_OPT(JSVirtualMachine::await) {}
 
 JS_OPT(JSVirtualMachine::nullishCoalescing) {
-  auto arg2 = *_stack.rbegin();
-  _stack.pop_back();
-  auto arg1 = *_stack.rbegin();
-  _stack.pop_back();
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   if (arg1->isNull() || arg1->isUndefined()) {
-    _stack.push_back(arg2);
+    _ctx->stack.push_back(arg2);
   } else {
-    _stack.push_back(arg1);
+    _ctx->stack.push_back(arg1);
   }
 }
 
 JS_OPT(JSVirtualMachine::pushScope) {
   _ctx->scopeChain.push_back(ctx->pushScope());
-  _ctx->stackFrames.push_back(_stack.size());
 }
 
 JS_OPT(JSVirtualMachine::popScope) {
-  auto size = *_ctx->stackFrames.rbegin();
-  _ctx->stackFrames.pop_back();
-  _stack.resize(size);
   auto scope = *_ctx->scopeChain.rbegin();
   _ctx->scopeChain.pop_back();
   ctx->popScope(scope);
@@ -286,13 +282,13 @@ JS_OPT(JSVirtualMachine::popScope) {
 
 JS_OPT(JSVirtualMachine::call) {
   auto size = argi(module);
-  auto now = _stack.size();
-  auto func = _stack[now - 1 - size];
+  auto now = _ctx->stack.size();
+  auto func = _ctx->stack[now - 1 - size];
   auto self = ctx->load(L"this");
   std::vector<common::AutoPtr<engine::JSValue>> args;
   args.resize(size, nullptr);
   for (auto i = 0; i < size; i++) {
-    args[i] = _stack[_stack.size() - size + i];
+    args[i] = _ctx->stack[_ctx->stack.size() - size + i];
   }
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _ctx->pc;
@@ -303,8 +299,8 @@ JS_OPT(JSVirtualMachine::call) {
           .filename = ctx->getRuntime()->setSourceFilename(module->filename),
           .funcname = name,
       });
-  _stack.resize(now - 1 - size);
-  _stack.push_back(res);
+  _ctx->stack.resize(now - 1 - size);
+  _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
     handleError(ctx, module, res);
   } else {
@@ -313,11 +309,11 @@ JS_OPT(JSVirtualMachine::call) {
 }
 
 JS_OPT(JSVirtualMachine::add) {
-  auto arg2 = *_stack.rbegin();
-  _stack.pop_back();
-  auto arg1 = *_stack.rbegin();
-  _stack.pop_back();
-  _stack.push_back(arg1->add(ctx, arg2));
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->add(ctx, arg2));
 }
 
 JS_OPT(JSVirtualMachine::tryStart) {
@@ -360,9 +356,8 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
                        const common::AutoPtr<compiler::JSModule> &module,
                        size_t offset) {
   auto scope = ctx->getScope();
-  auto frame = ctx->getCallStack();
-  _ctx = new JSEvalContext(_ctx, offset);
-  _ctx->stackFrames.push_back(_stack.size());
+  auto current = _ctx;
+  _ctx = new JSEvalContext(offset);
   while (_ctx->pc != module->codes.size()) {
     try {
       auto code = next(module);
@@ -543,8 +538,8 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
             exception = res;
           }
         } else {
-          if (_stack.size() != *_ctx->stackFrames.rbegin()) {
-            auto res = _stack[_stack.size() - 1];
+          if (!_ctx->stack.empty()) {
+            auto res = _ctx->stack[_ctx->stack.size() - 1];
             if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
               exception = res;
             }
@@ -559,25 +554,16 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
     }
   }
   auto value = ctx->undefined();
-  if (_stack.size() != *_ctx->stackFrames.rbegin()) {
-    value = _stack[_stack.size() - 1];
+  if (!_ctx->stack.empty()) {
+    value = _ctx->stack[_ctx->stack.size() - 1];
     if (ctx->getScope() != scope) {
       auto entity = value->getEntity();
       value = scope->createValue(entity);
     }
   }
-  while (!_ctx->scopeChain.empty()) {
+  while (ctx->getScope() != scope) {
     popScope(ctx, module);
   }
-  while (ctx->getCallStack() != frame) {
-    ctx->popCallStack();
-  }
-
-  _stack.resize(*_ctx->stackFrames.rbegin());
-  _ctx->stackFrames.pop_back();
-
-  auto tmp = _ctx;
-  _ctx = _ctx->parent;
-  delete tmp;
+  _ctx = current;
   return value;
 }

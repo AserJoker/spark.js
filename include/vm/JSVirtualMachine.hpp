@@ -16,8 +16,7 @@ class JSContext;
 namespace spark::vm {
 class JSVirtualMachine : public common::Object {
 private:
-  std::vector<common::AutoPtr<engine::JSValue>> _stack;
-  JSEvalContext *_ctx;
+  common::AutoPtr<JSEvalContext> _ctx;
 
 private:
   compiler::JSAsmOperator

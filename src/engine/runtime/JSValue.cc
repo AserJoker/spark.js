@@ -283,8 +283,13 @@ std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
   case JSValueType::JS_NATIVE_FUNCTION:
   case JSValueType::JS_CLASS:
     return toPrimitive(ctx)->convertToString(ctx);
-  case JSValueType::JS_EXCEPTION:
-    return getEntity<JSExceptionEntity>()->toString(ctx);
+  case JSValueType::JS_EXCEPTION: {
+    auto entity = getEntity<JSExceptionEntity>();
+    if (entity->getTarget() != nullptr) {
+      return ctx->createValue(entity->getTarget())->convertToString(ctx);
+    }
+    return entity->toString(ctx);
+  }
   case JSValueType::JS_SYMBOL:
     throw error::JSTypeError(L"Cannot convert a Symbol value to a string");
   default:

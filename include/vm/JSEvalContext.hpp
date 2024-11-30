@@ -4,15 +4,13 @@
 #include "engine/runtime/JSValue.hpp"
 
 namespace spark::vm {
-struct JSEvalContext {
-  std::vector<size_t> stackFrames;
+struct JSEvalContext : public common::Object {
+  std::vector<common::AutoPtr<engine::JSValue>> stack;
   std::vector<engine::JSScope *> scopeChain;
   size_t pc;
   JSErrorFrame *errorStacks;
-  JSEvalContext *parent;
-  JSEvalContext(JSEvalContext *parent, size_t pc) {
+  JSEvalContext(size_t pc) {
     errorStacks = nullptr;
-    this->parent = parent;
     this->pc = pc;
   };
 };
