@@ -61,11 +61,6 @@ private:
   JS_OPT(setField);
   JS_OPT(getField);
   JS_OPT(setAccessor);
-  JS_OPT(getAccessor);
-  JS_OPT(setMethod);
-  JS_OPT(getMethod);
-  JS_OPT(setIndex);
-  JS_OPT(getIndex);
   JS_OPT(setRegexHasIndices);
   JS_OPT(setRegexGlobal);
   JS_OPT(setRegexIgnoreCases);
@@ -86,6 +81,7 @@ private:
   JS_OPT(pushScope);
   JS_OPT(popScope);
   JS_OPT(call);
+  JS_OPT(memberCall);
   JS_OPT(tryStart);
   JS_OPT(tryEnd);
   JS_OPT(defer);

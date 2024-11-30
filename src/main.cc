@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
         out << L"push_uninitialized";
         break;
       case compiler::JSAsmOperator::PUSH:
-        out << L"push" << *(double *)(buffer + offset);
+        out << L"push " << *(double *)(buffer + offset);
         offset += sizeof(double);
         break;
       case compiler::JSAsmOperator::PUSH_OBJECT:
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
         out << L"push_super";
         break;
       case compiler::JSAsmOperator::PUSH_ARGUMENT:
-        out << L"push_argument" << *(uint32_t *)(buffer + offset);
+        out << L"push_argument " << *(uint32_t *)(buffer + offset);
         offset += sizeof(uint32_t);
         break;
       case compiler::JSAsmOperator::PUSH_BIGINT:
@@ -145,22 +145,8 @@ int main(int argc, char *argv[]) {
         out << L"get_field";
         break;
       case compiler::JSAsmOperator::SET_ACCESSOR:
-        out << L"set_accessor";
-        break;
-      case compiler::JSAsmOperator::GET_ACCESSOR:
-        out << L"get_accessor";
-        break;
-      case compiler::JSAsmOperator::SET_METHOD:
-        out << L"set_method";
-        break;
-      case compiler::JSAsmOperator::GET_METHOD:
-        out << L"get_method";
-        break;
-      case compiler::JSAsmOperator::SET_INDEX:
-        out << L"set_index";
-        break;
-      case compiler::JSAsmOperator::GET_INDEX:
-        out << L"get_index";
+        out << L"set_accessor " << *(uint32_t *)(buffer + offset);
+        offset += sizeof(uint32_t);
         break;
       case compiler::JSAsmOperator::SET_REGEX_HAS_INDICES:
         out << L"set_regex_has_indices";
@@ -226,6 +212,10 @@ int main(int argc, char *argv[]) {
         break;
       case compiler::JSAsmOperator::CALL:
         out << L"call " << *(uint32_t *)(buffer + offset);
+        offset += sizeof(uint32_t);
+        break;
+      case compiler::JSAsmOperator::MEMBER_CALL:
+        out << L"member_call " << *(uint32_t *)(buffer + offset);
         offset += sizeof(uint32_t);
         break;
       case compiler::JSAsmOperator::JMP:

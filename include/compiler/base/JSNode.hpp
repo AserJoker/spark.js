@@ -434,12 +434,11 @@ struct JSFunctionBodyDeclaration : public JSNode {
       : JSNode(JSNodeType::DECLARATION_FUNCTION_BODY, -2) {}
 };
 
-struct JSObjectAccessor : public JSNode {
+struct JSObjectAccessor : public JSFunctionDeclaration {
   JSAccessorKind kind;
-  JSNodeArray arguments;
-  common::AutoPtr<JSNode> identifier;
-  common::AutoPtr<JSNode> body;
-  JSObjectAccessor() : JSNode(JSNodeType::OBJECT_ACCESSOR) {}
+  JSObjectAccessor() : JSFunctionDeclaration() {
+    type = JSNodeType::OBJECT_ACCESSOR;
+  }
 };
 
 struct JSObjectMethod : public JSFunctionDeclaration {

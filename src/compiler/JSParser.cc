@@ -131,7 +131,7 @@ void JSParser::bindScope(common::AutoPtr<JSNode> node) {
     }
   } break;
   case JSNodeType::OBJECT_ACCESSOR: {
-    auto prop = node.cast<JSObjectMethod>();
+    auto prop = node.cast<JSObjectAccessor>();
     for (auto &arg : prop->arguments) {
       bindScope(arg);
     }

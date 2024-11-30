@@ -5,6 +5,7 @@
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
+#include "engine/entity/JSObjectEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
@@ -166,21 +167,59 @@ JS_OPT(JSVirtualMachine::setClosure) {
   func->setClosure(name, ctx->load(name)->getEntity());
 }
 
-JS_OPT(JSVirtualMachine::setField) {}
+JS_OPT(JSVirtualMachine::setField) {
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto obj = *_ctx->stack.rbegin();
+  _ctx->stack.push_back(obj->setProperty(ctx, name, field));
+}
 
-JS_OPT(JSVirtualMachine::getField) {}
+JS_OPT(JSVirtualMachine::getField) {
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto obj = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(obj->getProperty(ctx, name));
+}
 
-JS_OPT(JSVirtualMachine::setAccessor) {}
-
-JS_OPT(JSVirtualMachine::getAccessor) {}
-
-JS_OPT(JSVirtualMachine::setMethod) {}
-
-JS_OPT(JSVirtualMachine::getMethod) {}
-
-JS_OPT(JSVirtualMachine::setIndex) {}
-
-JS_OPT(JSVirtualMachine::getIndex) {}
+JS_OPT(JSVirtualMachine::setAccessor) {
+  auto type = argi(module);
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto accessor = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto obj = *_ctx->stack.rbegin();
+  auto prop = obj->getOwnPropertyDescriptor(ctx, name);
+  if (!prop) {
+    obj->setPropertyDescriptor(ctx, name,
+                               {
+                                   .configurable = true,
+                                   .enumable = true,
+                                   .value = ctx->undefined()->getEntity(),
+                                   .writable = true,
+                               });
+    prop = obj->getOwnPropertyDescriptor(ctx, name);
+  }
+  if (prop->value) {
+    obj->getEntity()->removeChild(prop->value);
+    prop->value = nullptr;
+  }
+  obj->getEntity()->appendChild(accessor->getEntity());
+  if (type) {
+    if (prop->get && prop->get != accessor->getEntity()) {
+      obj->getEntity()->removeChild(prop->get);
+    }
+    prop->get = accessor->getEntity();
+  } else {
+    if (prop->set && prop->set != accessor->getEntity()) {
+      obj->getEntity()->removeChild(prop->set);
+    }
+    prop->set = accessor->getEntity();
+  }
+  _ctx->stack.push_back(ctx->truly());
+}
 
 JS_OPT(JSVirtualMachine::setRegexHasIndices) {}
 
@@ -204,7 +243,8 @@ JS_OPT(JSVirtualMachine::pop) {
 
 JS_OPT(JSVirtualMachine::storeConst) {
   auto name = args(module);
-  auto value = _ctx->stack[_ctx->stack.size() - 1];
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   if (!ctx->getScope()->getValues().contains(name)) {
     ctx->createValue(value, name);
   } else {
@@ -215,14 +255,14 @@ JS_OPT(JSVirtualMachine::storeConst) {
 
 JS_OPT(JSVirtualMachine::store) {
   auto name = args(module);
-  auto value = _ctx->stack[_ctx->stack.size() - 1];
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   if (!ctx->getScope()->getValues().contains(name)) {
     ctx->createValue(value, name);
   } else {
     auto current = ctx->load(name);
     current->setEntity(value->getEntity());
   }
-  _ctx->stack.pop_back();
 }
 
 JS_OPT(JSVirtualMachine::load) {
@@ -297,18 +337,45 @@ JS_OPT(JSVirtualMachine::popScope) {
 JS_OPT(JSVirtualMachine::call) {
   auto offset = _ctx->pc - sizeof(uint16_t);
   auto size = argi(module);
-  auto now = _ctx->stack.size();
-  auto func = _ctx->stack[now - 1 - size];
-  auto self = ctx->load(L"this");
   std::vector<common::AutoPtr<engine::JSValue>> args;
   args.resize(size, nullptr);
   for (auto i = 0; i < size; i++) {
-    args[i] = _ctx->stack[_ctx->stack.size() - size + i];
+    args[size - 1 - i] = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
   }
+  auto func = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   auto name = func->getProperty(ctx, L"name")->getString().value();
-  auto pc = _ctx->pc;
-  auto scope = ctx->getScope();
   auto loc = module->sourceMap.at(offset);
+  auto res = func->apply(
+      ctx, ctx->undefined(), args,
+      {
+          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .line = loc.line + 1,
+          .column = loc.column + 1,
+          .funcname = name,
+      });
+  _ctx->stack.push_back(res);
+  if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+    _ctx->pc = module->codes.size();
+  }
+}
+JS_OPT(JSVirtualMachine::memberCall) {
+  auto offset = _ctx->pc - sizeof(uint16_t);
+  auto size = argi(module);
+  std::vector<common::AutoPtr<engine::JSValue>> args;
+  args.resize(size, nullptr);
+  for (auto i = 0; i < size; i++) {
+    args[size - 1 - i] = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
+  }
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto self = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto loc = module->sourceMap.at(offset);
+  auto func = self->getProperty(ctx, field);
+  auto name = func->getProperty(ctx, L"name")->getString().value();
   auto res = func->apply(
       ctx, self, args,
       {
@@ -317,12 +384,9 @@ JS_OPT(JSVirtualMachine::call) {
           .column = loc.column + 1,
           .funcname = name,
       });
-  _ctx->stack.resize(now - 1 - size);
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
-    handleError(ctx, module, res);
-  } else {
-    _ctx->pc = pc;
+    _ctx->pc = module->codes.size();
   }
 }
 
@@ -457,21 +521,6 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
       case compiler::JSAsmOperator::SET_ACCESSOR:
         setAccessor(ctx, module);
         break;
-      case compiler::JSAsmOperator::GET_ACCESSOR:
-        getAccessor(ctx, module);
-        break;
-      case compiler::JSAsmOperator::SET_METHOD:
-        setMethod(ctx, module);
-        break;
-      case compiler::JSAsmOperator::GET_METHOD:
-        getMethod(ctx, module);
-        break;
-      case compiler::JSAsmOperator::SET_INDEX:
-        setIndex(ctx, module);
-        break;
-      case compiler::JSAsmOperator::GET_INDEX:
-        getIndex(ctx, module);
-        break;
       case compiler::JSAsmOperator::SET_REGEX_HAS_INDICES:
         setRegexHasIndices(ctx, module);
         break;
@@ -528,6 +577,9 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
         break;
       case compiler::JSAsmOperator::CALL:
         call(ctx, module);
+        break;
+      case compiler::JSAsmOperator::MEMBER_CALL:
+        memberCall(ctx, module);
         break;
       case compiler::JSAsmOperator::ADD:
         add(ctx, module);

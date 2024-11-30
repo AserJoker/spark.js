@@ -1,2 +1,8 @@
-const a = new Error("Hello world");
-console.log(a)
+const obj = {
+    get a() {
+        return 1;
+    },
+    get a() {
+        return 2;
+    }
+}

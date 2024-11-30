@@ -25,14 +25,19 @@ JS_FUNC(JSErrorConstructor::constructor) {
   return ctx->undefined();
 }
 JS_FUNC(JSErrorConstructor::toString) {
-  auto message = self->getProperty(ctx, L"message")->convertToString(ctx);
+
+  auto message = self->getProperty(ctx, L"message");
   std::wstring result;
-  if (!message.empty()) {
-    result = fmt::format(L"Error: {}", message);
+  auto msg = message->convertToString(ctx);
+  if (!message->isUndefined() && !msg.empty()) {
+    result = fmt::format(L"Error: {}", msg);
   } else {
     result = L"Error";
   }
-  result += L"\n" + self->getProperty(ctx, L"stack")->convertToString(ctx);
+  auto stack = self->getProperty(ctx, L"stack");
+  if (!stack->isUndefined()) {
+    result += L"\n" + stack->convertToString(ctx);
+  }
   return ctx->createString(result);
 }
 void JSErrorConstructor::initialize(common::AutoPtr<JSContext> ctx,

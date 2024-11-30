@@ -176,6 +176,7 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
       ctx->createValue(
           new JSArgumentEntity(ctx->null()->getEntity(), arguments),
           L"arguments");
+      ctx->createValue(self, L"this");
       result = ctx->getRuntime()
                    ->getVirtualMachine()
                    ->eval(ctx, entity->getModule(), entity->getAddress())
