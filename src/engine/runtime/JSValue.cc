@@ -3,6 +3,7 @@
 #include "common/BigInt.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSArgumentEntity.hpp"
+#include "engine/entity/JSArrayEntity.hpp"
 #include "engine/entity/JSBigIntEntity.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
@@ -721,13 +722,37 @@ common::AutoPtr<JSValue> JSValue::getIndex(common::AutoPtr<JSContext> ctx,
       return ctx->createValue(arguments[index]);
     }
   }
+  if (getType() == JSValueType::JS_ARRAY) {
+    auto entity = getEntity<JSArrayEntity>();
+    auto &items = entity->getItems();
+    if (index < items.size()) {
+      return ctx->createValue(items[index]);
+    }
+  }
   return ctx->undefined();
 }
 
 common::AutoPtr<JSValue>
 JSValue::setIndex(common::AutoPtr<JSContext> ctx, const uint32_t &index,
                   const common::AutoPtr<JSValue> &field) {
-  return ctx->undefined();
+  if (getType() == JSValueType::JS_ARRAY) {
+    auto entity = getEntity<JSArrayEntity>();
+    auto &items = entity->getItems();
+    entity->appendChild((JSEntity *)field->getEntity());
+    if (index < items.size()) {
+      entity->removeChild(items[index]);
+    }
+    while (items.size() < index) {
+      items.push_back(ctx->null()->getEntity());
+    }
+    if (items.size() == index) {
+      items.push_back((JSEntity *)field->getEntity());
+    } else {
+      items[index] = (JSEntity *)field->getEntity();
+    }
+    return ctx->truly();
+  }
+  return setProperty(ctx, fmt::format(L"{}", index), field);
 }
 
 JSObjectEntity::JSField *
@@ -868,6 +893,12 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
                                               common::AutoPtr<JSValue> name) {
   auto key = name->toPrimitive(ctx);
+  if (getType() == JSValueType::JS_ARRAY) {
+    auto num = key->convertToNumber(ctx);
+    if (num.has_value()) {
+      return getIndex(ctx, num.value());
+    }
+  }
   if (key->getType() != JSValueType::JS_SYMBOL) {
     return getProperty(ctx, key->convertToString(ctx));
   }
@@ -890,6 +921,12 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx,
                      common::AutoPtr<JSValue> name,
                      const common::AutoPtr<JSValue> &field) {
   auto key = name->toPrimitive(ctx);
+  if (getType() == JSValueType::JS_ARRAY) {
+    auto num = key->convertToNumber(ctx);
+    if (num.has_value()) {
+      return setIndex(ctx, num.value(), field);
+    }
+  }
   if (key->getType() != JSValueType::JS_SYMBOL) {
     return setProperty(ctx, key->convertToString(ctx), field);
   }
