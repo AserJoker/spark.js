@@ -34,24 +34,6 @@ const std::vector<JSLocation> &JSExceptionEntity::getStack() const {
   return _stack;
 }
 
-std::wstring JSExceptionEntity::toString(common::AutoPtr<JSContext> ctx) const {
-  if (_target) {
-    return fmt::format(L"Uncaught {}", _target->toString(ctx));
-  }
-  std::wstring result =
-      fmt::format(L"{}: {}", getExceptionType(), getMessage());
-  for (auto &[fnindex, line, column, funcname] : getStack()) {
-    auto &filename = ctx->getRuntime()->getSourceFilename(fnindex);
-    if (fnindex != 0) {
-      result +=
-          fmt::format(L"\n at {}({}:{}:{})", funcname, filename, line, column);
-    } else {
-      result += fmt::format(L"\n at {} ({})", funcname, filename);
-    }
-  }
-  return result;
-}
-
 bool JSExceptionEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
   return true;
 }

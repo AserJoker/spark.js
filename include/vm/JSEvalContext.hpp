@@ -9,11 +9,7 @@ struct JSEvalContext : public common::Object {
   std::vector<common::AutoPtr<engine::JSValue>> stack;
   std::vector<common::AutoPtr<engine::JSScope>> scopeChain;
   common::AutoPtr<engine::JSValue> callee;
-  size_t pc;
   JSErrorFrame *errorStacks;
-  JSEvalContext(size_t pc) {
-    errorStacks = nullptr;
-    this->pc = pc;
-  };
+  JSEvalContext() { errorStacks = nullptr; };
 };
 } // namespace spark::vm

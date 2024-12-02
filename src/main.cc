@@ -134,6 +134,10 @@ int main(int argc, char *argv[]) {
         out << L"set_func_len " << *(uint32_t *)(buffer + offset);
         offset += sizeof(uint32_t);
         break;
+      case compiler::JSAsmOperator::SET_FUNC_SOURCE:
+        out << L"set_func_source " << *(uint32_t *)(buffer + offset);
+        offset += sizeof(uint32_t);
+        break;
       case compiler::JSAsmOperator::SET_CLOSURE:
         out << L"set_closure " << *(uint32_t *)(buffer + offset);
         offset += sizeof(uint32_t);

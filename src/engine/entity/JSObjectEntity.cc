@@ -43,7 +43,15 @@ JSObjectEntity::getProperties() {
 }
 
 std::wstring JSObjectEntity::toString(common::AutoPtr<JSContext> ctx) const {
-  return L"[object Object]";
+  std::wstring str = L"Object";
+  auto symbol = ctx->Symbol()->getProperty(ctx, L"toStringTag");
+  if (_symbolFields.contains(symbol->getEntity())) {
+    str = ctx->getScope()
+              ->createValue(
+                  (JSEntity *)_symbolFields.at(symbol->getEntity()).value)
+              ->convertToString(ctx);
+  }
+  return fmt::format(L"[object {}]", str);
 }
 
 std::optional<double>

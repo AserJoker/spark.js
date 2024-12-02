@@ -51,6 +51,9 @@ void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
     if (n->async) {
       generate(module, JSAsmOperator::SET_ASYNC, 1U);
     }
+    generate(
+        module, JSAsmOperator::SET_FUNC_SOURCE,
+        resolveConstant(ctx, module, n->location.getSource(module->source)));
     break;
   }
   }
@@ -471,6 +474,9 @@ void JSGenerator::resolveObjectMethod(JSGeneratorContext &ctx,
   ctx.currentScope->functionAddr[node->id] =
       module->codes.size() + sizeof(uint16_t);
   generate(module, JSAsmOperator::SET_ADDRESS, 0U);
+  generate(
+      module, JSAsmOperator::SET_FUNC_SOURCE,
+      resolveConstant(ctx, module, node->location.getSource(module->source)));
   if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
     generate(module, JSAsmOperator::LOAD_CONST,
              resolveConstant(ctx, module,
@@ -492,6 +498,9 @@ void JSGenerator::resolveObjectAccessor(JSGeneratorContext &ctx,
   ctx.currentScope->functionAddr[node->id] =
       module->codes.size() + sizeof(uint16_t);
   generate(module, JSAsmOperator::SET_ADDRESS, 0U);
+  generate(
+      module, JSAsmOperator::SET_FUNC_SOURCE,
+      resolveConstant(ctx, module, node->location.getSource(module->source)));
   if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
     generate(module, JSAsmOperator::LOAD_CONST,
              resolveConstant(ctx, module,
@@ -762,6 +771,9 @@ void JSGenerator::resolveFunction(JSGeneratorContext &ctx,
     if (n->async) {
       generate(module, JSAsmOperator::SET_ASYNC, 1U);
     }
+    generate(
+        module, JSAsmOperator::SET_FUNC_SOURCE,
+        resolveConstant(ctx, module, node->location.getSource(module->source)));
     std::vector<JSSourceScope *> workflow = {n->scope.getRawPointer()};
     while (!workflow.empty()) {
       auto item = *workflow.begin();
@@ -1088,11 +1100,12 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
 }
 
 common::AutoPtr<JSModule>
-JSGenerator::resolve(const std::wstring &filename,
+JSGenerator::resolve(const std::wstring &filename, const std::wstring &source,
                      const common::AutoPtr<JSNode> &node) {
   JSGeneratorContext ctx;
   common::AutoPtr<JSModule> module = new JSModule;
   module->filename = filename;
+  module->source = source;
   resolveNode(ctx, module, node);
   return module;
 }

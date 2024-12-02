@@ -27,8 +27,6 @@ public:
 
   const std::vector<JSLocation> &getStack() const;
 
-  std::wstring toString(common::AutoPtr<JSContext> ctx) const override;
-
   bool toBoolean(common::AutoPtr<JSContext> ctx) const override;
 };
 } // namespace spark::engine

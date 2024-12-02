@@ -29,11 +29,18 @@ void JSFunctionEntity::setClosure(const std::wstring &name, JSEntity *entity) {
   }
   _closure[name] = entity;
 }
+void JSFunctionEntity::setSource(const std::wstring &source) {
+  _source = source;
+}
 void JSFunctionEntity::setFuncName(const std::wstring &name) { _name = name; }
 bool JSFunctionEntity::getAsync() const { return _async; }
 uint32_t JSFunctionEntity::getAddress() const { return _address; }
 uint32_t JSFunctionEntity::getLength() const { return _length; }
 const std::wstring &JSFunctionEntity::getFuncName() const { return _name; }
+
+const std::wstring &JSFunctionEntity::getFunctionSource() const {
+  return _source;
+}
 
 const std::unordered_map<std::wstring, JSEntity *> &
 JSFunctionEntity::getClosure() const {

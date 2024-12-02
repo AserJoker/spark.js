@@ -21,6 +21,7 @@ enum class JSAsmOperator {
   SET_ASYNC,
   SET_FUNC_NAME,
   SET_FUNC_LEN,
+  SET_FUNC_SOURCE,
   SET_CLOSURE,
   SET_FIELD,
   GET_FIELD,

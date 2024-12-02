@@ -1,8 +1,6 @@
-const obj = {
-    get a() {
-        return 1;
-    },
-    get a() {
-        return 2;
-    }
+'use strict'
+function A() {
+    arguments.length = 10
+    console.log(Object.keys(arguments),arguments.length);
 }
+A(1)

@@ -17,6 +17,8 @@ namespace spark::vm {
 class JSVirtualMachine : public common::Object {
 private:
   common::AutoPtr<JSEvalContext> _ctx;
+  size_t _pc;
+  common::AutoPtr<engine::JSValue> _callee;
 
 private:
   compiler::JSAsmOperator
@@ -57,6 +59,7 @@ private:
   JS_OPT(setAsync);
   JS_OPT(setFuncName);
   JS_OPT(setFuncLen);
+  JS_OPT(setFuncSource);
   JS_OPT(setClosure);
   JS_OPT(setField);
   JS_OPT(getField);
@@ -94,5 +97,11 @@ public:
   common::AutoPtr<engine::JSValue>
   eval(common::AutoPtr<engine::JSContext> ctx,
        const common::AutoPtr<compiler::JSModule> &module, size_t offset = 0);
+
+  common::AutoPtr<engine::JSValue>
+  apply(common::AutoPtr<engine::JSContext> ctx,
+        common::AutoPtr<engine::JSValue> func,
+        common::AutoPtr<engine::JSValue> self,
+        std::vector<common::AutoPtr<engine::JSValue>> args);
 };
 }; // namespace spark::vm

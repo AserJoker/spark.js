@@ -448,6 +448,7 @@ private:
 
 public:
   common::AutoPtr<JSModule> resolve(const std::wstring &filename,
+                                    const std::wstring &source,
                                     const common::AutoPtr<JSNode> &root);
 };
 } // namespace spark::compiler

@@ -2,15 +2,12 @@
 #include "common/AutoPtr.hpp"
 #include "common/BigInt.hpp"
 #include "engine/base/JSValueType.hpp"
-#include "engine/entity/JSArgumentEntity.hpp"
 #include "engine/entity/JSArrayEntity.hpp"
 #include "engine/entity/JSBigIntEntity.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
-#include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
-#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
@@ -160,29 +157,8 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
   auto scope = ctx->pushScope();
   JSEntity *result = nullptr;
   try {
-    if (func->getType() == JSValueType::JS_NATIVE_FUNCTION) {
-      auto entity = (JSNativeFunctionEntity *)_entity;
-      auto closure = entity->getClosure();
-      auto callee = entity->getCallee();
-      for (auto &[name, entity] : closure) {
-        ctx->createValue(entity, name);
-      }
-      result = callee(ctx, self, args)->getEntity();
-    } else {
-      auto entity = func->getEntity<JSFunctionEntity>();
-      std::vector<JSEntity *> arguments;
-      for (auto &arg : args) {
-        arguments.push_back(arg->getEntity());
-      }
-      ctx->createValue(
-          new JSArgumentEntity(ctx->null()->getEntity(), arguments),
-          L"arguments");
-      ctx->createValue(self, L"this");
-      result = ctx->getRuntime()
-                   ->getVirtualMachine()
-                   ->eval(ctx, entity->getModule(), entity->getAddress())
-                   ->getEntity();
-    }
+    auto vm = ctx->getRuntime()->getVirtualMachine();
+    result = vm->apply(ctx, func, self, args)->getEntity();
   } catch (error::JSError &e) {
     result = ctx->createException(e.getType(), e.getMessage(), location)
                  ->getEntity();
@@ -284,6 +260,9 @@ std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
   case JSValueType::JS_OBJECT:
   case JSValueType::JS_NATIVE_FUNCTION:
   case JSValueType::JS_CLASS:
+  case JSValueType::JS_ARGUMENT:
+  case JSValueType::JS_ARRAY:
+  case JSValueType::JS_FUNCTION:
     return toPrimitive(ctx)->convertToString(ctx);
   case JSValueType::JS_EXCEPTION: {
     auto entity = getEntity<JSExceptionEntity>();
@@ -294,7 +273,9 @@ std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
   }
   case JSValueType::JS_SYMBOL:
     throw error::JSTypeError(L"Cannot convert a Symbol value to a string");
-  default:
+
+  case JSValueType::JS_UNINITIALIZED:
+  case JSValueType::JS_REGEXP:
     break;
   }
   return L"";
@@ -715,13 +696,6 @@ common::AutoPtr<JSValue> JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
 
 common::AutoPtr<JSValue> JSValue::getIndex(common::AutoPtr<JSContext> ctx,
                                            const uint32_t &index) {
-  if (getType() == JSValueType::JS_ARGUMENT) {
-    auto entity = getEntity<JSArgumentEntity>();
-    auto &arguments = entity->getArguments();
-    if (index < arguments.size()) {
-      return ctx->createValue(arguments[index]);
-    }
-  }
   if (getType() == JSValueType::JS_ARRAY) {
     auto entity = getEntity<JSArrayEntity>();
     auto &items = entity->getItems();
@@ -737,6 +711,11 @@ JSValue::setIndex(common::AutoPtr<JSContext> ctx, const uint32_t &index,
                   const common::AutoPtr<JSValue> &field) {
   if (getType() == JSValueType::JS_ARRAY) {
     auto entity = getEntity<JSArrayEntity>();
+    if (entity->isFrozen() || !entity->isExtensible()) {
+      throw error::JSTypeError(fmt::format(
+          L"Cannot assign to read only property '{}' of object '{}'", index,
+          convertToString(ctx)));
+    }
     auto &items = entity->getItems();
     entity->appendChild((JSEntity *)field->getEntity());
     if (index < items.size()) {

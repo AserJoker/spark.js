@@ -170,7 +170,7 @@ JSContext::compile(const std::wstring &source, const std::wstring &filename) {
   auto generator = _runtime->getGenerator();
   auto index = _runtime->setSourceFilename(filename);
   auto ast = parser->parse(index, source);
-  return generator->resolve(filename, ast);
+  return generator->resolve(filename, source, ast);
 }
 
 common::AutoPtr<JSScope> JSContext::pushScope() {

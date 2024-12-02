@@ -18,9 +18,7 @@ JS_FUNC(JSFunctionConstructor::toString) {
   }
   if (self->getType() == JSValueType::JS_FUNCTION) {
     auto entity = self->getEntity<JSFunctionEntity>();
-
-    return ctx->createString(fmt::format(L"function {}(){{ [native code] }}",
-                                         entity->getFuncName()));
+    return ctx->createString(fmt::format(L"{}", entity->getFunctionSource()));
   }
 
   throw error::JSTypeError(

@@ -2,9 +2,11 @@
 #include "common/AutoPtr.hpp"
 #include "compiler/base/JSAsmOperator.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/entity/JSArgumentEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
+#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "engine/runtime/JSValue.hpp"
@@ -16,21 +18,21 @@ using namespace spark::vm;
 JSVirtualMachine::JSVirtualMachine() { _ctx = nullptr; }
 compiler::JSAsmOperator
 JSVirtualMachine::next(const common::AutoPtr<compiler::JSModule> &module) {
-  auto codes = module->codes.data() + _ctx->pc;
-  _ctx->pc += sizeof(uint16_t);
+  auto codes = module->codes.data() + _pc;
+  _pc += sizeof(uint16_t);
   return (compiler::JSAsmOperator) * (uint16_t *)codes;
 }
 
 uint32_t
 JSVirtualMachine::argi(const common::AutoPtr<compiler::JSModule> &module) {
-  auto codes = module->codes.data() + _ctx->pc;
-  _ctx->pc += sizeof(uint32_t);
+  auto codes = module->codes.data() + _pc;
+  _pc += sizeof(uint32_t);
   return *(uint32_t *)codes;
 }
 double
 JSVirtualMachine::argf(const common::AutoPtr<compiler::JSModule> &module) {
-  auto codes = module->codes.data() + _ctx->pc;
-  _ctx->pc += sizeof(double);
+  auto codes = module->codes.data() + _pc;
+  _pc += sizeof(double);
   return *(double *)codes;
 }
 
@@ -73,10 +75,10 @@ void JSVirtualMachine::handleError(
     } else {
       _ctx->stack.push_back(exception);
     }
-    _ctx->pc = frame.handle;
+    _pc = frame.handle;
   } else {
     _ctx->stack.push_back(exception);
-    _ctx->pc = module->codes.size();
+    _pc = module->codes.size();
   }
 }
 
@@ -134,36 +136,36 @@ JS_OPT(JSVirtualMachine::pushRegex) {}
 
 JS_OPT(JSVirtualMachine::setAddress) {
   auto addr = argi(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]
-                  ->getEntity<engine::JSFunctionEntity>();
+  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
   func->setAddress(addr);
 }
 
 JS_OPT(JSVirtualMachine::setAsync) {
   auto async = argi(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]
-                  ->getEntity<engine::JSFunctionEntity>();
+  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
   func->setAsync(async);
 }
 
 JS_OPT(JSVirtualMachine::setFuncName) {
   auto name = args(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]
-                  ->getEntity<engine::JSFunctionEntity>();
+  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
   func->setFuncName(name);
 }
 
 JS_OPT(JSVirtualMachine::setFuncLen) {
   auto len = argi(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]
-                  ->getEntity<engine::JSFunctionEntity>();
+  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
   func->setAsync(len);
+}
+JS_OPT(JSVirtualMachine::setFuncSource) {
+  auto source = args(module);
+  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
+  func->setSource(source);
 }
 
 JS_OPT(JSVirtualMachine::setClosure) {
   auto name = args(module);
-  auto func = _ctx->stack[_ctx->stack.size() - 1]
-                  ->getEntity<engine::JSFunctionEntity>();
+  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
   func->setClosure(name, ctx->load(name)->getEntity());
 }
 
@@ -276,7 +278,7 @@ JS_OPT(JSVirtualMachine::loadConst) {
   _ctx->stack.push_back(ctx->createString(val));
 }
 
-JS_OPT(JSVirtualMachine::ret) { _ctx->pc = module->codes.size(); }
+JS_OPT(JSVirtualMachine::ret) { _pc = module->codes.size(); }
 
 JS_OPT(JSVirtualMachine::throw_) {
   auto value = *_ctx->stack.rbegin();
@@ -285,10 +287,10 @@ JS_OPT(JSVirtualMachine::throw_) {
     value = ctx->createException(value);
   }
   _ctx->stack.push_back(value);
-  _ctx->pc = module->codes.size();
+  _pc = module->codes.size();
 }
 JS_OPT(JSVirtualMachine::new_) {
-  auto offset = _ctx->pc - sizeof(uint16_t);
+  auto offset = _pc - sizeof(uint16_t);
   auto size = argi(module);
   auto now = _ctx->stack.size();
   auto func = _ctx->stack[now - 1 - size];
@@ -335,7 +337,7 @@ JS_OPT(JSVirtualMachine::popScope) {
 }
 
 JS_OPT(JSVirtualMachine::call) {
-  auto offset = _ctx->pc - sizeof(uint16_t);
+  auto offset = _pc - sizeof(uint16_t);
   auto size = argi(module);
   std::vector<common::AutoPtr<engine::JSValue>> args;
   args.resize(size, nullptr);
@@ -347,6 +349,9 @@ JS_OPT(JSVirtualMachine::call) {
   _ctx->stack.pop_back();
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto loc = module->sourceMap.at(offset);
+  auto pc = _pc;
+  auto callee = _callee;
+  _callee = func;
   auto res = func->apply(
       ctx, ctx->undefined(), args,
       {
@@ -355,13 +360,16 @@ JS_OPT(JSVirtualMachine::call) {
           .column = loc.column + 1,
           .funcname = name,
       });
+  _callee = callee;
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
-    _ctx->pc = module->codes.size();
+    _pc = module->codes.size();
+  } else {
+    _pc = pc;
   }
 }
 JS_OPT(JSVirtualMachine::memberCall) {
-  auto offset = _ctx->pc - sizeof(uint16_t);
+  auto offset = _pc - sizeof(uint16_t);
   auto size = argi(module);
   std::vector<common::AutoPtr<engine::JSValue>> args;
   args.resize(size, nullptr);
@@ -376,6 +384,9 @@ JS_OPT(JSVirtualMachine::memberCall) {
   auto loc = module->sourceMap.at(offset);
   auto func = self->getProperty(ctx, field);
   auto name = func->getProperty(ctx, L"name")->getString().value();
+  auto pc = _pc;
+  auto callee = _callee;
+  _callee = func;
   auto res = func->apply(
       ctx, self, args,
       {
@@ -384,9 +395,12 @@ JS_OPT(JSVirtualMachine::memberCall) {
           .column = loc.column + 1,
           .funcname = name,
       });
+  _callee = callee;
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
-    _ctx->pc = module->codes.size();
+    _pc = module->codes.size();
+  } else {
+    _pc = pc;
   }
 }
 
@@ -413,14 +427,14 @@ JS_OPT(JSVirtualMachine::tryEnd) {
   auto frame = *_ctx->errorStacks;
   delete _ctx->errorStacks;
   _ctx->errorStacks = frame.parent;
-  auto pc = _ctx->pc;
+  auto pc = _pc;
   if (frame.defer) {
     auto res = eval(ctx, module, frame.defer);
     if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
       return handleError(ctx, module, res);
     }
   }
-  _ctx->pc = pc;
+  _pc = pc;
 }
 
 JS_OPT(JSVirtualMachine::defer) {
@@ -430,7 +444,7 @@ JS_OPT(JSVirtualMachine::defer) {
 
 JS_OPT(JSVirtualMachine::jmp) {
   auto offset = argi(module);
-  _ctx->pc = offset;
+  _pc = offset;
 }
 
 common::AutoPtr<engine::JSValue>
@@ -439,8 +453,9 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
                        size_t offset) {
   auto scope = ctx->getScope();
   auto current = _ctx;
-  _ctx = new JSEvalContext(offset);
-  while (_ctx->pc != module->codes.size()) {
+  _ctx = new JSEvalContext();
+  _pc = offset;
+  while (_pc != module->codes.size()) {
     try {
       auto code = next(module);
       if (code == compiler::JSAsmOperator::HLT) {
@@ -508,6 +523,9 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
         break;
       case compiler::JSAsmOperator::SET_FUNC_LEN:
         setFuncLen(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SET_FUNC_SOURCE:
+        setFuncSource(ctx, module);
         break;
       case compiler::JSAsmOperator::SET_CLOSURE:
         setClosure(ctx, module);
@@ -600,7 +618,7 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
         new_(ctx, module);
         break;
       }
-      if (_ctx->pc == module->codes.size()) {
+      if (_pc == module->codes.size()) {
         common::AutoPtr<engine::JSValue> exception;
         if (_ctx->errorStacks != nullptr) {
           auto res = eval(ctx, module, _ctx->errorStacks->defer);
@@ -636,4 +654,48 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
   }
   _ctx = current;
   return value;
+}
+common::AutoPtr<engine::JSValue>
+JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
+                        common::AutoPtr<engine::JSValue> func,
+                        common::AutoPtr<engine::JSValue> self,
+                        std::vector<common::AutoPtr<engine::JSValue>> args) {
+  auto entity = func->getEntity<engine::JSFunctionEntity>();
+  std::vector<engine::JSEntity *> arguments;
+  for (auto &arg : args) {
+    arguments.push_back(arg->getEntity());
+  }
+  auto argv = ctx->createValue(
+      new engine::JSArgumentEntity(ctx->null()->getEntity(), arguments),
+      L"arguments");
+  argv->setPropertyDescriptor(
+      ctx, L"length",
+      {
+          .configurable = true,
+          .enumable = false,
+          .value = ctx->createNumber((double)arguments.size())->getEntity(),
+          .writable = true,
+      });
+  argv->setPropertyDescriptor(ctx, L"callee",
+                              {.configurable = false,
+                               .enumable = false,
+                               .value = func->getEntity(),
+                               .writable = false});
+  ctx->createValue(self, L"this");
+  auto callee = _callee;
+  _callee = func;
+  common::AutoPtr<engine::JSValue> result;
+  if (func->getType() == engine::JSValueType::JS_NATIVE_FUNCTION) {
+    auto entity = func->getEntity<engine::JSNativeFunctionEntity>();
+    auto closure = entity->getClosure();
+    auto callee = entity->getCallee();
+    for (auto &[name, entity] : closure) {
+      ctx->createValue(entity, name);
+    }
+    result = callee(ctx, self, args);
+  } else {
+    result = eval(ctx, entity->getModule(), entity->getAddress());
+  }
+  _callee = callee;
+  return result;
 }
