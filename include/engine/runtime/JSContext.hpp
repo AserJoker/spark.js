@@ -62,6 +62,7 @@ private:
 
   // internal
   std::unordered_map<std::wstring, JSEntity *> _symbols;
+
   common::AutoPtr<JSValue> _symbolValue;
   common::AutoPtr<JSValue> _symbolPack;
 

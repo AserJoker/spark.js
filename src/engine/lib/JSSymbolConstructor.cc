@@ -106,9 +106,8 @@ JS_FUNC(JSSymbolConstructor::toPrimitive) {
 }
 
 void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
-                                     common::AutoPtr<JSValue> Symbol) {
-
-  auto proto = Symbol->getProperty(ctx, L"prototype");
+                                     common::AutoPtr<JSValue> Symbol,
+                                     common::AutoPtr<JSValue> prototype) {
 
   Symbol->setProperty(ctx, L"asyncIterator",
                       ctx->createSymbol(L"Symbol.asyncIterator"));
@@ -142,25 +141,23 @@ void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
   Symbol->setProperty(ctx, L"unscopables",
                       ctx->createSymbol(L"Symbol.unscopables"));
 
-  proto->setProperty(ctx, L"constructor", Symbol);
-
-  proto->setProperty(
+  prototype->setProperty(
       ctx, L"toString",
       ctx->createNativeFunction(&JSSymbolConstructor::toString, L"toString"));
 
-  proto->setProperty(
+  prototype->setProperty(
       ctx, L"valueOf",
       ctx->createNativeFunction(&JSSymbolConstructor::valueOf, L"valueOf"));
 
-  proto->setProperty(
+  prototype->setProperty(
       ctx, L"for",
       ctx->createNativeFunction(&JSSymbolConstructor::_for, L"for"));
 
-  proto->setProperty(
+  prototype->setProperty(
       ctx, L"forKey",
       ctx->createNativeFunction(&JSSymbolConstructor::forKey, L"forKey"));
 
-  proto->setPropertyDescriptor(
+  prototype->setPropertyDescriptor(
       ctx, L"description",
       JSObjectEntity::JSField{
           .configurable = false,
@@ -171,11 +168,11 @@ void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
                      ->getEntity(),
           .set = nullptr});
 
-  proto->setProperty(
+  prototype->setProperty(
       ctx, toPrimitive,
       ctx->createNativeFunction(&JSSymbolConstructor::toPrimitive,
                                 L"[Symbol.toPrimitive]"));
-  proto->setProperty(ctx, toStringTag, ctx->createString(L"Symbol"));
+  prototype->setProperty(ctx, toStringTag, ctx->createString(L"Symbol"));
 
   Symbol->setOpaque<common::AutoPtr<JSSymbolOpaque>>(new JSSymbolOpaque);
 }

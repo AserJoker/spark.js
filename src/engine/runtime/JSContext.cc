@@ -148,10 +148,10 @@ void JSContext::initialize() {
   _symbolPack = createSymbol();
 
   auto scope = pushScope();
-  JSSymbolConstructor::initialize(this, _Symbol);
-  JSObjectConstructor::initialize(this, _Object);
-  JSFunctionConstructor::initialize(this, _Function);
-  JSErrorConstructor::initialize(this, _Error);
+  JSSymbolConstructor::initialize(this, _Symbol, symbolPrototype);
+  JSObjectConstructor::initialize(this, _Object, objectPrototype);
+  JSFunctionConstructor::initialize(this, _Function, functionPrototype);
+  JSErrorConstructor::initialize(this, _Error, errorPrototype);
   popScope(scope);
   subRef();
 }

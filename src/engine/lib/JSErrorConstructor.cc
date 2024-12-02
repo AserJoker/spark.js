@@ -41,8 +41,8 @@ JS_FUNC(JSErrorConstructor::toString) {
   return ctx->createString(result);
 }
 void JSErrorConstructor::initialize(common::AutoPtr<JSContext> ctx,
-                                    common::AutoPtr<JSValue> Error) {
-  auto prototype = Error->getProperty(ctx, L"prototype");
+                                    common::AutoPtr<JSValue> Error,
+                                    common::AutoPtr<JSValue> prototype) {
   prototype->setProperty(ctx, L"toString",
                          ctx->createNativeFunction(toString, L"toString"));
 }

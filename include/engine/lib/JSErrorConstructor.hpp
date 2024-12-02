@@ -7,12 +7,12 @@
 namespace spark::engine {
 class JSErrorConstructor {
 private:
-private:
   static JS_FUNC(toString);
 
 public:
   static JS_FUNC(constructor);
   static void initialize(common::AutoPtr<JSContext> ctx,
-                         common::AutoPtr<JSValue> Error);
+                         common::AutoPtr<JSValue> Error,
+                         common::AutoPtr<JSValue> prototype);
 };
 } // namespace spark::engine

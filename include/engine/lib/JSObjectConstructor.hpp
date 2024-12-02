@@ -10,6 +10,7 @@ private:
 public:
   static JS_FUNC(constructor);
   static void initialize(common::AutoPtr<JSContext> ctx,
-                         common::AutoPtr<JSValue> Object);
+                         common::AutoPtr<JSValue> Object,
+                         common::AutoPtr<JSValue> prototype);
 };
 } // namespace spark::engine

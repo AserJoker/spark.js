@@ -43,16 +43,15 @@ JS_FUNC(JSFunctionConstructor::call) {
 }
 
 void JSFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx,
-                                       common::AutoPtr<JSValue> Function) {
-  auto proto = Function->getProperty(ctx, L"prototype");
-  proto->setProperty(ctx, L"toString",
-                     ctx->createNativeFunction(toString, L"toString"));
-  proto->setProperty(ctx, L"constructor", Function);
+                                       common::AutoPtr<JSValue> Function,
+                                       common::AutoPtr<JSValue> prototype) {
+  prototype->setProperty(ctx, L"toString",
+                         ctx->createNativeFunction(toString, L"toString"));
 
-  proto->setProperty(ctx, ctx->Symbol()->getProperty(ctx, L"toStringTag"),
-                     ctx->createString(L"Function"));
+  prototype->setProperty(ctx, ctx->Symbol()->getProperty(ctx, L"toStringTag"),
+                         ctx->createString(L"Function"));
 
-  proto->setPropertyDescriptor(
+  prototype->setPropertyDescriptor(
       ctx, L"name",
       {
           .configurable = true,
