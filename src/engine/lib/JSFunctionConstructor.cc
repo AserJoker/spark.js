@@ -5,6 +5,7 @@
 #include "engine/runtime/JSContext.hpp"
 #include "error/JSTypeError.hpp"
 #include <fmt/xchar.h>
+#include <vector>
 using namespace spark;
 using namespace spark::engine;
 JS_FUNC(JSFunctionConstructor::constructor) { return self; }
@@ -36,6 +37,9 @@ JS_FUNC(JSFunctionConstructor::name) {
   }
   throw error::JSTypeError(
       L"Function.prototype.toString called on incompatible object");
+}
+JS_FUNC(JSFunctionConstructor::call) {
+  return self->apply(ctx, args[0], std::vector(args.begin() + 1, args.end()));
 }
 
 void JSFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx,

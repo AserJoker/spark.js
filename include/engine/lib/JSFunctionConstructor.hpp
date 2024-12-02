@@ -6,6 +6,7 @@ private:
   static JS_FUNC(toPrimitive);
   static JS_FUNC(toString);
   static JS_FUNC(name);
+  static JS_FUNC(call);
 
 public:
   static JS_FUNC(constructor);
