@@ -26,6 +26,7 @@
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSSyntaxError.hpp"
+#include "error/JSTypeError.hpp"
 #include <string>
 
 using namespace spark;
@@ -260,7 +261,16 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
         fmt::format(L"'{}' is not a constructor", constructor->getName()));
   }
   auto prototype = constructor->getProperty(this, L"prototype");
-  auto result = createObject(prototype, name);
+  common::AutoPtr<JSValue> result;
+  if (constructor == _Array) {
+    result = createValue(new JSArrayEntity(prototype->getEntity()));
+  } else if (constructor == _Function) {
+    result = createValue(new JSFunctionEntity(prototype->getEntity(), nullptr));
+  } else if (constructor == _Symbol) {
+    throw error::JSTypeError(L"Symbol is not a constructor");
+  } else {
+    result = createObject(prototype, name);
+  }
   result->setProperty(this, L"constructor", constructor);
   constructor->apply(this, result, args, loc);
   return result;
