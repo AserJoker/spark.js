@@ -24,8 +24,7 @@ static std::array KEYWORLDS = {
     L"switch",     L"this",       L"throw",     L"true",   L"try",
     L"typeof",     L"var",        L"void",      L"while",  L"with",
     L"enum",       L"implements", L"interface", L"let",    L"package",
-    L"private",    L"protected",  L"public",    L"static", L"await",
-    L"yield"};
+    L"private",    L"protected",  L"public",    L"static", L"yield"};
 
 void JSParser::bindDeclaration(
     common::AutoPtr<JSIdentifierLiteral> identifier) {
@@ -255,6 +254,8 @@ void JSParser::bindScope(common::AutoPtr<JSNode> node) {
   case JSNodeType::EXPRESSION_NEW:
   case JSNodeType::EXPRESSION_DELETE:
   case JSNodeType::EXPRESSION_AWAIT:
+  case JSNodeType::EXPRESSION_YIELD:
+  case JSNodeType::EXPRESSION_YIELD_DELEGATE:
   case JSNodeType::EXPRESSION_VOID:
   case JSNodeType::EXPRESSION_TYPEOF:
   case JSNodeType::EXPRESSION_GROUP:
@@ -269,7 +270,6 @@ void JSParser::bindScope(common::AutoPtr<JSNode> node) {
   case JSNodeType::STATEMENT_BLOCK:
   case JSNodeType::STATEMENT_DEBUGGER:
   case JSNodeType::STATEMENT_RETURN:
-  case JSNodeType::STATEMENT_YIELD:
   case JSNodeType::STATEMENT_LABEL:
   case JSNodeType::STATEMENT_BREAK:
   case JSNodeType::STATEMENT_CONTINUE:
@@ -1320,9 +1320,6 @@ JSParser::readStatement(uint32_t filename, const std::wstring &source,
     node = readDoWhileStatement(filename, source, current);
   }
   if (!node) {
-    node = readYieldStatement(filename, source, current);
-  }
-  if (!node) {
     node = readReturnStatement(filename, source, current);
   }
   if (!node) {
@@ -1765,13 +1762,21 @@ JSParser::readEmptyStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readYieldStatement(uint32_t filename, const std::wstring &source,
-                             JSSourceLocation::Position &position) {
+JSParser::readYieldExpression(uint32_t filename, const std::wstring &source,
+                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
-  auto token = readIdentifierToken(filename, source, current);
+  auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"yield")) {
-    common::AutoPtr node = new JSYieldStatement;
+    auto backup = current;
+    auto symbol = readSymbolToken(filename, source, current);
+    common::AutoPtr<JSYieldExpression> node;
+    if (symbol != nullptr && symbol->location.isEqual(source, L"*")) {
+      node = new JSYieldDelegateExpression;
+    } else {
+      current = backup;
+      node = new JSYieldExpression;
+    }
     auto isNewLine = false;
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
@@ -2286,6 +2291,9 @@ JSParser::readRValue(uint32_t filename, const std::wstring &source,
   }
   if (!node) {
     node = readAwaitExpression(filename, source, current);
+  }
+  if (!node) {
+    node = readYieldExpression(filename, source, current);
   }
   if (!node) {
     node = readValue(filename, source, current);
@@ -5483,9 +5491,6 @@ std::wstring JSParser::toJSON(const std::wstring &filename,
   case JSNodeType::STATEMENT_RETURN:
     type = L"STATEMENT_RETURN";
     break;
-  case JSNodeType::STATEMENT_YIELD:
-    type = L"STATEMENT_YIELD";
-    break;
   case JSNodeType::STATEMENT_LABEL:
     type = L"STATEMENT_LABEL";
     break;
@@ -5593,6 +5598,12 @@ std::wstring JSParser::toJSON(const std::wstring &filename,
     break;
   case JSNodeType::EXPRESSION_AWAIT:
     type = L"EXPRESSION_AWAIT";
+    break;
+  case JSNodeType::EXPRESSION_YIELD:
+    type = L"EXPRESSION_YIELD";
+    break;
+  case JSNodeType::EXPRESSION_YIELD_DELEGATE:
+    type = L"EXPRESSION_YIELD_DELEGATE";
     break;
   case JSNodeType::EXPRESSION_VOID:
     type = L"EXPRESSION_VOID";

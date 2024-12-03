@@ -8,6 +8,7 @@ namespace spark::engine {
 class JSFunctionEntity : public JSObjectEntity {
 private:
   bool _async;
+  bool _generator;
   uint32_t _address;
   uint32_t _length;
   std::unordered_map<std::wstring, JSEntity *> _closure;
@@ -19,6 +20,7 @@ public:
   JSFunctionEntity(JSEntity *prototype,
                    const common::AutoPtr<compiler::JSModule> &module);
   void setAsync(bool async);
+  void setGenerator(bool generator);
   void setAddress(uint32_t address);
   void setLength(uint32_t length);
   void setClosure(const std::wstring &name, JSEntity *entity);
@@ -26,6 +28,7 @@ public:
   void setSource(const std::wstring &name);
 
   bool getAsync() const;
+  bool getGenerator() const;
   uint32_t getAddress() const;
   uint32_t getLength() const;
   const std::wstring &getFuncName() const;

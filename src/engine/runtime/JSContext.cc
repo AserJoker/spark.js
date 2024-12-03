@@ -20,6 +20,8 @@
 #include "engine/lib/JSArrayConstructor.hpp"
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/lib/JSFunctionConstructor.hpp"
+#include "engine/lib/JSGeneratorFunctionConstructor.hpp"
+#include "engine/lib/JSIteratorConstructor.hpp"
 #include "engine/lib/JSObjectConstructor.hpp"
 #include "engine/lib/JSSymbolConstructor.hpp"
 #include "engine/runtime/JSRuntime.hpp"
@@ -89,6 +91,8 @@ void JSContext::initialize() {
   JSFunctionConstructor::initialize(this, _Function, functionPrototype);
   _Error = JSErrorConstructor::initialize(this);
   _Array = JSArrayConstructor::initialize(this);
+  _GeneratorFunction = JSGeneratorFunctionConstructor::initialize(this);
+  _Iterator = JSIteratorConstructor::initialize(this);
   subRef();
 }
 
@@ -304,6 +308,14 @@ JSContext::createFunction(const common::AutoPtr<compiler::JSModule> &module,
           _Function->getProperty(this, L"prototype")->getEntity(), module),
       name);
 }
+common::AutoPtr<JSValue>
+JSContext::createGenerator(const common::AutoPtr<compiler::JSModule> &module,
+                           const std::wstring &name) {
+  auto entity = new JSFunctionEntity(
+      _GeneratorFunction->getProperty(this, L"prototype")->getEntity(), module);
+  entity->setGenerator(true);
+  return _scope->createValue(entity, name);
+}
 
 common::AutoPtr<JSValue>
 JSContext::createException(const std::wstring &type,
@@ -339,6 +351,14 @@ common::AutoPtr<JSValue> JSContext::Object() { return _Object; }
 common::AutoPtr<JSValue> JSContext::Error() { return _Error; }
 
 common::AutoPtr<JSValue> JSContext::Array() { return _Array; }
+
+common::AutoPtr<JSValue> JSContext::Iterator() { return _Iterator; }
+
+common::AutoPtr<JSValue> JSContext::GeneratorFunction() {
+  return _GeneratorFunction;
+}
+
+common::AutoPtr<JSValue> JSContext::Generator() { return _Generator; }
 
 common::AutoPtr<JSValue> JSContext::symbolValue() { return _symbolValue; }
 

@@ -41,6 +41,7 @@ enum class JSAsmOperator {
   HLT,
   THROW,
   YIELD,
+  YIELD_DELEGATE,
   AWAIT,
   NEW,
   NULLISH_COALESCING,

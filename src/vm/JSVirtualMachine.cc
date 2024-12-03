@@ -113,7 +113,9 @@ JS_OPT(JSVirtualMachine::pushFunction) {
   _ctx->stack.push_back(ctx->createFunction(module));
 }
 
-JS_OPT(JSVirtualMachine::pushGenerator) {}
+JS_OPT(JSVirtualMachine::pushGenerator) {
+  _ctx->stack.push_back(ctx->createGenerator(module));
+}
 
 JS_OPT(JSVirtualMachine::pushArrow) {}
 
@@ -312,7 +314,11 @@ JS_OPT(JSVirtualMachine::new_) {
       }));
 };
 
-JS_OPT(JSVirtualMachine::yield) {}
+JS_OPT(JSVirtualMachine::yield) { _ctx->stack.push_back(ctx->undefined()); }
+
+JS_OPT(JSVirtualMachine::yieldDelegate) {
+  _ctx->stack.push_back(ctx->undefined());
+}
 
 JS_OPT(JSVirtualMachine::await) {}
 
@@ -583,6 +589,9 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
       case compiler::JSAsmOperator::YIELD:
         yield(ctx, module);
         break;
+      case compiler::JSAsmOperator::YIELD_DELEGATE:
+        yieldDelegate(ctx, module);
+        break;
       case compiler::JSAsmOperator::AWAIT:
         await(ctx, module);
         break;
@@ -662,7 +671,6 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
                         common::AutoPtr<engine::JSValue> func,
                         common::AutoPtr<engine::JSValue> self,
                         std::vector<common::AutoPtr<engine::JSValue>> args) {
-  auto entity = func->getEntity<engine::JSFunctionEntity>();
   std::vector<engine::JSEntity *> arguments;
   for (auto &arg : args) {
     arguments.push_back(arg->getEntity());
@@ -695,8 +703,12 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
       ctx->createValue(entity, name);
     }
     result = callee(ctx, self, args);
-  } else {
-    result = eval(ctx, entity->getModule(), entity->getAddress());
+  } else if (func->getType() == engine::JSValueType::JS_FUNCTION) {
+    auto entity = func->getEntity<engine::JSFunctionEntity>();
+    if (entity->getGenerator()) {
+    } else {
+      result = eval(ctx, entity->getModule(), entity->getAddress());
+    }
   }
   _callee = callee;
   return result;

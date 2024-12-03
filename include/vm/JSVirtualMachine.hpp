@@ -79,6 +79,7 @@ private:
   JS_OPT(throw_);
   JS_OPT(new_);
   JS_OPT(yield);
+  JS_OPT(yieldDelegate);
   JS_OPT(await);
   JS_OPT(nullishCoalescing);
   JS_OPT(pushScope);

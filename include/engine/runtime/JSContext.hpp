@@ -40,6 +40,9 @@ private:
 
   common::AutoPtr<JSValue> _Object;
   common::AutoPtr<JSValue> _Function;
+  common::AutoPtr<JSValue> _GeneratorFunction;
+  common::AutoPtr<JSValue> _Generator;
+  common::AutoPtr<JSValue> _Iterator;
   common::AutoPtr<JSValue> _Array;
   common::AutoPtr<JSValue> _Error;
   common::AutoPtr<JSValue> _Symbol;
@@ -145,6 +148,10 @@ public:
   createFunction(const common::AutoPtr<compiler::JSModule> &module,
                  const std::wstring &name = L"");
 
+  common::AutoPtr<JSValue>
+  createGenerator(const common::AutoPtr<compiler::JSModule> &module,
+                  const std::wstring &name = L"");
+
   common::AutoPtr<JSValue> createException(const std::wstring &type,
                                            const std::wstring &message,
                                            const JSLocation &location = {});
@@ -170,6 +177,12 @@ public:
   common::AutoPtr<JSValue> Error();
 
   common::AutoPtr<JSValue> Array();
+
+  common::AutoPtr<JSValue> Iterator();
+
+  common::AutoPtr<JSValue> GeneratorFunction();
+
+  common::AutoPtr<JSValue> Generator();
 
   common::AutoPtr<JSValue> uninitialized();
 

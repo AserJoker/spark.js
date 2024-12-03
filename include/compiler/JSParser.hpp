@@ -159,10 +159,6 @@ private:
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readYieldStatement(uint32_t filename, const std::wstring &source,
-                     JSSourceLocation::Position &position);
-
-  common::AutoPtr<JSNode>
   readReturnStatement(uint32_t filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
@@ -317,6 +313,10 @@ private:
 
   common::AutoPtr<JSNode>
   readAwaitExpression(uint32_t filename, const std::wstring &source,
+                      JSSourceLocation::Position &position);
+
+  common::AutoPtr<JSNode>
+  readYieldExpression(uint32_t filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>

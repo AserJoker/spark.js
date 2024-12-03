@@ -125,9 +125,13 @@ private:
                               common::AutoPtr<JSModule> &module,
                               const common::AutoPtr<JSNode> &node);
 
-  void resolveStatementYield(JSGeneratorContext &ctx,
-                             common::AutoPtr<JSModule> &module,
-                             const common::AutoPtr<JSNode> &node);
+  void resolveExpressionYield(JSGeneratorContext &ctx,
+                              common::AutoPtr<JSModule> &module,
+                              const common::AutoPtr<JSNode> &node);
+
+  void resolveExpressionYieldDelegate(JSGeneratorContext &ctx,
+                                      common::AutoPtr<JSModule> &module,
+                                      const common::AutoPtr<JSNode> &node);
 
   void resolveStatementLabel(JSGeneratorContext &ctx,
                              common::AutoPtr<JSModule> &module,

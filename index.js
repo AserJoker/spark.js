@@ -1,6 +1,6 @@
-'use strict'
-function A() {
-    arguments.length = 10
-    console.log(Object.keys(arguments),arguments.length);
+"use strict";
+function* T() {
+  yield 1;
 }
-A(1)
+const g = T();
+console.log(g.next(2))

@@ -284,16 +284,27 @@ void JSGenerator::resolveStatementReturn(JSGeneratorContext &ctx,
   generate(module, JSAsmOperator::RET);
 }
 
-void JSGenerator::resolveStatementYield(JSGeneratorContext &ctx,
-                                        common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {
-  auto n = node.cast<JSYieldStatement>();
+void JSGenerator::resolveExpressionYield(JSGeneratorContext &ctx,
+                                         common::AutoPtr<JSModule> &module,
+                                         const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSYieldExpression>();
   if (n->value != nullptr) {
     resolveNode(ctx, module, n->value);
   } else {
     generate(module, JSAsmOperator::PUSH_UNDEFINED);
   }
   generate(module, JSAsmOperator::YIELD);
+}
+void JSGenerator::resolveExpressionYieldDelegate(
+    JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
+    const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSYieldDelegateExpression>();
+  if (n->value != nullptr) {
+    resolveNode(ctx, module, n->value);
+  } else {
+    generate(module, JSAsmOperator::PUSH_UNDEFINED);
+  }
+  generate(module, JSAsmOperator::YIELD_DELEGATE);
 }
 
 void JSGenerator::resolveStatementLabel(JSGeneratorContext &ctx,
@@ -932,9 +943,7 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
   case JSNodeType::STATEMENT_RETURN:
     resolveStatementReturn(ctx, module, node);
     break;
-  case JSNodeType::STATEMENT_YIELD:
-    resolveStatementYield(ctx, module, node);
-    break;
+
   case JSNodeType::STATEMENT_LABEL:
     resolveStatementLabel(ctx, module, node);
     break;
@@ -1042,6 +1051,12 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
     break;
   case JSNodeType::EXPRESSION_AWAIT:
     resolveExpressionAwait(ctx, module, node);
+    break;
+  case JSNodeType::EXPRESSION_YIELD:
+    resolveExpressionYield(ctx, module, node);
+    break;
+  case JSNodeType::EXPRESSION_YIELD_DELEGATE:
+    resolveExpressionYieldDelegate(ctx, module, node);
     break;
   case JSNodeType::EXPRESSION_VOID:
     resolveExpressionVoid(ctx, module, node);

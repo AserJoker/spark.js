@@ -7,11 +7,13 @@ using namespace spark;
 using namespace spark::engine;
 JSFunctionEntity::JSFunctionEntity(
     JSEntity *prototype, const common::AutoPtr<compiler::JSModule> &module)
-    : JSObjectEntity(prototype) {
+    : JSObjectEntity(prototype), _async(false), _generator(false), _address(0),
+      _length(0) {
   _type = JSValueType::JS_FUNCTION;
   _module = module;
 }
 void JSFunctionEntity::setAsync(bool async) { _async = async; }
+void JSFunctionEntity::setGenerator(bool generator) { _generator = generator; }
 
 void JSFunctionEntity::setAddress(uint32_t address) { _address = address; }
 
@@ -34,6 +36,7 @@ void JSFunctionEntity::setSource(const std::wstring &source) {
 }
 void JSFunctionEntity::setFuncName(const std::wstring &name) { _name = name; }
 bool JSFunctionEntity::getAsync() const { return _async; }
+bool JSFunctionEntity::getGenerator() const { return _generator; }
 uint32_t JSFunctionEntity::getAddress() const { return _address; }
 uint32_t JSFunctionEntity::getLength() const { return _length; }
 const std::wstring &JSFunctionEntity::getFuncName() const { return _name; }

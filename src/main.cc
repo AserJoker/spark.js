@@ -202,6 +202,9 @@ int main(int argc, char *argv[]) {
       case compiler::JSAsmOperator::YIELD:
         out << L"yield";
         break;
+      case compiler::JSAsmOperator::YIELD_DELEGATE:
+        out << L"yield_delegate";
+        break;
       case compiler::JSAsmOperator::AWAIT:
         out << L"await";
         break;

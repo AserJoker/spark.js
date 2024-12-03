@@ -222,9 +222,13 @@ struct JSDoWhileStatement : public JSWhileStatement {
   JSDoWhileStatement() { type = JSNodeType::STATEMENT_DO_WHILE; }
 };
 
-struct JSYieldStatement : public JSNode {
+struct JSYieldExpression : public JSNode {
   common::AutoPtr<JSNode> value;
-  JSYieldStatement() : JSNode(JSNodeType::STATEMENT_YIELD) {}
+  JSYieldExpression() : JSNode(JSNodeType::EXPRESSION_YIELD) {}
+};
+
+struct JSYieldDelegateExpression : public JSYieldExpression {
+  JSYieldDelegateExpression() { type = JSNodeType::EXPRESSION_YIELD_DELEGATE; }
 };
 
 struct JSReturnStatement : public JSNode {
