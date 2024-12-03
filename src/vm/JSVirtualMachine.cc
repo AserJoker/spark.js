@@ -12,10 +12,12 @@
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
 #include "vm/JSErrorFrame.hpp"
+#include "vm/JSEvalContext.hpp"
 #include <cstdint>
 using namespace spark;
 using namespace spark::vm;
-JSVirtualMachine::JSVirtualMachine() { _ctx = nullptr; }
+JSVirtualMachine::JSVirtualMachine() { _ctx = new JSEvalContext; }
+
 compiler::JSAsmOperator
 JSVirtualMachine::next(const common::AutoPtr<compiler::JSModule> &module) {
   auto codes = module->codes.data() + _pc;
@@ -65,7 +67,10 @@ void JSVirtualMachine::handleError(
       popScope(ctx, module);
     }
     if (frame.defer != 0) {
+      auto current = _ctx;
+      _ctx = new JSEvalContext;
       auto res = eval(ctx, module, frame.defer);
+      _ctx = current;
       if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
         return handleError(ctx, module, res);
       }
@@ -437,7 +442,10 @@ JS_OPT(JSVirtualMachine::tryEnd) {
   _ctx->errorStacks = frame.parent;
   auto pc = _pc;
   if (frame.defer) {
+    auto current = _ctx;
+    _ctx = new JSEvalContext;
     auto res = eval(ctx, module, frame.defer);
+    _ctx = current;
     if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
       return handleError(ctx, module, res);
     }
@@ -460,8 +468,6 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
                        const common::AutoPtr<compiler::JSModule> &module,
                        size_t offset) {
   auto scope = ctx->getScope();
-  auto current = _ctx;
-  _ctx = new JSEvalContext();
   _pc = offset;
   while (_pc != module->codes.size()) {
     try {
@@ -632,7 +638,10 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
       if (_pc == module->codes.size()) {
         common::AutoPtr<engine::JSValue> exception;
         if (_ctx->errorStacks != nullptr) {
+          auto current = _ctx;
+          _ctx = new JSEvalContext;
           auto res = eval(ctx, module, _ctx->errorStacks->defer);
+          _ctx = current;
           if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
             exception = res;
           }
@@ -663,7 +672,6 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
   while (ctx->getScope() != scope) {
     popScope(ctx, module);
   }
-  _ctx = current;
   return value;
 }
 common::AutoPtr<engine::JSValue>
@@ -707,7 +715,10 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
     auto entity = func->getEntity<engine::JSFunctionEntity>();
     if (entity->getGenerator()) {
     } else {
+      auto current = _ctx;
+      _ctx = new JSEvalContext;
       result = eval(ctx, entity->getModule(), entity->getAddress());
+      _ctx = current;
     }
   }
   _callee = callee;
