@@ -855,7 +855,11 @@ void JSGenerator::resolveDeclarationArray(JSGeneratorContext &ctx,
   auto n = node.cast<JSArrayDeclaration>();
   generate(module, JSAsmOperator::PUSH_ARRAY);
   for (size_t index = 0; index < n->items.size(); index++) {
-    resolveNode(ctx, module, n->items[index]);
+    if (n->items[index] != nullptr) {
+      resolveNode(ctx, module, n->items[index]);
+    } else {
+      generate(module, JSAsmOperator::PUSH_UNDEFINED);
+    }
     generate(module, JSAsmOperator::PUSH, (double)index);
     generate(module, JSAsmOperator::SET_FIELD);
     generate(module, JSAsmOperator::POP, 1U);

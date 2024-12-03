@@ -3659,7 +3659,9 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
             formatException(L"Unexcepted token", filename, source, current),
             {filename, current.line, current.column});
       }
-      item->addParent(node);
+      if (item != nullptr) {
+        item->addParent(node);
+      }
       node->items.push_back(item);
       item = readRestExpression(filename, source, current);
       if (item == nullptr) {
