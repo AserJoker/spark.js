@@ -2177,7 +2177,7 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
             {filename, current.line, current.column});
       }
       declareVariable(filename, source, node, node->binding,
-                      JSSourceDeclaration::TYPE::UNINITIALIZED, false);
+                      JSSourceDeclaration::TYPE::UNDEFINED, false);
     } else {
       current = backup;
     }

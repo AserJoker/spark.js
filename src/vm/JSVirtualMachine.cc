@@ -633,8 +633,9 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
         common::AutoPtr<engine::JSValue> exception;
         if (_ctx->errorStacks != nullptr) {
           auto current = _ctx;
+          auto defer = _ctx->errorStacks->defer;
           _ctx = new JSEvalContext;
-          auto res = eval(ctx, module, _ctx->errorStacks->defer);
+          auto res = eval(ctx, module, defer);
           _ctx = current;
           if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
             exception = res;
