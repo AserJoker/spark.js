@@ -700,6 +700,10 @@ common::AutoPtr<JSValue> JSValue::getIndex(common::AutoPtr<JSContext> ctx,
     auto entity = getEntity<JSArrayEntity>();
     auto &items = entity->getItems();
     if (index < items.size()) {
+      auto item = items[index];
+      if (item->getType() == JSValueType::JS_UNINITIALIZED) {
+        return ctx->undefined();
+      }
       return ctx->createValue(items[index]);
     }
   }
