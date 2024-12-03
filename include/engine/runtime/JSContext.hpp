@@ -80,11 +80,11 @@ public:
   common::AutoPtr<compiler::JSModule> compile(const std::wstring &source,
                                               const std::wstring &filename);
 
-  common::AutoPtr<JSScope> pushScope();
+  void pushScope();
 
-  void popScope(common::AutoPtr<JSScope> scope);
+  void popScope();
 
-  void setScope(JSScope *scope);
+  common::AutoPtr<JSScope> setScope(common::AutoPtr<JSScope> scope);
 
   common::AutoPtr<JSScope> getScope();
 

@@ -113,27 +113,22 @@ JSContext::compile(const std::wstring &source, const std::wstring &filename) {
   return generator->resolve(filename, source, ast);
 }
 
-common::AutoPtr<JSScope> JSContext::pushScope() {
-  auto scope = _scope;
-  _scope = new JSScope(scope);
-  return scope;
+void JSContext::pushScope() { _scope = new JSScope(_scope); }
+
+void JSContext::popScope() {
+  auto parent = _scope->getParent();
+  parent->removeChild(_scope);
+  _scope = parent;
 }
 
-void JSContext::popScope(common::AutoPtr<JSScope> scope) {
-  if (_scope != scope) {
-    while (_scope->getParent() != scope) {
-      auto parent = _scope->getParent();
-      _scope = parent;
-    }
-    auto parent = _scope->getParent();
-    parent->removeChild(_scope);
-    _scope = scope;
-  }
+common::AutoPtr<JSScope> JSContext::setScope(common::AutoPtr<JSScope> scope) {
+  auto result = _scope;
+  _scope = scope;
+  return result;
 }
-
-void JSContext::setScope(JSScope *scope) { _scope = scope; }
 
 common::AutoPtr<JSScope> JSContext::getScope() { return _scope; }
+
 common::AutoPtr<JSScope> JSContext::getRoot() { return _root; }
 
 void JSContext::pushCallStack(const JSLocation &location) {

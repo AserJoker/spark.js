@@ -154,7 +154,8 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
                              location);
   }
   ctx->pushCallStack(location);
-  auto scope = ctx->pushScope();
+  auto scope = ctx->getScope();
+  ctx->pushScope();
   JSEntity *result = nullptr;
   try {
     auto vm = ctx->getRuntime()->getVirtualMachine();
@@ -169,7 +170,9 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
                  ->getEntity();
   }
   scope->getRoot()->appendChild(result);
-  ctx->popScope(scope);
+  while (ctx->getScope() != scope) {
+    ctx->popScope();
+  }
   ctx->popCallStack();
   return ctx->createValue(result);
 }

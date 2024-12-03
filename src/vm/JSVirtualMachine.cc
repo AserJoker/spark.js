@@ -339,15 +339,9 @@ JS_OPT(JSVirtualMachine::nullishCoalescing) {
   }
 }
 
-JS_OPT(JSVirtualMachine::pushScope) {
-  _ctx->scopeChain.push_back(ctx->pushScope());
-}
+JS_OPT(JSVirtualMachine::pushScope) { ctx->pushScope(); }
 
-JS_OPT(JSVirtualMachine::popScope) {
-  auto scope = *_ctx->scopeChain.rbegin();
-  _ctx->scopeChain.pop_back();
-  ctx->popScope(scope);
-}
+JS_OPT(JSVirtualMachine::popScope) { ctx->popScope(); }
 
 JS_OPT(JSVirtualMachine::call) {
   auto offset = _pc - sizeof(uint16_t);
