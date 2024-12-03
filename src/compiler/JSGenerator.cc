@@ -641,7 +641,32 @@ void JSGenerator::resolveExpressionGroup(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveExpressionAssigment(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSBinaryExpression>();
+  auto host = n->left;
+  auto value = n->right;
+  if (host->type == JSNodeType::LITERAL_IDENTITY) {
+    resolveNode(ctx, module, value);
+    generate(
+        module, JSAsmOperator::STORE,
+        resolveConstant(ctx, module, host.cast<JSIdentifierLiteral>()->value));
+  } else if (host->type == JSNodeType::EXPRESSION_MEMBER) {
+    auto h = host.cast<JSMemberExpression>();
+    resolveNode(ctx, module, h->left);
+    resolveNode(ctx, module, value);
+    generate(module, JSAsmOperator::LOAD_CONST,
+             resolveConstant(ctx, module,
+                             h->right.cast<JSIdentifierLiteral>()->value));
+    generate(module, JSAsmOperator::SET_FIELD);
+  } else if (host->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+    auto h = host.cast<JSComputedMemberExpression>();
+    resolveNode(ctx, module, h->left);
+    resolveNode(ctx, module, value);
+    resolveNode(ctx, module, h->right);
+    generate(module, JSAsmOperator::SET_FIELD);
+    generate(module, JSAsmOperator::POP, 1U);
+  }
+}
 
 void JSGenerator::resolveExpressionRest(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
@@ -827,6 +852,14 @@ void JSGenerator::resolveDeclarationObject(
 void JSGenerator::resolveDeclarationArray(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
                                           const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSArrayDeclaration>();
+  generate(module, JSAsmOperator::PUSH_ARRAY);
+  for (size_t index = 0; index < n->items.size(); index++) {
+    resolveNode(ctx, module, n->items[index]);
+    generate(module, JSAsmOperator::PUSH, (double)index);
+    generate(module, JSAsmOperator::SET_FIELD);
+    generate(module, JSAsmOperator::POP, 1U);
+  }
 }
 
 void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,

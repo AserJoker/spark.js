@@ -40,9 +40,14 @@ JS_FUNC(JSErrorConstructor::toString) {
   }
   return ctx->createString(result);
 }
-void JSErrorConstructor::initialize(common::AutoPtr<JSContext> ctx,
-                                    common::AutoPtr<JSValue> Error,
-                                    common::AutoPtr<JSValue> prototype) {
+
+common::AutoPtr<JSValue>
+JSErrorConstructor::initialize(common::AutoPtr<JSContext> ctx) {
+  auto prototype = ctx->createObject();
+  auto Error = ctx->createNativeFunction(&constructor, L"Error", L"Error");
+  Error->setProperty(ctx, L"prototype", prototype);
+  prototype->setProperty(ctx, L"constructor", prototype);
   prototype->setProperty(ctx, L"toString",
                          ctx->createNativeFunction(toString, L"toString"));
+  return Error;
 }

@@ -30,17 +30,6 @@ public:
   };
 
 private:
-  static JS_FUNC(JSArrayConstructor);
-
-  static JS_FUNC(JSNumberConstructor);
-
-  static JS_FUNC(JSStringConstructor);
-
-  static JS_FUNC(JSBooleanConstructor);
-
-  static JS_FUNC(JSBigIntConstructor);
-
-private:
   common::AutoPtr<JSValue> _NaN;
   common::AutoPtr<JSValue> _null;
   common::AutoPtr<JSValue> _undefined;
@@ -134,6 +123,7 @@ public:
                                         const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createObject(const std::wstring &name = L"");
+  common::AutoPtr<JSValue> createArray(const std::wstring &name = L"");
 
   common::AutoPtr<JSValue>
   constructObject(common::AutoPtr<JSValue> constructor,
@@ -167,11 +157,19 @@ public:
 
   common::AutoPtr<JSValue> NaN();
 
-  common::AutoPtr<JSValue> Symbol();
-
   common::AutoPtr<JSValue> truly();
 
   common::AutoPtr<JSValue> falsely();
+
+  common::AutoPtr<JSValue> Symbol();
+
+  common::AutoPtr<JSValue> Function();
+
+  common::AutoPtr<JSValue> Object();
+
+  common::AutoPtr<JSValue> Error();
+
+  common::AutoPtr<JSValue> Array();
 
   common::AutoPtr<JSValue> uninitialized();
 

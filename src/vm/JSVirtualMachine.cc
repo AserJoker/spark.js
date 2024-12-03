@@ -105,7 +105,9 @@ JS_OPT(JSVirtualMachine::pushObject) {
   _ctx->stack.push_back(ctx->createObject());
 }
 
-JS_OPT(JSVirtualMachine::pushArray) {}
+JS_OPT(JSVirtualMachine::pushArray) {
+  _ctx->stack.push_back(ctx->createArray());
+}
 
 JS_OPT(JSVirtualMachine::pushFunction) {
   _ctx->stack.push_back(ctx->createFunction(module));

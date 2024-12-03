@@ -2,6 +2,7 @@
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSLocation.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/entity/JSArrayEntity.hpp"
 #include "engine/entity/JSBigIntEntity.hpp"
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
@@ -16,6 +17,7 @@
 #include "engine/entity/JSStringEntity.hpp"
 #include "engine/entity/JSSymbolEntity.hpp"
 #include "engine/entity/JSUndefinedEntity.hpp"
+#include "engine/lib/JSArrayConstructor.hpp"
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/lib/JSFunctionConstructor.hpp"
 #include "engine/lib/JSObjectConstructor.hpp"
@@ -28,12 +30,6 @@
 
 using namespace spark;
 using namespace spark::engine;
-
-JS_FUNC(JSContext::JSArrayConstructor) { return ctx->undefined(); }
-JS_FUNC(JSContext::JSNumberConstructor) { return ctx->undefined(); }
-JS_FUNC(JSContext::JSStringConstructor) { return ctx->undefined(); }
-JS_FUNC(JSContext::JSBooleanConstructor) { return ctx->undefined(); }
-JS_FUNC(JSContext::JSBigIntConstructor) { return ctx->undefined(); }
 
 JSContext::JSContext(const common::AutoPtr<JSRuntime> &runtime)
     : _runtime(runtime) {
@@ -63,22 +59,6 @@ void JSContext::initialize() {
   auto objectPrototype = createValue(new JSObjectEntity(_null->getEntity()));
   auto functionPrototype =
       createValue(new JSObjectEntity(objectPrototype->getEntity()));
-  auto symbolPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
-  auto arrayPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
-  auto errorPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
-  auto numberPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
-  auto stringPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
-  auto booleanPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
-  auto bigintPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
-  auto regexpPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
 
   JSNativeFunctionEntity *ObjectConstructorEntity =
       new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Object",
@@ -94,65 +74,20 @@ void JSContext::initialize() {
   _Function->setProperty(this, L"prototype", functionPrototype);
   functionPrototype->setProperty(this, L"constructor", _Function);
 
-  JSNativeFunctionEntity *SymbolConstructorEntity =
-      new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Symbol",
-                                 &JSSymbolConstructor::constructor, {});
-  _Symbol = _scope->createValue(SymbolConstructorEntity, L"Symbol");
+  auto symbolPrototype = createObject();
+  _Symbol = createNativeFunction(JSSymbolConstructor::constructor, L"Symbol",
+                                 L"Symbol");
   _Symbol->setProperty(this, L"prototype", symbolPrototype);
   symbolPrototype->setProperty(this, L"constructor", _Symbol);
-
-  JSNativeFunctionEntity *ArrayConstructorEntity = new JSNativeFunctionEntity(
-      functionPrototype->getEntity(), L"Array", &JSArrayConstructor, {});
-  _Array = _scope->createValue(ArrayConstructorEntity, L"Array");
-  _Array->setProperty(this, L"prototype", arrayPrototype);
-  arrayPrototype->setProperty(this, L"constructor", _Array);
-
-  JSNativeFunctionEntity *ErrorConstructorEntity =
-      new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Error",
-                                 &JSErrorConstructor::constructor, {});
-  _Error = _scope->createValue(ErrorConstructorEntity, L"Error");
-  _Error->setProperty(this, L"prototype", errorPrototype);
-  errorPrototype->setProperty(this, L"constructor", _Error);
-
-  JSNativeFunctionEntity *NumberConstructorEntity = new JSNativeFunctionEntity(
-      functionPrototype->getEntity(), L"Number", &JSNumberConstructor, {});
-  _Number = _scope->createValue(NumberConstructorEntity, L"Number");
-  _Number->setProperty(this, L"prototype", numberPrototype);
-  numberPrototype->setProperty(this, L"constructor", _Number);
-
-  JSNativeFunctionEntity *StringConstructorEntity = new JSNativeFunctionEntity(
-      functionPrototype->getEntity(), L"String", &JSStringConstructor, {});
-  _String = _scope->createValue(StringConstructorEntity, L"String");
-  _String->setProperty(this, L"prototype", stringPrototype);
-  stringPrototype->setProperty(this, L"constructor", _String);
-
-  JSNativeFunctionEntity *BooleanConstructorEntity = new JSNativeFunctionEntity(
-      functionPrototype->getEntity(), L"Boolean", &JSBooleanConstructor, {});
-  _Boolean = _scope->createValue(BooleanConstructorEntity, L"Boolean");
-  _Boolean->setProperty(this, L"prototype", booleanPrototype);
-  booleanPrototype->setProperty(this, L"constructor", _Boolean);
-
-  JSNativeFunctionEntity *BigIntConstructorEntity = new JSNativeFunctionEntity(
-      functionPrototype->getEntity(), L"BigInt", &JSBigIntConstructor, {});
-  _BigInt = _scope->createValue(BigIntConstructorEntity, L"BigInt");
-  _BigInt->setProperty(this, L"prototype", bigintPrototype);
-  bigintPrototype->setProperty(this, L"constructor", _BigInt);
-
-  JSNativeFunctionEntity *RegExpConstructorEntity = new JSNativeFunctionEntity(
-      functionPrototype->getEntity(), L"RegExp", &JSBigIntConstructor, {});
-  _RegExp = _scope->createValue(RegExpConstructorEntity, L"RegExp");
-  _RegExp->setProperty(this, L"prototype", regexpPrototype);
-  regexpPrototype->setProperty(this, L"constructor", _RegExp);
 
   _symbolValue = createSymbol();
   _symbolPack = createSymbol();
 
-  auto scope = pushScope();
   JSSymbolConstructor::initialize(this, _Symbol, symbolPrototype);
   JSObjectConstructor::initialize(this, _Object, objectPrototype);
   JSFunctionConstructor::initialize(this, _Function, functionPrototype);
-  JSErrorConstructor::initialize(this, _Error, errorPrototype);
-  popScope(scope);
+  _Error = JSErrorConstructor::initialize(this);
+  _Array = JSArrayConstructor::initialize(this);
   subRef();
 }
 
@@ -303,8 +238,15 @@ JSContext::createObject(common::AutoPtr<JSValue> prototype,
   }
   return _scope->createValue(new JSObjectEntity(proto), name);
 }
+
 common::AutoPtr<JSValue> JSContext::createObject(const std::wstring &name) {
   return createObject(nullptr, name);
+}
+
+common::AutoPtr<JSValue> JSContext::createArray(const std::wstring &name) {
+  return _scope->createValue(
+      new JSArrayEntity(_Array->getProperty(this, L"prototype")->getEntity()),
+      name);
 }
 
 common::AutoPtr<JSValue>
@@ -374,11 +316,19 @@ common::AutoPtr<JSValue> JSContext::null() { return _null; }
 
 common::AutoPtr<JSValue> JSContext::NaN() { return _NaN; }
 
-common::AutoPtr<JSValue> JSContext::Symbol() { return _Symbol; }
-
 common::AutoPtr<JSValue> JSContext::truly() { return _true; }
 
 common::AutoPtr<JSValue> JSContext::falsely() { return _false; }
+
+common::AutoPtr<JSValue> JSContext::Symbol() { return _Symbol; }
+
+common::AutoPtr<JSValue> JSContext::Function() { return _Function; }
+
+common::AutoPtr<JSValue> JSContext::Object() { return _Object; }
+
+common::AutoPtr<JSValue> JSContext::Error() { return _Error; }
+
+common::AutoPtr<JSValue> JSContext::Array() { return _Array; }
 
 common::AutoPtr<JSValue> JSContext::symbolValue() { return _symbolValue; }
 

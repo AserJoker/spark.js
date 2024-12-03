@@ -872,13 +872,13 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
                                               common::AutoPtr<JSValue> name) {
   auto key = name->toPrimitive(ctx);
-  if (getType() == JSValueType::JS_ARRAY) {
-    auto num = key->convertToNumber(ctx);
-    if (num.has_value()) {
-      return getIndex(ctx, num.value());
-    }
-  }
   if (key->getType() != JSValueType::JS_SYMBOL) {
+    if (getType() == JSValueType::JS_ARRAY) {
+      auto num = key->convertToNumber(ctx);
+      if (num.has_value()) {
+        return getIndex(ctx, num.value());
+      }
+    }
     return getProperty(ctx, key->convertToString(ctx));
   }
   auto self = pack(ctx);
