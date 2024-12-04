@@ -15,6 +15,11 @@ JS_FUNC(JSGeneratorConstructor::next) {
   ctx->pushCallStack({.funcname = co.funcname});
   vm->setContext(co.eval);
   ctx->setScope(co.scope);
+  if (args.empty()) {
+    co.eval->stack.push_back(ctx->undefined());
+  } else {
+    co.eval->stack.push_back(co.scope->createValue(args[0]->getEntity()));
+  }
   vm->run(ctx, co.module, co.pc);
   auto pc = *co.eval->stack.rbegin();
   co.eval->stack.pop_back();
