@@ -212,11 +212,11 @@ JS_OPT(JSVirtualMachine::storeConst) {
   auto name = args(module);
   auto value = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
-  if (!ctx->getScope()->getValues().contains(name)) {
+  auto val = ctx->getScope()->getValue(name);
+  if (!val || val->getType() == engine::JSValueType::JS_UNINITIALIZED) {
     ctx->createValue(value, name);
   } else {
-    auto current = ctx->load(name);
-    current->setEntity(value->getEntity());
+    val->setEntity(value->getEntity());
   }
 }
 
@@ -224,11 +224,11 @@ JS_OPT(JSVirtualMachine::store) {
   auto name = args(module);
   auto value = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
-  if (!ctx->getScope()->getValues().contains(name)) {
+  auto val = ctx->getScope()->getValue(name);
+  if (!val || val->getType() == engine::JSValueType::JS_UNINITIALIZED) {
     ctx->createValue(value, name);
   } else {
-    auto current = ctx->load(name);
-    current->setEntity(value->getEntity());
+    val->setEntity(value->getEntity());
   }
 }
 
@@ -653,7 +653,6 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
                                .value = func->getEntity(),
                                .writable = false});
   ctx->createValue(self, L"this");
-  auto callee = _callee;
   _callee = func;
   common::AutoPtr<engine::JSValue> result;
   if (func->getType() == engine::JSValueType::JS_NATIVE_FUNCTION) {
@@ -674,6 +673,5 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
       _ctx = current;
     }
   }
-  _callee = callee;
   return result;
 }

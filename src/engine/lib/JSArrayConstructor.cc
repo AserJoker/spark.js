@@ -98,8 +98,9 @@ JS_FUNC(JSArrayConstructor::toString) {
 
 common::AutoPtr<JSValue>
 JSArrayConstructor::initialize(common::AutoPtr<JSContext> ctx) {
-  auto prototype = ctx->createObject();
   auto Array = ctx->createNativeFunction(constructor, L"Array", L"Array");
+  ctx->pushScope();
+  auto prototype = ctx->createObject();
   prototype->setProperty(ctx, L"constructor", Array);
   Array->setProperty(ctx, L"prototype", prototype);
   prototype->setPropertyDescriptor(
@@ -117,7 +118,10 @@ JSArrayConstructor::initialize(common::AutoPtr<JSContext> ctx) {
        .get = ctx->createNativeFunction(toStringTag, L"[Symbol.toStringTag]")
                   ->getEntity(),
        .set = nullptr});
-  prototype->setProperty(ctx, L"toString", ctx->createNativeFunction(toString));
-  prototype->setProperty(ctx, L"join", ctx->createNativeFunction(join));
+  prototype->setProperty(ctx, L"toString",
+                         ctx->createNativeFunction(toString, L"toString"));
+  prototype->setProperty(ctx, L"join",
+                         ctx->createNativeFunction(join, L"join"));
+  ctx->popScope();
   return Array;
 }

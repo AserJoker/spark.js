@@ -35,7 +35,7 @@ public:
       _object->addRef();
     }
   }
-  
+
   const T *getRawPointer() const { return _object; }
 
   T *getRawPointer() { return _object; }
@@ -78,24 +78,25 @@ public:
   }
 
   template <class K> AutoPtr<T> &operator=(K *object) {
-    if (_object && _object != object) {
+    if (object) {
+      object->addRef();
+    }
+    if (_object) {
       dispose();
     }
     _object = object;
-    if (_object) {
-      _object->addRef();
-    }
     return *this;
   }
 
   template <class K> AutoPtr<T> &operator=(const AutoPtr<K> &another) {
-    if (_object && _object != another.getRawPointer()) {
+    K *obj = (K *)another.getRawPointer();
+    if (obj) {
+      obj->addRef();
+    }
+    if (_object) {
       dispose();
     }
-    _object = const_cast<K *>(another.getRawPointer());
-    if (_object) {
-      _object->addRef();
-    }
+    _object = obj;
     return *this;
   }
 
@@ -103,13 +104,14 @@ public:
     if (this == &another) {
       return *this;
     }
-    if (_object && _object != another.getRawPointer()) {
+    T *obj = (T *)another.getRawPointer();
+    if (obj) {
+      obj->addRef();
+    }
+    if (_object) {
       dispose();
     }
-    _object = (T *)another.getRawPointer();
-    if (_object) {
-      _object->addRef();
-    }
+    _object = obj;
     return *this;
   }
 

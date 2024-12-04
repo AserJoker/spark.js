@@ -56,7 +56,19 @@ int main(int argc, char *argv[]) {
     out << L".filename \"" << module->filename << L"\"" << std::endl;
     size_t index = 0;
     for (auto &constant : module->constants) {
-      out << L".const_" << index << " \"" << constant << "\"" << std::endl;
+      std::wstring str;
+      for (auto &ch : constant) {
+        if (ch == L'\n') {
+          str += L"\\n";
+        } else if (ch == L'\r') {
+          str += L"\\r";
+        } else if (ch == '\"') {
+          str += L"\\\"";
+        } else {
+          str += ch;
+        }
+      }
+      out << L".const_" << index << " \"" << str << "\"" << std::endl;
       index++;
     }
     out << L"[section .text]" << std::endl;

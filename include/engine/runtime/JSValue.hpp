@@ -34,6 +34,8 @@ public:
     return (T *)_entity;
   }
 
+  common::AutoPtr<JSScope> getScope();
+
   void setEntity(JSEntity *entity);
 
   std::optional<double> getNumber() const;

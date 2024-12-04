@@ -567,7 +567,7 @@ void JSGenerator::resolveExpressionOptionalMember(
 void JSGenerator::resolveExpressionComputedMember(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
-  auto n = node.cast<JSMemberExpression>();
+  auto n = node.cast<JSComputedMemberExpression>();
   resolveNode(ctx, module, n->left);
   resolveNode(ctx, module, n->right);
   generate(module, JSAsmOperator::GET_FIELD);
@@ -845,6 +845,7 @@ void JSGenerator::resolveDeclarationFunctionBody(
   for (auto &item : n->statements) {
     resolveNode(ctx, module, item);
   }
+  generate(module, JSAsmOperator::PUSH_UNDEFINED);
   generate(module, JSAsmOperator::RET);
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);

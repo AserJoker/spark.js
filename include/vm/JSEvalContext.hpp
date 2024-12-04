@@ -10,6 +10,6 @@ struct JSEvalContext : public common::Object {
   std::vector<size_t> stackTops;
   std::vector<size_t> deferStack;
   common::AutoPtr<JSErrorFrame> errorStacks;
-  JSEvalContext() { errorStacks = nullptr; };
+  JSEvalContext(){};
 };
 } // namespace spark::vm

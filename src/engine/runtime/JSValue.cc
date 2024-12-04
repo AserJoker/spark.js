@@ -46,8 +46,17 @@ std::wstring JSValue::getName() const {
   }
   return L"anonymous";
 }
+common::AutoPtr<JSScope> JSValue::getScope() { return _scope; }
 
-void JSValue::setEntity(JSEntity *entity) { _entity = entity; }
+void JSValue::setEntity(JSEntity *entity) {
+  if (entity) {
+    _scope->getRoot()->appendChild(entity);
+  }
+  if (_entity) {
+    _scope->getRoot()->removeChild(_entity);
+  }
+  _entity = entity;
+}
 
 std::optional<double> JSValue::getNumber() const {
   if (getType() == JSValueType::JS_NUMBER) {
