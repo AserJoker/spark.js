@@ -247,6 +247,7 @@ void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
   for (auto &item : n->body) {
     resolveNode(ctx, module, item);
   }
+  generate(module, JSAsmOperator::PUSH_UNDEFINED);
   generate(module, JSAsmOperator::RET);
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
@@ -350,9 +351,11 @@ void JSGenerator::resolveStatementTry(JSGeneratorContext &ctx,
   auto catchStart = (module->codes.size() + sizeof(uint16_t));
   generate(module, JSAsmOperator::TRY, 0U);
   auto finallyStart = (module->codes.size() + sizeof(uint16_t));
-  generate(module, JSAsmOperator::DEFER, 0U);
+  if (n->finally != nullptr) {
+    generate(module, JSAsmOperator::DEFER, 0U);
+  }
   resolveNode(ctx, module, n->try_);
-  generate(module, JSAsmOperator::ENDTRY);
+  generate(module, JSAsmOperator::END_TRY);
   auto catchEnd = (module->codes.size() + sizeof(uint16_t));
   generate(module, JSAsmOperator::JMP, 0U);
   *(uint32_t *)(module->codes.data() + catchStart) =
@@ -362,16 +365,18 @@ void JSGenerator::resolveStatementTry(JSGeneratorContext &ctx,
   }
   *(uint32_t *)(module->codes.data() + catchEnd) =
       (uint32_t)(module->codes.size());
-  auto finallyEnd = (module->codes.size() + sizeof(uint16_t));
-  generate(module, JSAsmOperator::JMP, 0U);
-  *(uint32_t *)(module->codes.data() + finallyStart) =
-      (uint32_t)(module->codes.size());
   if (n->finally != nullptr) {
-    resolveNode(ctx, module, n->finally);
-    generate(module, JSAsmOperator::HLT);
+    auto finallyEnd = (module->codes.size() + sizeof(uint16_t));
+    generate(module, JSAsmOperator::JMP, 0U);
+    *(uint32_t *)(module->codes.data() + finallyStart) =
+        (uint32_t)(module->codes.size());
+    if (n->finally != nullptr) {
+      resolveNode(ctx, module, n->finally);
+    }
+    generate(module, JSAsmOperator::END_DEFER);
+    *(uint32_t *)(module->codes.data() + finallyEnd) =
+        (uint32_t)(module->codes.size());
   }
-  *(uint32_t *)(module->codes.data() + finallyEnd) =
-      (uint32_t)(module->codes.size());
 }
 
 void JSGenerator::resolveStatementTryCatch(

@@ -2,6 +2,7 @@
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
+#include <fmt/xchar.h>
 using namespace spark;
 using namespace spark::engine;
 JSObjectEntity::JSObjectEntity(JSEntity *prototype)

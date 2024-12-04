@@ -1,10 +1,14 @@
 #pragma once
-#include "engine/runtime/JSScope.hpp"
+#include "common/AutoPtr.hpp"
+#include "common/Object.hpp"
 namespace spark::vm {
-struct JSErrorFrame {
-  common::AutoPtr<engine::JSScope> scope;
+struct JSErrorFrame : public common::Object {
   uint32_t defer;
   uint32_t handle;
-  JSErrorFrame *parent;
+  common::AutoPtr<JSErrorFrame> parent;
+  JSErrorFrame(const common::AutoPtr<JSErrorFrame> &parent)
+      : defer(0), handle(0) {
+    this->parent = parent;
+  }
 };
 } // namespace spark::vm

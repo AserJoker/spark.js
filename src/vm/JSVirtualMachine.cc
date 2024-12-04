@@ -4,7 +4,6 @@
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSArgumentEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
-#include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
@@ -42,49 +41,6 @@ const std::wstring &
 JSVirtualMachine::args(const common::AutoPtr<compiler::JSModule> &module) {
   auto index = argi(module);
   return module->constants.at(index);
-}
-
-void JSVirtualMachine::handleError(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module,
-    const error::JSError &e) {
-  auto exception =
-      ctx->createException(e.getType(), e.getMessage(), e.getLocation());
-  handleError(ctx, module, exception);
-}
-
-void JSVirtualMachine::handleError(
-    common::AutoPtr<engine::JSContext> ctx,
-    const common::AutoPtr<compiler::JSModule> &module,
-    common::AutoPtr<engine::JSValue> exception) {
-  if (_ctx->errorStacks != nullptr) {
-    auto frame = *_ctx->errorStacks;
-    delete _ctx->errorStacks;
-    _ctx->errorStacks = frame.parent;
-    auto entity = exception->getEntity<engine::JSExceptionEntity>();
-    frame.scope->getRoot()->appendChild(entity);
-    while (ctx->getScope() != frame.scope) {
-      popScope(ctx, module);
-    }
-    if (frame.defer != 0) {
-      auto current = _ctx;
-      _ctx = new JSEvalContext;
-      auto res = eval(ctx, module, frame.defer);
-      _ctx = current;
-      if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
-        return handleError(ctx, module, res);
-      }
-    }
-    if (entity->getTarget()) {
-      _ctx->stack.push_back(ctx->createValue(entity->getTarget()));
-    } else {
-      _ctx->stack.push_back(exception);
-    }
-    _pc = frame.handle;
-  } else {
-    _ctx->stack.push_back(exception);
-    _pc = module->codes.size();
-  }
 }
 
 JS_OPT(JSVirtualMachine::pushNull) { _ctx->stack.push_back(ctx->null()); }
@@ -302,12 +258,14 @@ JS_OPT(JSVirtualMachine::new_) {
   auto offset = _pc - sizeof(uint16_t);
   auto size = argi(module);
   auto now = _ctx->stack.size();
-  auto func = _ctx->stack[now - 1 - size];
   std::vector<common::AutoPtr<engine::JSValue>> args;
   args.resize(size, nullptr);
   for (auto i = 0; i < size; i++) {
-    args[i] = _ctx->stack[_ctx->stack.size() - size + i];
+    args[size - 1 - i] = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
   }
+  auto func = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   auto loc = module->sourceMap.at(offset);
   _ctx->stack.push_back(ctx->constructObject(
       func, args,
@@ -339,9 +297,16 @@ JS_OPT(JSVirtualMachine::nullishCoalescing) {
   }
 }
 
-JS_OPT(JSVirtualMachine::pushScope) { ctx->pushScope(); }
+JS_OPT(JSVirtualMachine::pushScope) {
+  ctx->pushScope();
+  _ctx->stackTops.push_back(_ctx->stack.size());
+}
 
-JS_OPT(JSVirtualMachine::popScope) { ctx->popScope(); }
+JS_OPT(JSVirtualMachine::popScope) {
+  _ctx->stack.resize(*_ctx->stackTops.rbegin());
+  _ctx->stackTops.pop_back();
+  ctx->popScope();
+}
 
 JS_OPT(JSVirtualMachine::call) {
   auto offset = _pc - sizeof(uint16_t);
@@ -421,30 +386,17 @@ JS_OPT(JSVirtualMachine::add) {
 
 JS_OPT(JSVirtualMachine::tryStart) {
   auto handle = argi(module);
-  auto frame = new JSErrorFrame{
-      .scope = ctx->getScope(),
-      .defer = 0,
-      .handle = handle,
-      .parent = _ctx->errorStacks,
-  };
-  _ctx->errorStacks = frame;
+  _ctx->errorStacks = new JSErrorFrame(_ctx->errorStacks);
+  _ctx->errorStacks->handle = handle;
 }
 
 JS_OPT(JSVirtualMachine::tryEnd) {
-  auto frame = *_ctx->errorStacks;
-  delete _ctx->errorStacks;
-  _ctx->errorStacks = frame.parent;
-  auto pc = _pc;
-  if (frame.defer) {
-    auto current = _ctx;
-    _ctx = new JSEvalContext;
-    auto res = eval(ctx, module, frame.defer);
-    _ctx = current;
-    if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
-      return handleError(ctx, module, res);
-    }
+  auto defer = _ctx->errorStacks->defer;
+  _ctx->errorStacks = _ctx->errorStacks->parent;
+  if (defer) {
+    _ctx->deferStack.push_back(_pc);
+    _pc = defer;
   }
-  _pc = pc;
 }
 
 JS_OPT(JSVirtualMachine::defer) {
@@ -452,26 +404,24 @@ JS_OPT(JSVirtualMachine::defer) {
   _ctx->errorStacks->defer = addr;
 }
 
+JS_OPT(JSVirtualMachine::deferEnd) {
+  _pc = *_ctx->deferStack.rbegin();
+  _ctx->deferStack.pop_back();
+}
+
 JS_OPT(JSVirtualMachine::jmp) {
   auto offset = argi(module);
   _pc = offset;
 }
 
-common::AutoPtr<engine::JSValue>
-JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
-                       const common::AutoPtr<compiler::JSModule> &module,
-                       size_t offset) {
-  auto scope = ctx->getScope();
-  _pc = offset;
-  while (_pc != module->codes.size()) {
+void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
+                           const common::AutoPtr<compiler::JSModule> &module,
+                           size_t begin, size_t end) {
+  _pc = begin;
+  while (_pc != end) {
     try {
       auto code = next(module);
-      if (code == compiler::JSAsmOperator::HLT) {
-        break;
-      }
       switch (code) {
-      case compiler::JSAsmOperator::HLT:
-        break;
       case compiler::JSAsmOperator::PUSH_NULL:
         pushNull(ctx, module);
         break;
@@ -622,43 +572,51 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
       case compiler::JSAsmOperator::DEFER:
         defer(ctx, module);
         break;
-      case compiler::JSAsmOperator::ENDTRY:
+      case compiler::JSAsmOperator::END_DEFER:
+        deferEnd(ctx, module);
+        break;
+      case compiler::JSAsmOperator::END_TRY:
         tryEnd(ctx, module);
         break;
       case compiler::JSAsmOperator::NEW:
         new_(ctx, module);
         break;
       }
-      if (_pc == module->codes.size()) {
-        common::AutoPtr<engine::JSValue> exception;
-        if (_ctx->errorStacks != nullptr) {
-          auto current = _ctx;
-          auto defer = _ctx->errorStacks->defer;
-          _ctx = new JSEvalContext;
-          auto res = eval(ctx, module, defer);
-          _ctx = current;
-          if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
-            exception = res;
-          }
-        } else {
-          if (!_ctx->stack.empty()) {
-            auto res = _ctx->stack[_ctx->stack.size() - 1];
-            if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
-              exception = res;
-            }
+    } catch (error::JSError &e) {
+      auto exp =
+          ctx->createException(e.getType(), e.getMessage(), e.getLocation());
+      _ctx->stack.push_back(exp);
+      _pc = module->codes.size();
+    }
+    if (_pc == module->codes.size()) {
+      if (_ctx->errorStacks != nullptr) {
+        auto result = *_ctx->stack.rbegin();
+        auto handle = _ctx->errorStacks->handle;
+        auto defer = _ctx->errorStacks->defer;
+        _ctx->errorStacks = _ctx->errorStacks->parent;
+        if (result->getType() == engine::JSValueType::JS_EXCEPTION) {
+          if (handle != 0) {
+            _pc = handle;
           }
         }
-        if (exception != nullptr) {
-          handleError(ctx, module, exception);
+        if (defer != 0) {
+          _ctx->deferStack.push_back(_pc);
+          _pc = defer;
         }
       }
-    } catch (error::JSError &e) {
-      handleError(ctx, module, e);
     }
   }
+}
+
+common::AutoPtr<engine::JSValue>
+JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
+                       const common::AutoPtr<compiler::JSModule> &module,
+                       size_t offset) {
+  auto scope = ctx->getScope();
+  run(ctx, module, offset, module->codes.size());
   auto value = ctx->undefined();
   if (!_ctx->stack.empty()) {
-    value = _ctx->stack[_ctx->stack.size() - 1];
+    value = *_ctx->stack.rbegin();
     if (ctx->getScope() != scope) {
       auto entity = value->getEntity();
       value = scope->createValue(entity);

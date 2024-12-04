@@ -1,5 +1,6 @@
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/base/JSValueType.hpp"
+#include <fmt/xchar.h>
 using namespace spark;
 using namespace spark::engine;
 JS_FUNC(JSErrorConstructor::constructor) {

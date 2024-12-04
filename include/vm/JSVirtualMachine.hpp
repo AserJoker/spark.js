@@ -5,7 +5,6 @@
 #include "compiler/base/JSAsmOperator.hpp"
 #include "compiler/base/JSModule.hpp"
 #include "engine/runtime/JSValue.hpp"
-#include "error/JSError.hpp"
 #include <string>
 #define JS_OPT(name)                                                           \
   void name(common::AutoPtr<engine::JSContext> ctx,                            \
@@ -29,14 +28,6 @@ private:
   double argf(const common::AutoPtr<compiler::JSModule> &module);
 
   const std::wstring &args(const common::AutoPtr<compiler::JSModule> &module);
-
-  void handleError(common::AutoPtr<engine::JSContext> ctx,
-                   const common::AutoPtr<compiler::JSModule> &module,
-                   const error::JSError &e);
-
-  void handleError(common::AutoPtr<engine::JSContext> ctx,
-                   const common::AutoPtr<compiler::JSModule> &module,
-                   common::AutoPtr<engine::JSValue> e);
 
 private:
   JS_OPT(pushNull);
@@ -89,8 +80,14 @@ private:
   JS_OPT(tryStart);
   JS_OPT(tryEnd);
   JS_OPT(defer);
+  JS_OPT(deferEnd);
   JS_OPT(jmp);
   JS_OPT(add);
+
+private:
+  void run(common::AutoPtr<engine::JSContext> ctx,
+           const common::AutoPtr<compiler::JSModule> &module, size_t start,
+           size_t end);
 
 public:
   JSVirtualMachine();

@@ -1,6 +1,11 @@
 "use strict";
-function* T() {
-  yield 1;
+function A() {
+  try {
+    throw new Error(1);
+  } catch (e) {
+    throw new Error(2);
+  } finally {
+    return;
+  }
 }
-const g = T();
-console.log(g.next(2))
+A();

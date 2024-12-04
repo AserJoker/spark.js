@@ -193,8 +193,8 @@ int main(int argc, char *argv[]) {
       case compiler::JSAsmOperator::RET:
         out << L"ret";
         break;
-      case compiler::JSAsmOperator::HLT:
-        out << L"hlt";
+      case compiler::JSAsmOperator::END_DEFER:
+        out << L"end_defer";
         break;
       case compiler::JSAsmOperator::THROW:
         out << L"throw";
@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
         out << L"defer " << *(uint32_t *)(buffer + offset);
         offset += sizeof(uint32_t);
         break;
-      case compiler::JSAsmOperator::ENDTRY:
+      case compiler::JSAsmOperator::END_TRY:
         out << L"endtry";
         break;
       case compiler::JSAsmOperator::ADD:
