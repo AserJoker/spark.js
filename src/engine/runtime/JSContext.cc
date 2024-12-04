@@ -20,6 +20,7 @@
 #include "engine/lib/JSArrayConstructor.hpp"
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/lib/JSFunctionConstructor.hpp"
+#include "engine/lib/JSGeneratorConstructor.hpp"
 #include "engine/lib/JSGeneratorFunctionConstructor.hpp"
 #include "engine/lib/JSIteratorConstructor.hpp"
 #include "engine/lib/JSObjectConstructor.hpp"
@@ -93,6 +94,7 @@ void JSContext::initialize() {
   _Array = JSArrayConstructor::initialize(this);
   _GeneratorFunction = JSGeneratorFunctionConstructor::initialize(this);
   _Iterator = JSIteratorConstructor::initialize(this);
+  _Generator = JSGeneratorConstructor::initialize(this);
   subRef();
 }
 

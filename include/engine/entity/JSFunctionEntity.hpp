@@ -28,7 +28,7 @@ public:
   void setSource(const std::wstring &name);
 
   bool getAsync() const;
-  bool getGenerator() const;
+  bool isGenerator() const;
   uint32_t getAddress() const;
   uint32_t getLength() const;
   const std::wstring &getFuncName() const;

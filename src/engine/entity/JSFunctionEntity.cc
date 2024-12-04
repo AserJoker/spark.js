@@ -36,7 +36,7 @@ void JSFunctionEntity::setSource(const std::wstring &source) {
 }
 void JSFunctionEntity::setFuncName(const std::wstring &name) { _name = name; }
 bool JSFunctionEntity::getAsync() const { return _async; }
-bool JSFunctionEntity::getGenerator() const { return _generator; }
+bool JSFunctionEntity::isGenerator() const { return _generator; }
 uint32_t JSFunctionEntity::getAddress() const { return _address; }
 uint32_t JSFunctionEntity::getLength() const { return _length; }
 const std::wstring &JSFunctionEntity::getFuncName() const { return _name; }

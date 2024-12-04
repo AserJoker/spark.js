@@ -17,7 +17,6 @@ class JSVirtualMachine : public common::Object {
 private:
   common::AutoPtr<JSEvalContext> _ctx;
   size_t _pc;
-  common::AutoPtr<engine::JSValue> _callee;
 
 private:
   compiler::JSAsmOperator
@@ -84,13 +83,15 @@ private:
   JS_OPT(jmp);
   JS_OPT(add);
 
-private:
-  void run(common::AutoPtr<engine::JSContext> ctx,
-           const common::AutoPtr<compiler::JSModule> &module, size_t start,
-           size_t end);
-
 public:
   JSVirtualMachine();
+
+  common::AutoPtr<JSEvalContext> getContext();
+
+  void setContext(common::AutoPtr<JSEvalContext> ctx);
+
+  void run(common::AutoPtr<engine::JSContext> ctx,
+           const common::AutoPtr<compiler::JSModule> &module, size_t offset);
 
   common::AutoPtr<engine::JSValue>
   eval(common::AutoPtr<engine::JSContext> ctx,
