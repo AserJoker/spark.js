@@ -543,9 +543,61 @@ void JSGenerator::resolveExpressionBinary(JSGeneratorContext &ctx,
                                           const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSBinaryExpression>();
   resolveNode(ctx, module, n->left);
-  resolveNode(ctx, module, n->right);
-  if (n->opt == L"+") {
-    generate(module, JSAsmOperator::ADD);
+  if (n->opt == L"&&" || n->opt == L"||") {
+    auto pin = (module->codes.size() + sizeof(uint16_t));
+    if (n->opt == L"&&") {
+      generate(module, JSAsmOperator::JFALSE, 0U);
+    } else {
+      generate(module, JSAsmOperator::JTRUE, 0U);
+    }
+    resolveNode(ctx, module, n->right);
+    *(uint32_t *)(module->codes.data() + pin) =
+        (uint32_t)(module->codes.size());
+  } else {
+    resolveNode(ctx, module, n->right);
+    if (n->opt == L"**") {
+      generate(module, JSAsmOperator::POW);
+    } else if (n->opt == L"*") {
+      generate(module, JSAsmOperator::MUL);
+    } else if (n->opt == L"/") {
+      generate(module, JSAsmOperator::DIV);
+    } else if (n->opt == L"%") {
+      generate(module, JSAsmOperator::MOD);
+    } else if (n->opt == L"+") {
+      generate(module, JSAsmOperator::ADD);
+    } else if (n->opt == L"-") {
+      generate(module, JSAsmOperator::SUB);
+    } else if (n->opt == L">>>") {
+      generate(module, JSAsmOperator::USHR);
+    } else if (n->opt == L">>") {
+      generate(module, JSAsmOperator::SHR);
+    } else if (n->opt == L">>") {
+      generate(module, JSAsmOperator::SHL);
+    } else if (n->opt == L">=") {
+      generate(module, JSAsmOperator::GE);
+    } else if (n->opt == L"<=") {
+      generate(module, JSAsmOperator::LE);
+    } else if (n->opt == L">") {
+      generate(module, JSAsmOperator::GT);
+    } else if (n->opt == L"<") {
+      generate(module, JSAsmOperator::LT);
+    } else if (n->opt == L"===") {
+      generate(module, JSAsmOperator::SEQ);
+    } else if (n->opt == L"!==") {
+      generate(module, JSAsmOperator::SNE);
+    } else if (n->opt == L"==") {
+      generate(module, JSAsmOperator::EQ);
+    } else if (n->opt == L"!=") {
+      generate(module, JSAsmOperator::NE);
+    } else if (n->opt == L"&") {
+      generate(module, JSAsmOperator::AND);
+    } else if (n->opt == L"|") {
+      generate(module, JSAsmOperator::OR);
+    } else if (n->opt == L"^") {
+      generate(module, JSAsmOperator::XOR);
+    } else if (n->opt == L"??") {
+      generate(module, JSAsmOperator::NC);
+    }
   }
 }
 
@@ -776,18 +828,7 @@ void JSGenerator::resolveDeclarationFunction(
   for (auto &arg : n->arguments) {
     auto a = arg.cast<JSParameterDeclaration>();
     generate(module, JSAsmOperator::PUSH_ARGUMENT, index);
-    if (a->value != nullptr) {
-      resolveNode(ctx, module, a->value);
-      generate(module, JSAsmOperator::NULLISH_COALESCING);
-    }
-    if (a->identifier->type == JSNodeType::LITERAL_IDENTITY) {
-      generate(
-          module, JSAsmOperator::STORE,
-          resolveConstant(ctx, module,
-                          a->identifier.cast<JSIdentifierLiteral>()->value));
-    } else {
-      generate(module, JSAsmOperator::POP, 1U);
-    }
+    resolveDeclarationParameter(ctx, module, arg);
     index++;
   }
   resolveNode(ctx, module, n->body);
@@ -854,7 +895,20 @@ void JSGenerator::resolveDeclarationFunctionBody(
 
 void JSGenerator::resolveDeclarationParameter(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  auto a = node.cast<JSParameterDeclaration>();
+  if (a->value != nullptr) {
+    resolveNode(ctx, module, a->value);
+    generate(module, JSAsmOperator::NC);
+  }
+  if (a->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+    generate(module, JSAsmOperator::STORE,
+             resolveConstant(ctx, module,
+                             a->identifier.cast<JSIdentifierLiteral>()->value));
+  } else {
+    generate(module, JSAsmOperator::POP, 1U);
+  }
+}
 
 void JSGenerator::resolveDeclarationObject(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,

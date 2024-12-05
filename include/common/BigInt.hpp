@@ -65,6 +65,7 @@ public:
   std::wstring toString() const {
     std::wstring result;
     BigInt<> tmp = *this;
+    tmp._negative = 0;
     while (tmp > 0) {
       result += (tmp % 10)._data[0] + '0';
       tmp /= 10;
@@ -230,7 +231,7 @@ public:
       for (auto it = data.rbegin(); it != data.rend(); it++) {
         tmp._data.push_back(*it);
       }
-      tmp += next * (int64_t)pow(2, sizeof(T) * 8);
+      tmp += next * (int64_t)std::pow(2, sizeof(T) * 8);
       T v = 0;
       while (tmp >= another) {
         tmp -= another;
@@ -271,7 +272,7 @@ public:
       for (auto it = data.rbegin(); it != data.rend(); it++) {
         tmp._data.push_back(*it);
       }
-      tmp += next * (int64_t)(pow(2, sizeof(T) * 8));
+      tmp += next * (int64_t)(std::pow(2, sizeof(T) * 8));
       while (tmp >= another) {
         tmp -= another;
       }
@@ -291,13 +292,10 @@ public:
 
   BigInt operator~() const {
     BigInt result;
-    result._data.clear();
-    for (auto &part : _data) {
-      result._data.push_back(~part);
+    for (auto &val : _data) {
+      result._data.push_back(val);
     }
-    if (*result._data.rbegin() == 0) {
-      result._data.push_back(1);
-    }
+    result -= 1;
     result._negative = !_negative;
     return result;
   }
@@ -415,6 +413,71 @@ public:
       }
     }
     return false;
+  }
+
+  BigInt pow(const BigInt &another) {
+    BigInt result = 1;
+    for (BigInt i = 0; i < another; i += 1) {
+      result *= *this;
+    }
+    return result;
+  }
+
+  BigInt operator<<(const BigInt &another) {
+    BigInt result = *this;
+    for (BigInt i = 0; i < another; i += 1) {
+      result *= 2;
+    }
+    return result;
+  }
+
+  BigInt operator>>(const BigInt &another) {
+    BigInt result = *this;
+    for (BigInt i = 0; i < another; i += 1) {
+      result /= 2;
+    }
+    return result;
+  }
+
+  BigInt operator&(const BigInt &another) {
+    BigInt result;
+    size_t index = 0;
+    while (_data.size() > index || another._data.size() > index) {
+      T val1 = 0;
+      T val2 = 0;
+      if (index < _data.size()) {
+        val1 = _data[index];
+      }
+      if (index < another._data.size()) {
+        val2 = another._data[index];
+      }
+      result._data.push_back(val1 & val2);
+    }
+    result._negative = _negative && another._negative;
+    return result;
+  }
+
+  BigInt operator|(const BigInt &another) {
+    BigInt result;
+    size_t index = 0;
+    while (_data.size() > index || another._data.size() > index) {
+      T val1 = 0;
+      T val2 = 0;
+      if (index < _data.size()) {
+        val1 = _data[index];
+      }
+      if (index < another._data.size()) {
+        val2 = another._data[index];
+      }
+      result._data.push_back(val1 | val2);
+    }
+    result._negative = _negative || another._negative;
+    return result;
+  }
+
+  BigInt operator^(const BigInt &another) {
+    BigInt result;
+    return result;
   }
 
   BigInt &operator*=(const BigInt &another) { return *this = *this * another; }

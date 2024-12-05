@@ -295,7 +295,7 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
 
 JS_OPT(JSVirtualMachine::await) {}
 
-JS_OPT(JSVirtualMachine::nullishCoalescing) {
+JS_OPT(JSVirtualMachine::nc) {
   auto arg2 = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto arg1 = *_ctx->stack.rbegin();
@@ -379,13 +379,145 @@ JS_OPT(JSVirtualMachine::memberCall) {
     _pc = pc;
   }
 }
-
+JS_OPT(JSVirtualMachine::pow) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->pow(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::mul) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->mul(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::div) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->div(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::mod) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->mod(ctx, arg2));
+}
 JS_OPT(JSVirtualMachine::add) {
   auto arg2 = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto arg1 = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   _ctx->stack.push_back(arg1->add(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::sub) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->sub(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::ushr) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->ushr(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::shr) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->shr(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::shl) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->shl(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::le) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->le(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::ge) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->ge(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::gt) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->gt(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::lt) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->lt(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::seq) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->strictEqual(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::sne) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->strictNotEqual(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::eq) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->equal(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::ne) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->notEqual(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::and_) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->and_(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::or_) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->or_(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::xor_) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->xor_(ctx, arg2));
 }
 
 JS_OPT(JSVirtualMachine::tryStart) {
@@ -416,6 +548,21 @@ JS_OPT(JSVirtualMachine::deferEnd) {
 JS_OPT(JSVirtualMachine::jmp) {
   auto offset = argi(module);
   _pc = offset;
+}
+JS_OPT(JSVirtualMachine::jfalse) {
+  auto offset = argi(module);
+  auto value = *_ctx->stack.rbegin();
+  if (!value->convertToBoolean(ctx)) {
+    _pc = offset;
+  }
+}
+
+JS_OPT(JSVirtualMachine::jtrue) {
+  auto offset = argi(module);
+  auto value = *_ctx->stack.rbegin();
+  if (value->convertToBoolean(ctx)) {
+    _pc = offset;
+  }
 }
 
 void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
@@ -572,8 +719,8 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case compiler::JSAsmOperator::AWAIT:
         await(ctx, module);
         break;
-      case compiler::JSAsmOperator::NULLISH_COALESCING:
-        nullishCoalescing(ctx, module);
+      case compiler::JSAsmOperator::NC:
+        nc(ctx, module);
         break;
       case compiler::JSAsmOperator::PUSH_SCOPE:
         pushScope(ctx, module);
@@ -587,11 +734,74 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case compiler::JSAsmOperator::MEMBER_CALL:
         memberCall(ctx, module);
         break;
+      case compiler::JSAsmOperator::POW:
+        pow(ctx, module);
+        break;
+      case compiler::JSAsmOperator::MUL:
+        mul(ctx, module);
+        break;
+      case compiler::JSAsmOperator::DIV:
+        div(ctx, module);
+        break;
+      case compiler::JSAsmOperator::MOD:
+        mod(ctx, module);
+        break;
       case compiler::JSAsmOperator::ADD:
         add(ctx, module);
         break;
+      case compiler::JSAsmOperator::SUB:
+        sub(ctx, module);
+        break;
+      case compiler::JSAsmOperator::USHR:
+        ushr(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SHR:
+        shr(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SHL:
+        shl(ctx, module);
+        break;
+      case compiler::JSAsmOperator::GE:
+        ge(ctx, module);
+        break;
+      case compiler::JSAsmOperator::LE:
+        le(ctx, module);
+        break;
+      case compiler::JSAsmOperator::GT:
+        gt(ctx, module);
+        break;
+      case compiler::JSAsmOperator::LT:
+        lt(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SEQ:
+        seq(ctx, module);
+        break;
+      case compiler::JSAsmOperator::SNE:
+        sne(ctx, module);
+        break;
+      case compiler::JSAsmOperator::EQ:
+        eq(ctx, module);
+        break;
+      case compiler::JSAsmOperator::NE:
+        ne(ctx, module);
+        break;
+      case compiler::JSAsmOperator::AND:
+        and_(ctx, module);
+        break;
+      case compiler::JSAsmOperator::OR:
+        or_(ctx, module);
+        break;
+      case compiler::JSAsmOperator::XOR:
+        xor_(ctx, module);
+        break;
       case compiler::JSAsmOperator::JMP:
         jmp(ctx, module);
+        break;
+      case compiler::JSAsmOperator::JFALSE:
+        jfalse(ctx, module);
+        break;
+      case compiler::JSAsmOperator::JTRUE:
+        jtrue(ctx, module);
         break;
       case compiler::JSAsmOperator::TRY:
         tryStart(ctx, module);

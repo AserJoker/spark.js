@@ -19,10 +19,12 @@
 #include "error/JSRangeError.hpp"
 #include "error/JSReferenceError.hpp"
 #include "error/JSTypeError.hpp"
+#include <cmath>
 #include <codecvt>
 #include <exception>
 #include <fmt/xchar.h>
 #include <locale>
+#include <stdexcept>
 #include <string>
 
 using namespace spark;
@@ -1302,6 +1304,243 @@ common::AutoPtr<JSValue> JSValue::mod(common::AutoPtr<JSContext> ctx,
   return ctx->NaN();
 }
 
+common::AutoPtr<JSValue> JSValue::pow(common::AutoPtr<JSContext> ctx,
+                                      common::AutoPtr<JSValue> another) {
+  auto left = toPrimitive(ctx);
+  auto right = toPrimitive(ctx);
+  auto leftval = left->convertToNumber(ctx);
+  auto rightval = right->convertToNumber(ctx);
+  if (leftval.has_value() && rightval.has_value()) {
+    return ctx->createNumber(std::pow(leftval.value(), rightval.value()));
+  }
+  if (right->isInfinity() &&
+      right->getEntity<JSInfinityEntity>()->isNegative()) {
+    if (leftval.has_value() || left->isInfinity()) {
+      return ctx->createNumber();
+    } else {
+      return ctx->NaN();
+    }
+  }
+  if (left->isInfinity()) {
+    if (!rightval.has_value()) {
+      return ctx->NaN();
+    } else {
+      if (rightval.value() < 0) {
+        return ctx->createNumber();
+      } else {
+        return ctx->createInfinity();
+      }
+    }
+  }
+  if (left->getType() == JSValueType::JS_BIGINT ||
+      right->getType() == JSValueType::JS_BIGINT) {
+    if (left->getType() == JSValueType::JS_BIGINT &&
+        right->getType() == JSValueType::JS_BIGINT) {
+      if (right->getEntity<JSBigIntEntity>()->getValue() == 0) {
+        throw error::JSRangeError(L"Division by zero");
+      }
+      return ctx->createBigInt(
+          left->getEntity<JSBigIntEntity>()->getValue().pow(
+              right->getEntity<JSBigIntEntity>()->getValue()));
+    } else {
+      throw error::JSTypeError(
+          L"Cannot mix BigInt and other types, use explicit conversions");
+    }
+  }
+  return ctx->NaN();
+} // a**b
+
+common::AutoPtr<JSValue> JSValue::shl(common::AutoPtr<JSContext> ctx,
+                                      common::AutoPtr<JSValue> another) {
+  auto left = toPrimitive(ctx);
+  auto right = toPrimitive(ctx);
+  auto leftval = left->convertToNumber(ctx);
+  auto rightval = right->convertToNumber(ctx);
+  if (leftval.has_value() && rightval.has_value()) {
+    int32_t val = (int32_t)leftval.value();
+    int64_t arg = (int64_t)rightval.value();
+    while (arg > 256) {
+      arg -= 256;
+    }
+    while (arg < 0) {
+      arg += 256;
+    }
+    return ctx->createNumber(val << (uint8_t)arg);
+  }
+  if (left->getType() == JSValueType::JS_BIGINT ||
+      right->getType() == JSValueType::JS_BIGINT) {
+    if (left->getType() == JSValueType::JS_BIGINT &&
+        right->getType() == JSValueType::JS_BIGINT) {
+      if (right->getEntity<JSBigIntEntity>()->getValue() == 0) {
+        throw error::JSRangeError(L"Division by zero");
+      }
+      return ctx->createBigInt(
+          left->getEntity<JSBigIntEntity>()->getValue()
+          << right->getEntity<JSBigIntEntity>()->getValue());
+    } else {
+      throw error::JSTypeError(
+          L"Cannot mix BigInt and other types, use explicit conversions");
+    }
+  }
+  return ctx->createNumber();
+} // a<<b
+
+common::AutoPtr<JSValue> JSValue::shr(common::AutoPtr<JSContext> ctx,
+                                      common::AutoPtr<JSValue> another) {
+  auto left = toPrimitive(ctx);
+  auto right = toPrimitive(ctx);
+  auto leftval = left->convertToNumber(ctx);
+  auto rightval = right->convertToNumber(ctx);
+  if (leftval.has_value() && rightval.has_value()) {
+    int32_t val = (int32_t)leftval.value();
+    int64_t arg = (int64_t)rightval.value();
+    while (arg > 256) {
+      arg -= 256;
+    }
+    while (arg < 0) {
+      arg += 256;
+    }
+    return ctx->createNumber(val >> (uint8_t)arg);
+  }
+  if (left->getType() == JSValueType::JS_BIGINT ||
+      right->getType() == JSValueType::JS_BIGINT) {
+    if (left->getType() == JSValueType::JS_BIGINT &&
+        right->getType() == JSValueType::JS_BIGINT) {
+      if (right->getEntity<JSBigIntEntity>()->getValue() == 0) {
+        throw error::JSRangeError(L"Division by zero");
+      }
+      return ctx->createBigInt(left->getEntity<JSBigIntEntity>()->getValue() >>
+                               right->getEntity<JSBigIntEntity>()->getValue());
+    } else {
+      throw error::JSTypeError(
+          L"Cannot mix BigInt and other types, use explicit conversions");
+    }
+  }
+  return ctx->createNumber();
+} // a>>b
+
+common::AutoPtr<JSValue> JSValue::ushr(common::AutoPtr<JSContext> ctx,
+                                       common::AutoPtr<JSValue> another) {
+  throw std::runtime_error("not implement");
+} // a>>>b
+
+common::AutoPtr<JSValue> JSValue::ge(common::AutoPtr<JSContext> ctx,
+                                     common::AutoPtr<JSValue> another) {
+  return ctx->falsely();
+} // a>=b
+
+common::AutoPtr<JSValue> JSValue::le(common::AutoPtr<JSContext> ctx,
+                                     common::AutoPtr<JSValue> another) {
+  return ctx->falsely();
+} // a<=b
+
+common::AutoPtr<JSValue> JSValue::gt(common::AutoPtr<JSContext> ctx,
+                                     common::AutoPtr<JSValue> another) {
+  return ctx->falsely();
+} // a>b
+
+common::AutoPtr<JSValue> JSValue::lt(common::AutoPtr<JSContext> ctx,
+                                     common::AutoPtr<JSValue> another) {
+  return ctx->falsely();
+} // a<b
+
+common::AutoPtr<JSValue> JSValue::and_(common::AutoPtr<JSContext> ctx,
+                                       common::AutoPtr<JSValue> another) {
+  auto left = toPrimitive(ctx);
+  auto right = toPrimitive(ctx);
+  auto leftval = left->convertToNumber(ctx);
+  auto rightval = right->convertToNumber(ctx);
+  if (leftval.has_value() && rightval.has_value()) {
+    int32_t val = (int32_t)leftval.value();
+    int32_t arg = (int64_t)rightval.value();
+    return ctx->createNumber(val & arg);
+  }
+  if (left->getType() == JSValueType::JS_BIGINT ||
+      right->getType() == JSValueType::JS_BIGINT) {
+    if (left->getType() == JSValueType::JS_BIGINT &&
+        right->getType() == JSValueType::JS_BIGINT) {
+      if (right->getEntity<JSBigIntEntity>()->getValue() == 0) {
+        throw error::JSRangeError(L"Division by zero");
+      }
+      return ctx->createBigInt(left->getEntity<JSBigIntEntity>()->getValue() &
+                               right->getEntity<JSBigIntEntity>()->getValue());
+    } else {
+      throw error::JSTypeError(
+          L"Cannot mix BigInt and other types, use explicit conversions");
+    }
+  }
+  return ctx->createNumber();
+} // a&b
+
+common::AutoPtr<JSValue> JSValue::or_(common::AutoPtr<JSContext> ctx,
+                                      common::AutoPtr<JSValue> another) {
+  auto left = toPrimitive(ctx);
+  auto right = toPrimitive(ctx);
+  auto leftval = left->convertToNumber(ctx);
+  auto rightval = right->convertToNumber(ctx);
+  if (leftval.has_value() && rightval.has_value()) {
+    int32_t val = (int32_t)leftval.value();
+    int32_t arg = (int64_t)rightval.value();
+    return ctx->createNumber(val | arg);
+  }
+  if (left->getType() == JSValueType::JS_BIGINT ||
+      right->getType() == JSValueType::JS_BIGINT) {
+    if (left->getType() == JSValueType::JS_BIGINT &&
+        right->getType() == JSValueType::JS_BIGINT) {
+      if (right->getEntity<JSBigIntEntity>()->getValue() == 0) {
+        throw error::JSRangeError(L"Division by zero");
+      }
+      return ctx->createBigInt(left->getEntity<JSBigIntEntity>()->getValue() |
+                               right->getEntity<JSBigIntEntity>()->getValue());
+    } else {
+      throw error::JSTypeError(
+          L"Cannot mix BigInt and other types, use explicit conversions");
+    }
+  }
+  if (leftval.has_value()) {
+    return ctx->createNumber(leftval.value());
+  }
+  if (rightval.has_value()) {
+    return ctx->createNumber(rightval.value());
+  }
+  return ctx->createNumber();
+} // a|b
+
+common::AutoPtr<JSValue> JSValue::xor_(common::AutoPtr<JSContext> ctx,
+                                       common::AutoPtr<JSValue> another) {
+
+  auto left = toPrimitive(ctx);
+  auto right = toPrimitive(ctx);
+  auto leftval = left->convertToNumber(ctx);
+  auto rightval = right->convertToNumber(ctx);
+  if (leftval.has_value() && rightval.has_value()) {
+    int32_t val = (int32_t)leftval.value();
+    int32_t arg = (int64_t)rightval.value();
+    return ctx->createNumber(val ^ arg);
+  }
+  if (left->getType() == JSValueType::JS_BIGINT ||
+      right->getType() == JSValueType::JS_BIGINT) {
+    if (left->getType() == JSValueType::JS_BIGINT &&
+        right->getType() == JSValueType::JS_BIGINT) {
+      if (right->getEntity<JSBigIntEntity>()->getValue() == 0) {
+        throw error::JSRangeError(L"Division by zero");
+      }
+      return ctx->createBigInt(left->getEntity<JSBigIntEntity>()->getValue() ^
+                               right->getEntity<JSBigIntEntity>()->getValue());
+    } else {
+      throw error::JSTypeError(
+          L"Cannot mix BigInt and other types, use explicit conversions");
+    }
+  }
+  if (leftval.has_value()) {
+    return ctx->createNumber(leftval.value());
+  }
+  if (rightval.has_value()) {
+    return ctx->createNumber(rightval.value());
+  }
+  return ctx->createNumber();
+} // a^b
+
 common::AutoPtr<JSValue> JSValue::equal(common::AutoPtr<JSContext> ctx,
                                         common::AutoPtr<JSValue> another) {
   if (getType() == another->getType()) {
@@ -1434,7 +1673,7 @@ JSValue::strictEqual(common::AutoPtr<JSContext> ctx,
 }
 
 common::AutoPtr<JSValue>
-JSValue::notStrictEqual(common::AutoPtr<JSContext> ctx,
+JSValue::strictNotEqual(common::AutoPtr<JSContext> ctx,
                         common::AutoPtr<JSValue> another) {
   return ctx->createBoolean(!strictEqual(ctx, another)->getBoolean().value());
 }

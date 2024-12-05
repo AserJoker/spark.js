@@ -71,7 +71,7 @@ private:
   JS_OPT(yield);
   JS_OPT(yieldDelegate);
   JS_OPT(await);
-  JS_OPT(nullishCoalescing);
+  JS_OPT(nc);
   JS_OPT(pushScope);
   JS_OPT(popScope);
   JS_OPT(call);
@@ -81,7 +81,28 @@ private:
   JS_OPT(defer);
   JS_OPT(deferEnd);
   JS_OPT(jmp);
+  JS_OPT(jfalse);
+  JS_OPT(jtrue);
+  JS_OPT(pow);
+  JS_OPT(mul);
+  JS_OPT(div);
+  JS_OPT(mod);
   JS_OPT(add);
+  JS_OPT(sub);
+  JS_OPT(ushr);
+  JS_OPT(shr);
+  JS_OPT(shl);
+  JS_OPT(le);
+  JS_OPT(ge);
+  JS_OPT(gt);
+  JS_OPT(lt);
+  JS_OPT(seq);
+  JS_OPT(sne);
+  JS_OPT(eq);
+  JS_OPT(ne);
+  JS_OPT(and_);
+  JS_OPT(or_);
+  JS_OPT(xor_);
 
 public:
   JSVirtualMachine();

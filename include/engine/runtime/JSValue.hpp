@@ -176,6 +176,39 @@ public:
   common::AutoPtr<JSValue> mod(common::AutoPtr<JSContext> ctx,
                                common::AutoPtr<JSValue> another); // a%b
 
+  common::AutoPtr<JSValue> pow(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a**b
+
+  common::AutoPtr<JSValue> shl(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a<<b
+
+  common::AutoPtr<JSValue> shr(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a>>b
+
+  common::AutoPtr<JSValue> ushr(common::AutoPtr<JSContext> ctx,
+                                common::AutoPtr<JSValue> another); // a>>>b
+
+  common::AutoPtr<JSValue> ge(common::AutoPtr<JSContext> ctx,
+                              common::AutoPtr<JSValue> another); // a>=b
+
+  common::AutoPtr<JSValue> le(common::AutoPtr<JSContext> ctx,
+                              common::AutoPtr<JSValue> another); // a<=b
+
+  common::AutoPtr<JSValue> gt(common::AutoPtr<JSContext> ctx,
+                              common::AutoPtr<JSValue> another); // a>b
+
+  common::AutoPtr<JSValue> lt(common::AutoPtr<JSContext> ctx,
+                              common::AutoPtr<JSValue> another); // a<b
+
+  common::AutoPtr<JSValue> and_(common::AutoPtr<JSContext> ctx,
+                                common::AutoPtr<JSValue> another); // a&b
+
+  common::AutoPtr<JSValue> or_(common::AutoPtr<JSContext> ctx,
+                               common::AutoPtr<JSValue> another); // a|b
+
+  common::AutoPtr<JSValue> xor_(common::AutoPtr<JSContext> ctx,
+                                common::AutoPtr<JSValue> another); // a^b
+
   common::AutoPtr<JSValue> equal(common::AutoPtr<JSContext> ctx,
                                  common::AutoPtr<JSValue> another); // a==b
 
@@ -187,7 +220,7 @@ public:
               common::AutoPtr<JSValue> another); // a===b
 
   common::AutoPtr<JSValue>
-  notStrictEqual(common::AutoPtr<JSContext> ctx,
+  strictNotEqual(common::AutoPtr<JSContext> ctx,
                  common::AutoPtr<JSValue> another); // a!==b
 };
 }; // namespace spark::engine

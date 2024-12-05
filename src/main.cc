@@ -1,4 +1,5 @@
 #include "common/AutoPtr.hpp"
+#include "common/BigInt.hpp"
 #include "compiler/base/JSAsmOperator.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
@@ -45,6 +46,9 @@ std::wstring read(const std::wstring &filename) {
 }
 
 int main(int argc, char *argv[]) {
+  common::BigInt a = -1;
+  fmt::print(L"{}\n", a.toString());
+  return 0;
   common::AutoPtr runtime = new engine::JSRuntime();
   try {
     common::AutoPtr ctx = new engine::JSContext(runtime);
@@ -220,8 +224,8 @@ int main(int argc, char *argv[]) {
       case compiler::JSAsmOperator::AWAIT:
         out << L"await";
         break;
-      case compiler::JSAsmOperator::NULLISH_COALESCING:
-        out << L"nullish_coalescing";
+      case compiler::JSAsmOperator::NC:
+        out << L"nc";
         break;
       case compiler::JSAsmOperator::PUSH_SCOPE:
         out << L"push_scope";
@@ -241,6 +245,10 @@ int main(int argc, char *argv[]) {
         out << L"jmp " << *(uint32_t *)(buffer + offset);
         offset += sizeof(uint32_t);
         break;
+      case compiler::JSAsmOperator::JFALSE:
+        out << L"jfalse " << *(uint32_t *)(buffer + offset);
+        offset += sizeof(uint32_t);
+        break;
       case compiler::JSAsmOperator::TRY:
         out << L"try " << *(uint32_t *)(buffer + offset);
         offset += sizeof(uint32_t);
@@ -258,6 +266,67 @@ int main(int argc, char *argv[]) {
       case compiler::JSAsmOperator::NEW:
         out << L"new " << *(uint32_t *)(buffer + offset);
         offset += sizeof(uint32_t);
+        break;
+      case compiler::JSAsmOperator::JTRUE:
+        out << L"jtrue " << *(uint32_t *)(buffer + offset);
+        offset += sizeof(uint32_t);
+        break;
+      case compiler::JSAsmOperator::POW:
+        out << L"pow";
+        break;
+      case compiler::JSAsmOperator::MUL:
+        out << L"mul";
+        break;
+      case compiler::JSAsmOperator::DIV:
+        out << L"div";
+        break;
+      case compiler::JSAsmOperator::MOD:
+        out << L"mod";
+        break;
+      case compiler::JSAsmOperator::SUB:
+        out << L"sub";
+        break;
+      case compiler::JSAsmOperator::USHR:
+        out << L"ushr";
+        break;
+      case compiler::JSAsmOperator::SHR:
+        out << L"shr";
+        break;
+      case compiler::JSAsmOperator::SHL:
+        out << L"shl";
+        break;
+      case compiler::JSAsmOperator::GE:
+        out << L"ge";
+        break;
+      case compiler::JSAsmOperator::LE:
+        out << L"le";
+        break;
+      case compiler::JSAsmOperator::GT:
+        out << L"gt";
+        break;
+      case compiler::JSAsmOperator::LT:
+        out << L"lt";
+        break;
+      case compiler::JSAsmOperator::SEQ:
+        out << L"seq";
+        break;
+      case compiler::JSAsmOperator::SNE:
+        out << L"sne";
+        break;
+      case compiler::JSAsmOperator::EQ:
+        out << L"eq";
+        break;
+      case compiler::JSAsmOperator::NE:
+        out << L"ne";
+        break;
+      case compiler::JSAsmOperator::AND:
+        out << L"and";
+        break;
+      case compiler::JSAsmOperator::OR:
+        out << L"or";
+        break;
+      case compiler::JSAsmOperator::XOR:
+        out << L"xor";
         break;
       }
       out << std::endl;
