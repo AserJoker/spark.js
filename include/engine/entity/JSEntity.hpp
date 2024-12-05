@@ -1,9 +1,10 @@
 #pragma once
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSValueType.hpp"
-#include <any>
 #include <optional>
 #include <string>
+#include <type_traits>
+#include <typeinfo>
 #include <vector>
 
 namespace spark::engine {
@@ -15,7 +16,15 @@ private:
 
   std::vector<JSEntity *> _children;
 
-  std::any _opaque;
+  struct Opaque {
+    virtual ~Opaque() = default;
+  };
+
+  template <class T> struct OpaqueImpl : public Opaque {
+    T _value;
+  };
+
+  Opaque *_opaque;
 
 protected:
   JSValueType _type;
@@ -35,9 +44,30 @@ public:
 
   std::vector<JSEntity *> &getChildren();
 
-  std::any &getOpaque();
-  const std::any &getOpaque() const;
-  void setOpaque(const std::any &value);
+  template <class T> void setOpaque(T &&value) {
+    if (_opaque) {
+      delete _opaque;
+    }
+    auto opaque =
+        new OpaqueImpl<std::remove_cv_t<std::remove_reference_t<T>>>();
+    opaque->_value = value;
+    _opaque = opaque;
+  }
+  template <class T> T &getOpaque() {
+    auto impl = dynamic_cast<OpaqueImpl<T> *>(_opaque);
+    if (!impl) {
+      throw std::bad_cast();
+    }
+    return impl->_value;
+  }
+
+  template <class T> const T &getOpaque() const {
+    auto impl = dynamic_cast<OpaqueImpl<T>>(_opaque);
+    if (!impl) {
+      throw std::bad_cast();
+    }
+    return impl->_value;
+  }
 
   virtual std::wstring toString(common::AutoPtr<JSContext> ctx) const;
 

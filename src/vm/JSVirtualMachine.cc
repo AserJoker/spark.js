@@ -7,6 +7,7 @@
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
+#include "engine/entity/JSTasKEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSValue.hpp"
@@ -281,7 +282,10 @@ JS_OPT(JSVirtualMachine::new_) {
 };
 
 JS_OPT(JSVirtualMachine::yield) {
-  _ctx->stack.push_back(ctx->createNumber(_pc));
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(
+      ctx->createValue(new engine::JSTaskEntity(value->getEntity(), _pc)));
   _pc = module->codes.size();
 }
 

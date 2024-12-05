@@ -6,6 +6,7 @@ namespace spark::engine {
 enum class JSValueType {
   JS_UNINITIALIZED = 0,
   JS_INTERNAL,
+  JS_TASK,
   JS_UNDEFINED,
   JS_NULL,
   JS_NAN,

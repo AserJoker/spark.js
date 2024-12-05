@@ -6,6 +6,10 @@ using namespace spark::engine;
 JSEntity::JSEntity(const JSValueType &type) : _type(type), _opaque(nullptr) {}
 
 JSEntity::~JSEntity() {
+  if (_opaque) {
+    delete _opaque;
+    _opaque = nullptr;
+  }
   for (auto &child : _children) {
     auto it = std::find(child->_parents.begin(), child->_parents.end(), this);
     if (it != child->_parents.end()) {
@@ -40,12 +44,6 @@ void JSEntity::removeChild(JSEntity *entity) {
 std::vector<JSEntity *> &JSEntity::getParent() { return _parents; }
 
 std::vector<JSEntity *> &JSEntity::getChildren() { return _children; }
-
-std::any &JSEntity::getOpaque() { return _opaque; }
-
-const std::any &JSEntity::getOpaque() const { return _opaque; }
-
-void JSEntity::setOpaque(const std::any &value) { _opaque = value; }
 
 const JSValueType &JSEntity::getType() const { return _type; }
 

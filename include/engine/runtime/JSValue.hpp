@@ -46,12 +46,10 @@ public:
 
   std::optional<common::BigInt<>> getBigInt() const;
 
-  template <class T> T getOpaque() {
-    return std::any_cast<T>(_entity->getOpaque());
-  }
+  template <class T> T &getOpaque() { return _entity->getOpaque<T>(); }
 
-  template <class T> T getOpaque() const {
-    return std::any_cast<T>(_entity->getOpaque());
+  template <class T> const T &getOpaque() const {
+    return _entity->getOpaque<T>();
   }
 
   template <class T> void setOpaque(T &&value) const {

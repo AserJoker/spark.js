@@ -45,8 +45,8 @@ std::wstring read(const std::wstring &filename) {
 }
 
 int main(int argc, char *argv[]) {
+  common::AutoPtr runtime = new engine::JSRuntime();
   try {
-    common::AutoPtr runtime = new engine::JSRuntime();
     common::AutoPtr ctx = new engine::JSContext(runtime);
     ctx->createNativeFunction(print, L"print", L"print");
     auto source = read(L"index.js");
@@ -270,6 +270,11 @@ int main(int argc, char *argv[]) {
     out.close();
     auto res = ctx->getRuntime()->getVirtualMachine()->eval(ctx, module);
     fmt::print(L"{}\n", res->convertToString(ctx));
+  } catch (error::JSError &e) {
+    std::cout << e.what();
+    fmt::print(L"  at {} ({}:{}:{})", e.getLocation().funcname,
+               runtime->getSourceFilename(e.getLocation().filename),
+               e.getLocation().line + 1, e.getLocation().column + 1);
   } catch (std::exception &e) {
     std::cout << e.what() << std::endl;
   }

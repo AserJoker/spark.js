@@ -247,6 +247,8 @@ std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
   switch (getType()) {
   case JSValueType::JS_INTERNAL:
     return L"[internal]";
+  case JSValueType::JS_TASK:
+    return L"[task]";
   case JSValueType::JS_UNDEFINED:
     return L"undefined";
   case JSValueType::JS_NULL:
@@ -489,6 +491,8 @@ std::wstring JSValue::getTypeName() {
   case JSValueType::JS_UNINITIALIZED:
     throw error::JSReferenceError(
         fmt::format(L"Cannot access '{}' before initialization", getName()));
+  case JSValueType::JS_TASK:
+    break;
   }
   return L"unknown";
 }
