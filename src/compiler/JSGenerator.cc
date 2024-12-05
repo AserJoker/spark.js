@@ -358,9 +358,9 @@ void JSGenerator::resolveStatementTry(JSGeneratorContext &ctx,
   generate(module, JSAsmOperator::END_TRY);
   auto catchEnd = (module->codes.size() + sizeof(uint16_t));
   generate(module, JSAsmOperator::JMP, 0U);
-  *(uint32_t *)(module->codes.data() + catchStart) =
-      (uint32_t)(module->codes.size());
   if (n->catch_ != nullptr) {
+    *(uint32_t *)(module->codes.data() + catchStart) =
+        (uint32_t)(module->codes.size());
     resolveNode(ctx, module, n->catch_);
   }
   *(uint32_t *)(module->codes.data() + catchEnd) =

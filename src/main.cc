@@ -269,7 +269,11 @@ int main(int argc, char *argv[]) {
     }
     out.close();
     auto res = ctx->getRuntime()->getVirtualMachine()->eval(ctx, module);
-    fmt::print(L"{}\n", res->convertToString(ctx));
+    if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
+      fmt::print(L"Uncaught {}\n", res->convertToString(ctx));
+    } else {
+      fmt::print(L"{}\n", res->convertToString(ctx));
+    }
   } catch (error::JSError &e) {
     std::cout << e.what();
     fmt::print(L"  at {} ({}:{}:{})", e.getLocation().funcname,

@@ -422,7 +422,30 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
                            const common::AutoPtr<compiler::JSModule> &module,
                            size_t offset) {
   _pc = offset;
-  while (_pc != module->codes.size()) {
+  for (;;) {
+    if (_pc == module->codes.size()) {
+      if (_ctx->errorStacks != nullptr) {
+        auto result = *_ctx->stack.rbegin();
+        if (result->getType() == engine::JSValueType::JS_TASK) {
+          break;
+        }
+        auto handle = _ctx->errorStacks->handle;
+        auto defer = _ctx->errorStacks->defer;
+        _ctx->errorStacks = _ctx->errorStacks->parent;
+        if (result->getType() == engine::JSValueType::JS_EXCEPTION) {
+          if (handle != 0) {
+            _pc = handle;
+          }
+        }
+        if (defer != 0) {
+          _ctx->deferStack.push_back(_pc);
+          _pc = defer;
+        }
+      }
+    }
+    if (_pc == module->codes.size()) {
+      break;
+    }
     try {
       auto code = next(module);
       switch (code) {
@@ -591,23 +614,6 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
           ctx->createException(e.getType(), e.getMessage(), e.getLocation());
       _ctx->stack.push_back(exp);
       _pc = module->codes.size();
-    }
-    if (_pc == module->codes.size()) {
-      if (_ctx->errorStacks != nullptr) {
-        auto result = *_ctx->stack.rbegin();
-        auto handle = _ctx->errorStacks->handle;
-        auto defer = _ctx->errorStacks->defer;
-        _ctx->errorStacks = _ctx->errorStacks->parent;
-        if (result->getType() == engine::JSValueType::JS_EXCEPTION) {
-          if (handle != 0) {
-            _pc = handle;
-          }
-        }
-        if (defer != 0) {
-          _ctx->deferStack.push_back(_pc);
-          _pc = defer;
-        }
-      }
     }
   }
 }

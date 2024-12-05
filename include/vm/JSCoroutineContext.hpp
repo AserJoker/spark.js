@@ -13,5 +13,10 @@ struct JSCoroutineContext {
   common::AutoPtr<engine::JSValue> value;
   std::wstring funcname;
   size_t pc;
+  ~JSCoroutineContext() {
+    while (scope != nullptr) {
+      scope = scope->getParent();
+    }
+  }
 };
 }; // namespace spark::vm

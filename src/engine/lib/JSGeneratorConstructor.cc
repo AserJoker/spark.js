@@ -28,6 +28,7 @@ JS_FUNC(JSGeneratorConstructor::next) {
     co.eval->stack.push_back(co.scope->createValue(args[0]->getEntity()));
   }
   vm->run(ctx, co.module, co.pc);
+  co.scope = ctx->getScope();
   auto task = *co.eval->stack.rbegin();
   co.eval->stack.pop_back();
   if (task->getType() == JSValueType::JS_TASK) {
@@ -53,6 +54,26 @@ JS_FUNC(JSGeneratorConstructor::next) {
   return result;
 }
 
+JS_FUNC(JSGeneratorConstructor::throw_) {
+  auto arg = ctx->undefined();
+  if (!args.empty()) {
+    arg = args[0];
+  }
+  arg = ctx->createException(arg);
+  auto &co = self->getOpaque<vm::JSCoroutineContext>();
+  co.pc = co.module->codes.size();
+  return next(ctx, self, {arg});
+}
+JS_FUNC(JSGeneratorConstructor::return_) {
+  auto arg = ctx->undefined();
+  if (!args.empty()) {
+    arg = args[0];
+  }
+  auto &co = self->getOpaque<vm::JSCoroutineContext>();
+  co.pc = co.module->codes.size();
+  return next(ctx, self, {arg});
+}
+
 JS_FUNC(JSGeneratorConstructor::constructor) { return self; }
 
 common::AutoPtr<JSValue>
@@ -64,5 +85,9 @@ JSGeneratorConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   prototype->setProperty(ctx, L"constructor", Generator);
   prototype->setProperty(ctx, L"next",
                          ctx->createNativeFunction(next, L"next"));
+  prototype->setProperty(ctx, L"throw",
+                         ctx->createNativeFunction(throw_, L"throw"));
+  prototype->setProperty(ctx, L"return",
+                         ctx->createNativeFunction(return_, L"return"));
   return Generator;
 }
