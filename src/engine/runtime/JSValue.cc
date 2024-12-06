@@ -358,7 +358,7 @@ std::optional<double> JSValue::convertToNumber(common::AutoPtr<JSContext> ctx) {
       }
     }
     if (snum.empty()) {
-      if (raw[index] == L'.' && raw[index + 1] >= '0' && raw[index + 1] <= 9) {
+      if (raw[index] == L'.' && raw[index + 1] >= '0' && raw[index + 1] <= '9') {
         snum += L'.';
         index++;
         while (raw[index] >= '0' && raw[index] <= '9') {
@@ -1149,7 +1149,7 @@ common::AutoPtr<JSValue> JSValue::add(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::sub(common::AutoPtr<JSContext> ctx,
                                       common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1185,7 +1185,7 @@ common::AutoPtr<JSValue> JSValue::sub(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::mul(common::AutoPtr<JSContext> ctx,
                                       common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1224,7 +1224,7 @@ common::AutoPtr<JSValue> JSValue::mul(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::div(common::AutoPtr<JSContext> ctx,
                                       common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1266,7 +1266,7 @@ common::AutoPtr<JSValue> JSValue::div(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::mod(common::AutoPtr<JSContext> ctx,
                                       common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1305,7 +1305,7 @@ common::AutoPtr<JSValue> JSValue::mod(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::pow(common::AutoPtr<JSContext> ctx,
                                       common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1351,7 +1351,7 @@ common::AutoPtr<JSValue> JSValue::pow(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::shl(common::AutoPtr<JSContext> ctx,
                                       common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1386,7 +1386,7 @@ common::AutoPtr<JSValue> JSValue::shl(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::shr(common::AutoPtr<JSContext> ctx,
                                       common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1420,7 +1420,7 @@ common::AutoPtr<JSValue> JSValue::shr(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::ushr(common::AutoPtr<JSContext> ctx,
                                        common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1451,7 +1451,7 @@ common::AutoPtr<JSValue> JSValue::ushr(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::ge(common::AutoPtr<JSContext> ctx,
                                      common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (left->isNaN() || right->isNaN()) {
@@ -1501,7 +1501,7 @@ common::AutoPtr<JSValue> JSValue::ge(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::le(common::AutoPtr<JSContext> ctx,
                                      common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (left->isNaN() || right->isNaN()) {
@@ -1550,7 +1550,7 @@ common::AutoPtr<JSValue> JSValue::le(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::gt(common::AutoPtr<JSContext> ctx,
                                      common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (left->isNaN() || right->isNaN()) {
@@ -1599,7 +1599,7 @@ common::AutoPtr<JSValue> JSValue::gt(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::lt(common::AutoPtr<JSContext> ctx,
                                      common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (left->isNaN() || right->isNaN()) {
@@ -1648,7 +1648,7 @@ common::AutoPtr<JSValue> JSValue::lt(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::and_(common::AutoPtr<JSContext> ctx,
                                        common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1676,7 +1676,7 @@ common::AutoPtr<JSValue> JSValue::and_(common::AutoPtr<JSContext> ctx,
 common::AutoPtr<JSValue> JSValue::or_(common::AutoPtr<JSContext> ctx,
                                       common::AutoPtr<JSValue> another) {
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {
@@ -1711,7 +1711,7 @@ common::AutoPtr<JSValue> JSValue::xor_(common::AutoPtr<JSContext> ctx,
                                        common::AutoPtr<JSValue> another) {
 
   auto left = toPrimitive(ctx);
-  auto right = toPrimitive(ctx);
+  auto right = another->toPrimitive(ctx);
   auto leftval = left->convertToNumber(ctx);
   auto rightval = right->convertToNumber(ctx);
   if (leftval.has_value() && rightval.has_value()) {

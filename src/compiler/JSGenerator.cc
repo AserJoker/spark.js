@@ -550,6 +550,7 @@ void JSGenerator::resolveExpressionBinary(JSGeneratorContext &ctx,
     } else {
       generate(module, JSAsmOperator::JTRUE, 0U);
     }
+    generate(module, JSAsmOperator::POP, 1U);
     resolveNode(ctx, module, n->right);
     *(uint32_t *)(module->codes.data() + pin) =
         (uint32_t)(module->codes.size());
