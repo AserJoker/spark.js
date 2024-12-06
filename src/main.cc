@@ -46,9 +46,6 @@ std::wstring read(const std::wstring &filename) {
 }
 
 int main(int argc, char *argv[]) {
-  common::BigInt a = -1;
-  fmt::print(L"{}\n", a.toString());
-  return 0;
   common::AutoPtr runtime = new engine::JSRuntime();
   try {
     common::AutoPtr ctx = new engine::JSContext(runtime);
