@@ -1,5 +1,4 @@
 #include "common/AutoPtr.hpp"
-#include "common/BigInt.hpp"
 #include "compiler/base/JSAsmOperator.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
