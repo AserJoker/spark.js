@@ -12,6 +12,7 @@
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
+#include "error/JSTypeError.hpp"
 #include "vm/JSCoroutineContext.hpp"
 #include "vm/JSErrorFrame.hpp"
 #include "vm/JSEvalContext.hpp"
@@ -290,7 +291,37 @@ JS_OPT(JSVirtualMachine::yield) {
 }
 
 JS_OPT(JSVirtualMachine::yieldDelegate) {
-  _ctx->stack.push_back(ctx->undefined());
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto iterator =
+      value->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
+  if (iterator->getType() != engine::JSValueType::JS_FUNCTION) {
+    throw error::JSTypeError(L"yield delegate require iterator");
+  }
+  auto gen = iterator->apply(ctx, value);
+  if (gen->getType() != engine::JSValueType::JS_OBJECT) {
+    throw error::JSTypeError(
+        L"Result of the Symbol.iterator method is not an object");
+  }
+  auto next = gen->getProperty(ctx, L"next");
+  if (next->getType() != engine::JSValueType::JS_FUNCTION) {
+    throw error::JSTypeError(L"yield delegate require iterator");
+  }
+  auto val = next->apply(ctx, gen);
+  if (val->getType() != engine::JSValueType::JS_OBJECT) {
+    throw error::JSTypeError(fmt::format(
+        L"Iterator result '{}' is not an object", val->convertToString(ctx)));
+  }
+  auto done = val->getProperty(ctx, L"done");
+  auto result = val->getProperty(ctx, L"value");
+  if (done->convertToBoolean(ctx)) {
+    _ctx->stack.push_back(
+        ctx->createValue(new engine::JSTaskEntity(result->getEntity(), _pc)));
+  } else {
+    _ctx->stack.push_back(ctx->createValue(
+        new engine::JSTaskEntity(result->getEntity(), _pc - sizeof(uint16_t))));
+  }
+  _pc = module->codes.size();
 }
 
 JS_OPT(JSVirtualMachine::await) {}
@@ -549,6 +580,7 @@ JS_OPT(JSVirtualMachine::jmp) {
   auto offset = argi(module);
   _pc = offset;
 }
+
 JS_OPT(JSVirtualMachine::jfalse) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
