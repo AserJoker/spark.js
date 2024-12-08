@@ -233,7 +233,7 @@ JS_OPT(JSVirtualMachine::store) {
   auto value = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto val = ctx->getScope()->getValue(name);
-  if (!val || val->getType() == engine::JSValueType::JS_UNINITIALIZED) {
+  if (val == nullptr) {
     ctx->createValue(value, name);
   } else {
     val->setEntity(value->getEntity());
