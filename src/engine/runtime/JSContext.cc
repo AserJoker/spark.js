@@ -42,7 +42,6 @@ JSContext::JSContext(const common::AutoPtr<JSRuntime> &runtime)
   _root = _scope;
   _callStack = new JSCallFrame();
   initialize();
-  createValue(_undefined, L"this");
 }
 
 JSContext::~JSContext() {
@@ -53,18 +52,10 @@ JSContext::~JSContext() {
 
 void JSContext::initialize() {
   addRef();
-  _undefined =
-      _scope->createValue(new JSStore(new JSUndefinedEntity()), L"undefined");
-  _null = _scope->createValue(new JSStore(new JSNullEntity()), L"null");
-  _NaN = _scope->createValue(new JSStore(new JSNaNEntity()), L"NaN");
-  _true = createBoolean(true);
-  _false = createBoolean(false);
-  _uninitialized = _scope->createValue(
-      new JSStore(new JSEntity(JSValueType::JS_UNINITIALIZED)));
-
+  auto null = this->null();
   auto objectPrototype =
-      createValue(new JSStore(new JSObjectEntity(_null->getStore())));
-  objectPrototype->getStore()->appendChild(_null->getStore());
+      createValue(new JSStore(new JSObjectEntity(null->getStore())));
+  objectPrototype->getStore()->appendChild(null->getStore());
 
   auto functionPrototype =
       createValue(new JSStore(new JSObjectEntity(objectPrototype->getStore())));
@@ -344,15 +335,21 @@ JSContext::createException(common::AutoPtr<JSValue> target) {
   return res;
 }
 
-common::AutoPtr<JSValue> JSContext::undefined() { return _undefined; }
+common::AutoPtr<JSValue> JSContext::undefined() {
+  return createValue(new JSStore(new JSUndefinedEntity()));
+}
 
-common::AutoPtr<JSValue> JSContext::null() { return _null; }
+common::AutoPtr<JSValue> JSContext::null() {
+  return createValue(new JSStore(new JSNullEntity()));
+}
 
-common::AutoPtr<JSValue> JSContext::NaN() { return _NaN; }
+common::AutoPtr<JSValue> JSContext::NaN() {
+  return createValue(new JSStore(new JSNaNEntity()));
+}
 
-common::AutoPtr<JSValue> JSContext::truly() { return _true; }
+common::AutoPtr<JSValue> JSContext::truly() { return createBoolean(true); }
 
-common::AutoPtr<JSValue> JSContext::falsely() { return _false; }
+common::AutoPtr<JSValue> JSContext::falsely() { return createBoolean(false); }
 
 common::AutoPtr<JSValue> JSContext::Symbol() { return _Symbol; }
 
@@ -376,7 +373,9 @@ common::AutoPtr<JSValue> JSContext::symbolValue() { return _symbolValue; }
 
 common::AutoPtr<JSValue> JSContext::symbolPack() { return _symbolPack; }
 
-common::AutoPtr<JSValue> JSContext::uninitialized() { return _uninitialized; }
+common::AutoPtr<JSValue> JSContext::uninitialized() {
+  return createValue(new JSStore(new JSEntity(JSValueType::JS_UNINITIALIZED)));
+}
 
 common::AutoPtr<JSValue> JSContext::load(const std::wstring &name) {
   auto val = _scope->getValue(name);

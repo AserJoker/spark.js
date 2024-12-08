@@ -31,14 +31,6 @@ public:
   };
 
 private:
-  common::AutoPtr<JSValue> _NaN;
-  common::AutoPtr<JSValue> _null;
-  common::AutoPtr<JSValue> _undefined;
-  common::AutoPtr<JSValue> _global;
-  common::AutoPtr<JSValue> _true;
-  common::AutoPtr<JSValue> _false;
-  common::AutoPtr<JSValue> _uninitialized;
-
   common::AutoPtr<JSValue> _Object;
   common::AutoPtr<JSValue> _Function;
   common::AutoPtr<JSValue> _GeneratorFunction;
