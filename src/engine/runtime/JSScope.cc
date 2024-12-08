@@ -10,7 +10,7 @@ using namespace spark;
 using namespace spark::engine;
 JSScope::JSScope(const common::AutoPtr<JSScope> &parent) {
   _parent = (JSScope *)parent.getRawPointer();
-  _root = new JSEntity();
+  _root = new JSStore(new JSEntity(JSValueType::JS_INTERNAL));
   if (_parent) {
     _parent->_root->appendChild(_root);
     _parent->_children.push_back(this);
@@ -19,19 +19,13 @@ JSScope::JSScope(const common::AutoPtr<JSScope> &parent) {
 
 JSScope::~JSScope() {
   _children.clear();
-  for (auto &[_, value] : _values) {
-    value->setEntity(nullptr);
-  }
   _values.clear();
-  for (auto &value : _anonymousValues) {
-    value->setEntity(nullptr);
-  }
   _anonymousValues.clear();
-  std::vector<JSEntity *> workflow;
+  std::vector<JSStore *> workflow;
   while (_root->getChildren().size()) {
-    auto entity = *_root->getChildren().begin();
-    workflow.push_back(entity);
-    _root->removeChild(entity);
+    auto store = *_root->getChildren().begin();
+    workflow.push_back(store);
+    _root->removeChild(store);
   }
   if (_parent) {
     auto it =
@@ -42,18 +36,18 @@ JSScope::~JSScope() {
     _parent->_root->removeChild(_root);
     _parent = nullptr;
   }
-  common::Map<JSEntity *, bool> cache;
-  std::vector<JSEntity *> destroyed;
+  common::Map<JSStore *, bool> cache;
+  std::vector<JSStore *> destroyed;
   while (!workflow.empty()) {
-    auto entity = *workflow.begin();
+    auto store = *workflow.begin();
     workflow.erase(workflow.begin());
-    if (!cache.contains(entity)) {
-      bool isAlived = isEntityAlived(entity, cache);
+    if (!cache.contains(store)) {
+      bool isAlived = isEntityAlived(store, cache);
       if (!isAlived) {
-        destroyed.push_back(entity);
+        destroyed.push_back(store);
       }
-      cache[entity] = isAlived;
-      for (auto &child : entity->getChildren()) {
+      cache[store] = isAlived;
+      for (auto &child : store->getChildren()) {
         if (!cache.contains(child)) {
           workflow.push_back(child);
         }
@@ -67,21 +61,21 @@ JSScope::~JSScope() {
   delete _root;
 }
 
-bool JSScope::isEntityAlived(JSEntity *entity,
-                             common::Map<JSEntity *, bool> &cache) {
-  std::vector<JSEntity *> workflow = {entity};
-  std::vector<JSEntity *> alivedCache;
+bool JSScope::isEntityAlived(JSStore *store,
+                             common::Map<JSStore *, bool> &cache) {
+  std::vector<JSStore *> workflow = {store};
+  std::vector<JSStore *> alivedCache;
   while (!workflow.empty()) {
-    auto entity = *workflow.rbegin();
+    auto store = *workflow.rbegin();
     workflow.pop_back();
-    if (cache.contains(entity) && cache.at(entity)) {
+    if (cache.contains(store) && cache.at(store)) {
       return true;
     }
-    if (entity->getType() == JSValueType::JS_INTERNAL) {
+    if (store->getEntity()->getType() == JSValueType::JS_INTERNAL) {
       return true;
     }
-    alivedCache.push_back(entity);
-    for (auto &parent : entity->getParent()) {
+    alivedCache.push_back(store);
+    for (auto &parent : store->getParent()) {
       auto it = std::find(alivedCache.begin(), alivedCache.end(), parent);
       if (it == alivedCache.end()) {
         workflow.push_back(parent);
@@ -91,7 +85,7 @@ bool JSScope::isEntityAlived(JSEntity *entity,
   return false;
 }
 
-JSEntity *JSScope::getRoot() { return _root; }
+JSStore *JSScope::getRoot() { return _root; }
 
 common::AutoPtr<JSScope> JSScope::getRootScope() {
   auto root = this;
@@ -109,10 +103,10 @@ void JSScope::removeChild(const common::AutoPtr<JSScope> &child) {
   }
 }
 
-common::AutoPtr<JSValue> JSScope::createValue(JSEntity *entity,
+common::AutoPtr<JSValue> JSScope::createValue(JSStore *store,
                                               const std::wstring &name) {
-  _root->appendChild(entity);
-  auto value = new JSValue(this, entity);
+  _root->appendChild(store);
+  auto value = new JSValue(this, store);
   if (!name.empty()) {
     _values[name] = value;
   } else {

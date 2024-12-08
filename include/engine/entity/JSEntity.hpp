@@ -1,21 +1,17 @@
 #pragma once
 #include "common/AutoPtr.hpp"
+#include "common/Object.hpp"
 #include "engine/base/JSValueType.hpp"
 #include <optional>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
-#include <vector>
 
 namespace spark::engine {
 class JSContext;
 class JSValue;
-class JSEntity {
+class JSEntity : public common::Object {
 private:
-  std::vector<JSEntity *> _parents;
-
-  std::vector<JSEntity *> _children;
-
   struct Opaque {
     virtual ~Opaque() = default;
   };
@@ -34,15 +30,7 @@ public:
 
   virtual ~JSEntity();
 
-  void appendChild(JSEntity *entity);
-
-  void removeChild(JSEntity *entity);
-
   const JSValueType &getType() const;
-
-  std::vector<JSEntity *> &getParent();
-
-  std::vector<JSEntity *> &getChildren();
 
   template <class T> void setOpaque(T &&value) {
     if (_opaque) {

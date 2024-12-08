@@ -1,4 +1,5 @@
 #pragma once
+#include "JSStore.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/BigInt.hpp"
 #include "common/Object.hpp"
@@ -15,12 +16,12 @@ class JSScope;
 
 class JSValue : public common::Object {
 private:
-  JSEntity *_entity;
+  JSStore *_store;
 
   JSScope *_scope;
 
 public:
-  JSValue(JSScope *scope, JSEntity *entity);
+  JSValue(JSScope *scope, JSStore *store);
 
   ~JSValue() override;
 
@@ -28,15 +29,21 @@ public:
 
   std::wstring getName() const;
 
-  template <class T = JSEntity> T *getEntity() { return (T *)_entity; }
-
-  template <class T = JSEntity> const T *getEntity() const {
-    return (T *)_entity;
+  template <class T = JSEntity> common::AutoPtr<T> getEntity() {
+    return (T*)_store->getEntity().getRawPointer();
   }
+
+  template <class T = JSEntity> const common::AutoPtr<T> getEntity() const {
+    return (T *)_store->getEntity().getRawPointer();
+  }
+
+  JSStore *getStore();
+
+  const JSStore *getStore() const;
 
   common::AutoPtr<JSScope> getScope();
 
-  void setEntity(JSEntity *entity);
+  void setEntity(const common::AutoPtr<JSEntity> &entity);
 
   std::optional<double> getNumber() const;
 
@@ -46,14 +53,14 @@ public:
 
   std::optional<common::BigInt<>> getBigInt() const;
 
-  template <class T> T &getOpaque() { return _entity->getOpaque<T>(); }
+  template <class T> T &getOpaque() { return getEntity()->getOpaque<T>(); }
 
   template <class T> const T &getOpaque() const {
-    return _entity->getOpaque<T>();
+    return getEntity()->getOpaque<T>();
   }
 
-  template <class T> void setOpaque(T &&value) const {
-    _entity->setOpaque(std::forward<T>(value));
+  template <class T> void setOpaque(T &&value) {
+    getEntity()->setOpaque(std::forward<T>(value));
   }
 
   bool isUndefined() const;
@@ -69,14 +76,6 @@ public:
   void setString(const std::wstring &value);
 
   void setBoolean(bool value);
-
-  void setUndefined();
-
-  void setNull();
-
-  void setInfinity();
-
-  void setNaN();
 
   std::wstring getTypeName();
 

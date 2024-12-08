@@ -1,5 +1,6 @@
 #pragma once
 #include "engine/entity/JSEntity.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include <string>
 #include <unordered_map>
 namespace spark::engine {
@@ -9,26 +10,26 @@ public:
   struct JSField {
     bool configurable;
     bool enumable;
-    JSEntity *value;
+    JSStore *value;
     bool writable;
-    JSEntity *get;
-    JSEntity *set;
+    JSStore *get;
+    JSStore *set;
   };
 
 private:
-  JSEntity *_prototype;
-  std::unordered_map<JSEntity *, JSField> _symbolFields;
+  JSStore *_prototype;
+  std::unordered_map<JSStore *, JSField> _symbolFields;
   std::unordered_map<std::wstring, JSField> _fields;
   bool _extensible;
   bool _sealed;
   bool _frozen;
 
 public:
-  JSObjectEntity(JSEntity *prototype);
+  JSObjectEntity(JSStore *prototype);
 
-  const JSEntity *getPrototype() const;
+  const JSStore *getPrototype() const;
 
-  JSEntity *getPrototype();
+  JSStore *getPrototype();
 
   bool isExtensible() const;
 
@@ -42,11 +43,11 @@ public:
 
   void freeze();
 
-  const std::unordered_map<JSEntity *, JSField> &getSymbolProperties() const;
+  const std::unordered_map<JSStore *, JSField> &getSymbolProperties() const;
 
   const std::unordered_map<std::wstring, JSField> &getProperties() const;
 
-  std::unordered_map<JSEntity *, JSField> &getSymbolProperties();
+  std::unordered_map<JSStore *, JSField> &getSymbolProperties();
 
   std::unordered_map<std::wstring, JSField> &getProperties();
 

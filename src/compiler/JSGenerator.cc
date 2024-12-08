@@ -262,11 +262,11 @@ void JSGenerator::resolveStatementBlock(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
                                         const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSBlockStatement>();
-  generate(module, JSAsmOperator::PUSH_SCOPE);
+  pushLexScope(ctx, module, n->scope);
   for (auto &sts : n->body) {
     resolveNode(ctx, module, sts);
   }
-  generate(module, JSAsmOperator::POP_SCOPE);
+  popLexScope(ctx, module);
 }
 
 void JSGenerator::resolveStatementDebugger(

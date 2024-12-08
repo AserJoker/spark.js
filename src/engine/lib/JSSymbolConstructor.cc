@@ -57,8 +57,8 @@ JS_FUNC(JSSymbolConstructor::_for) {
     return ctx->createValue(symbols.at(key));
   }
   auto value = ctx->createSymbol(key);
-  ctx->Symbol()->getEntity()->appendChild(value->getEntity());
-  symbols[key] = value->getEntity();
+  ctx->Symbol()->getStore()->appendChild(value->getStore());
+  symbols[key] = value->getStore();
   return value;
 }
 
@@ -165,7 +165,7 @@ void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
           .value = nullptr,
           .writable = false,
           .get = ctx->createNativeFunction(&JSSymbolConstructor::description)
-                     ->getEntity(),
+                     ->getStore(),
           .set = nullptr});
 
   prototype->setProperty(

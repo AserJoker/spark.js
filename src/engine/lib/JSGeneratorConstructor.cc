@@ -25,7 +25,7 @@ JS_FUNC(JSGeneratorConstructor::next) {
   if (args.empty()) {
     co.eval->stack.push_back(ctx->undefined());
   } else {
-    co.eval->stack.push_back(co.scope->createValue(args[0]->getEntity()));
+    co.eval->stack.push_back(co.scope->createValue(args[0]->getStore()));
   }
   vm->run(ctx, co.module, co.pc);
   co.scope = ctx->getScope();
@@ -39,13 +39,13 @@ JS_FUNC(JSGeneratorConstructor::next) {
   } else if (task->getType() == JSValueType::JS_EXCEPTION) {
     result = task;
     co.value = ctx->undefined();
-    co.value->getEntity()->appendChild(ctx->undefined()->getEntity());
+    co.value->getStore()->appendChild(ctx->undefined()->getStore());
     co.pc = co.module->codes.size();
   } else {
     result->setProperty(ctx, L"done", ctx->truly());
     result->setProperty(ctx, L"value", task);
     co.value = task;
-    co.value->getEntity()->appendChild(task->getEntity());
+    co.value->getStore()->appendChild(task->getStore());
     co.pc = co.module->codes.size();
   }
   ctx->popCallStack();

@@ -1,12 +1,12 @@
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/base/JSValueType.hpp"
-#include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
+#include "engine/runtime/JSStore.hpp"
 
 using namespace spark;
 using namespace spark::engine;
 JSFunctionEntity::JSFunctionEntity(
-    JSEntity *prototype, const common::AutoPtr<compiler::JSModule> &module)
+    JSStore *prototype, const common::AutoPtr<compiler::JSModule> &module)
     : JSObjectEntity(prototype), _async(false), _generator(false), _address(0),
       _length(0) {
   _type = JSValueType::JS_FUNCTION;
@@ -19,15 +19,11 @@ void JSFunctionEntity::setAddress(uint32_t address) { _address = address; }
 
 void JSFunctionEntity::setLength(uint32_t length) { _length = length; }
 
-void JSFunctionEntity::setClosure(const std::wstring &name, JSEntity *entity) {
+void JSFunctionEntity::setClosure(const std::wstring &name, JSStore *entity) {
   if (_closure.contains(name)) {
     if (_closure.at(name) == entity) {
       return;
     }
-    appendChild(entity);
-    removeChild(_closure.at(name));
-  } else {
-    appendChild(entity);
   }
   _closure[name] = entity;
 }
@@ -45,7 +41,7 @@ const std::wstring &JSFunctionEntity::getFunctionSource() const {
   return _source;
 }
 
-const std::unordered_map<std::wstring, JSEntity *> &
+const std::unordered_map<std::wstring, JSStore *> &
 JSFunctionEntity::getClosure() const {
   return _closure;
 }

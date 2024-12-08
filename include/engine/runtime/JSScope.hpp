@@ -1,4 +1,5 @@
 #pragma once
+#include "JSStore.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/Map.hpp"
 #include "engine/base/JSValueType.hpp"
@@ -9,7 +10,7 @@
 namespace spark::engine {
 class JSScope : public common::Object {
 private:
-  JSEntity *_root;
+  JSStore *_root;
   JSScope *_parent;
 
   std::vector<common::AutoPtr<JSScope>> _children;
@@ -19,22 +20,22 @@ private:
   std::vector<common::AutoPtr<JSValue>> _anonymousValues;
 
 private:
-  bool isEntityAlived(JSEntity *entity, common::Map<JSEntity *, bool> &cache);
+  bool isEntityAlived(JSStore *entity, common::Map<JSStore *, bool> &cache);
 
 public:
-  JSScope(const common::AutoPtr<JSScope>& parent);
+  JSScope(const common::AutoPtr<JSScope> &parent);
 
   virtual ~JSScope();
 
-  JSEntity *getRoot();
+  JSStore *getRoot();
 
   common::AutoPtr<JSScope> getRootScope();
 
   common::AutoPtr<JSScope> getParent();
-  
-  void removeChild(const common::AutoPtr<JSScope>& child);
 
-  common::AutoPtr<JSValue> createValue(JSEntity *entity,
+  void removeChild(const common::AutoPtr<JSScope> &child);
+
+  common::AutoPtr<JSValue> createValue(JSStore *entity,
                                        const std::wstring &name = L"");
 
   const common::Map<std::wstring, common::AutoPtr<JSValue>> &getValues() const;

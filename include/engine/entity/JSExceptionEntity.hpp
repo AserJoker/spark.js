@@ -1,25 +1,24 @@
 #pragma once
 #include "engine/base/JSLocation.hpp"
 #include "engine/entity/JSEntity.hpp"
-#include "engine/entity/JSObjectEntity.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include <string>
 namespace spark::engine {
 struct JSExceptionData {};
-class JSExceptionEntity : public JSObjectEntity {
+class JSExceptionEntity : public JSEntity {
 private:
   std::wstring _errorType;
   std::wstring _message;
   std::vector<JSLocation> _stack;
-  JSEntity *_target;
+  JSStore *_target;
 
 public:
-  JSExceptionEntity(JSEntity *prototype, const std::wstring &type,
-                    const std::wstring &message,
+  JSExceptionEntity(const std::wstring &type, const std::wstring &message,
                     const std::vector<JSLocation> &stack);
 
-  JSExceptionEntity(JSEntity *prototype, JSEntity *target);
+  JSExceptionEntity(JSStore *target);
 
-  JSEntity *getTarget();
+  JSStore *getTarget();
 
   const std::wstring &getMessage() const;
 

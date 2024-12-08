@@ -1,15 +1,15 @@
 #pragma once
-#include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include <vector>
 namespace spark::engine {
 class JSArgumentEntity : public JSObjectEntity {
 private:
-  std::vector<JSEntity *> _arguments;
+  std::vector<JSStore *> _arguments;
 
 public:
-  JSArgumentEntity(JSEntity *prototype, const std::vector<JSEntity *> &args);
-  
-  const std::vector<JSEntity *> &getArguments() const;
+  JSArgumentEntity(JSStore *prototype, const std::vector<JSStore *> &args);
+
+  const std::vector<JSStore *> &getArguments() const;
 };
 }; // namespace spark::engine

@@ -14,10 +14,12 @@
 #include "engine/entity/JSSymbolEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "engine/runtime/JSScope.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include "error/JSError.hpp"
 #include "error/JSInternalError.hpp"
 #include "error/JSRangeError.hpp"
 #include "error/JSReferenceError.hpp"
+#include "error/JSSyntaxError.hpp"
 #include "error/JSTypeError.hpp"
 #include <cmath>
 #include <codecvt>
@@ -28,16 +30,16 @@
 
 using namespace spark;
 using namespace spark::engine;
-JSValue::JSValue(JSScope *scope, JSEntity *entity)
-    : _scope(scope), _entity(entity) {}
+JSValue::JSValue(JSScope *scope, JSStore *store)
+    : _scope(scope), _store(store) {}
 
 JSValue::~JSValue() {}
 
 const JSValueType &JSValue::getType() const {
-  if (!_entity) {
+  if (!_store) {
     throw error::JSInternalError(L"out of scope");
   }
-  return _entity->getType();
+  return getEntity()->getType();
 }
 std::wstring JSValue::getName() const {
   for (auto &[name, val] : _scope->getValues()) {
@@ -47,35 +49,34 @@ std::wstring JSValue::getName() const {
   }
   return L"anonymous";
 }
+
+JSStore *JSValue::getStore() { return _store; }
+
+const JSStore *JSValue::getStore() const { return _store; }
+
 common::AutoPtr<JSScope> JSValue::getScope() { return _scope; }
 
-void JSValue::setEntity(JSEntity *entity) {
-  if (entity) {
-    _scope->getRoot()->appendChild(entity);
-  }
-  if (_entity) {
-    _scope->getRoot()->removeChild(_entity);
-  }
-  _entity = entity;
+void JSValue::setEntity(const common::AutoPtr<JSEntity> &entity) {
+  _store->setEntity(entity);
 }
 
 std::optional<double> JSValue::getNumber() const {
   if (getType() == JSValueType::JS_NUMBER) {
-    return ((JSNumberEntity *)_entity)->getValue();
+    return getEntity<JSNumberEntity>()->getValue();
   }
   return std::nullopt;
 }
 
 std::optional<std::wstring> JSValue::getString() const {
   if (getType() == JSValueType::JS_STRING) {
-    return ((JSStringEntity *)_entity)->getValue();
+    return getEntity<JSStringEntity>()->getValue();
   }
   return std::nullopt;
 }
 
 std::optional<bool> JSValue::getBoolean() const {
   if (getType() == JSValueType::JS_BOOLEAN) {
-    return ((JSBooleanEntity *)_entity)->getValue();
+    return getEntity<JSBooleanEntity>()->getValue();
   }
   return std::nullopt;
 }
@@ -100,52 +101,26 @@ bool JSValue::isInfinity() const {
 bool JSValue::isNaN() const { return getType() == JSValueType::JS_NAN; }
 
 void JSValue::setNumber(double value) {
-  if (_entity->getType() != JSValueType::JS_NUMBER) {
-    _entity = new JSNumberEntity(value);
-    _scope->getRoot()->appendChild(_entity);
+  if (getType() != JSValueType::JS_NUMBER) {
+    _store->setEntity(new JSNumberEntity(value));
   } else {
-    ((JSNumberEntity *)_entity)->getValue() = value;
+    getEntity<JSNumberEntity>()->getValue() = value;
   }
 }
 
 void JSValue::setString(const std::wstring &value) {
-  if (_entity->getType() != JSValueType::JS_STRING) {
-    _entity = new JSStringEntity(value);
-    _scope->getRoot()->appendChild(_entity);
+  if (getType() != JSValueType::JS_STRING) {
+    _store->setEntity(new JSStringEntity(value));
   } else {
-    ((JSStringEntity *)_entity)->getValue() = value;
+    getEntity<JSStringEntity>()->getValue() = value;
   }
 }
 
 void JSValue::setBoolean(bool value) {
-  if (_entity->getType() != JSValueType::JS_BOOLEAN) {
-    _entity = new JSBooleanEntity(value);
-    _scope->getRoot()->appendChild(_entity);
+  if (getType() != JSValueType::JS_BOOLEAN) {
+    _store->setEntity(new JSBooleanEntity(value));
   } else {
-    ((JSBooleanEntity *)_entity)->getValue() = value;
-  }
-}
-void JSValue::setUndefined() {
-  if (_entity->getType() != JSValueType::JS_UNDEFINED) {
-    _entity = _scope->getRootScope()->getValue(L"undefined")->getEntity();
-  }
-}
-
-void JSValue::setNull() {
-  if (_entity->getType() != JSValueType::JS_NULL) {
-    _entity = _scope->getValue(L"null")->getEntity();
-  }
-}
-
-void JSValue::setInfinity() {
-  if (_entity->getType() != JSValueType::JS_INFINITY) {
-    _entity = _scope->getValue(L"Infinity")->getEntity();
-  }
-}
-
-void JSValue::setNaN() {
-  if (_entity->getType() != JSValueType::JS_NAN) {
-    _entity = _scope->getValue(L"NaN")->getEntity();
+    getEntity<JSBooleanEntity>()->getValue() = value;
   }
 }
 
@@ -166,25 +141,25 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
   ctx->pushCallStack(location);
   auto scope = ctx->getScope();
   ctx->pushScope();
-  JSEntity *result = nullptr;
+  JSStore *store = nullptr;
   try {
     auto vm = ctx->getRuntime()->getVirtualMachine();
-    result = vm->apply(ctx, func, self, args)->getEntity();
+    store = vm->apply(ctx, func, self, args)->getStore();
   } catch (error::JSError &e) {
-    result = ctx->createException(e.getType(), e.getMessage(), location)
-                 ->getEntity();
+    store =
+        ctx->createException(e.getType(), e.getMessage(), location)->getStore();
   } catch (std::exception &e) {
     static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    result = ctx->createException(L"InternalError",
-                                  converter.from_bytes(e.what()), location)
-                 ->getEntity();
+    store = ctx->createException(L"InternalError",
+                                 converter.from_bytes(e.what()), location)
+                ->getStore();
   }
-  scope->getRoot()->appendChild(result);
+  scope->getRoot()->appendChild(store);
   while (ctx->getScope() != scope) {
     ctx->popScope();
   }
   ctx->popCallStack();
-  return ctx->createValue(result);
+  return ctx->createValue(store);
 }
 
 common::AutoPtr<JSValue> JSValue::toPrimitive(common::AutoPtr<JSContext> ctx,
@@ -290,6 +265,8 @@ std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
     throw error::JSTypeError(L"Cannot convert a Symbol value to a string");
 
   case JSValueType::JS_UNINITIALIZED:
+    throw error::JSSyntaxError(
+        fmt::format(L"'{}' is uninitialized", getName()));
   case JSValueType::JS_REGEXP:
     break;
   }
@@ -358,7 +335,8 @@ std::optional<double> JSValue::convertToNumber(common::AutoPtr<JSContext> ctx) {
       }
     }
     if (snum.empty()) {
-      if (raw[index] == L'.' && raw[index + 1] >= '0' && raw[index + 1] <= '9') {
+      if (raw[index] == L'.' && raw[index + 1] >= '0' &&
+          raw[index + 1] <= '9') {
         snum += L'.';
         index++;
         while (raw[index] >= '0' && raw[index] <= '9') {
@@ -527,13 +505,13 @@ JSValue::getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
     throw error::JSTypeError(
         fmt::format(L"Cannot read properties of null (reading '{}')", name));
   }
-  auto entity = pack(ctx)->getEntity();
-  while (entity->getType() >= JSValueType::JS_OBJECT) {
-    auto &fields = ((JSObjectEntity *)entity)->getProperties();
+  auto entity = pack(ctx)->getEntity<JSObjectEntity>();
+  while (entity != nullptr) {
+    auto &fields = entity->getProperties();
     if (fields.contains(name)) {
       return &fields.at(name);
     }
-    entity = ((JSObjectEntity *)entity)->getPrototype();
+    entity = entity->getPrototype()->getEntity().cast<JSObjectEntity>();
   }
   return nullptr;
 }
@@ -548,6 +526,7 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
                     L"accessors and a value or writable attribute, #<Object>"));
   }
   auto self = pack(ctx);
+  auto store = self->getStore();
   auto entity = self->getEntity<JSObjectEntity>();
   auto old = self->getOwnPropertyDescriptor(ctx, name);
   if (old != nullptr) {
@@ -564,40 +543,40 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
   if (old != nullptr) {
     if (old->get != descriptor.get) {
       if (old->get) {
-        entity->removeChild(old->get);
+        store->removeChild(old->get);
         ctx->getScope()->getRoot()->appendChild(old->get);
       }
       if (descriptor.get) {
-        entity->appendChild(descriptor.get);
+        store->appendChild(descriptor.get);
       }
     }
     if (old->set != descriptor.set) {
       if (old->set) {
-        entity->removeChild(old->set);
+        store->removeChild(old->set);
         ctx->getScope()->getRoot()->appendChild(old->set);
       }
       if (descriptor.set) {
-        entity->appendChild(descriptor.set);
+        store->appendChild(descriptor.set);
       }
     }
     if (old->value != descriptor.value) {
       if (old->value) {
-        entity->removeChild(old->value);
+        store->removeChild(old->value);
         ctx->getScope()->getRoot()->appendChild(old->value);
       }
       if (descriptor.value) {
-        entity->appendChild(descriptor.value);
+        store->appendChild(descriptor.value);
       }
     }
   } else {
     if (descriptor.get) {
-      entity->appendChild(descriptor.get);
+      store->appendChild(descriptor.get);
     }
     if (descriptor.set) {
-      entity->appendChild(descriptor.set);
+      store->appendChild(descriptor.set);
     }
     if (descriptor.value) {
-      entity->appendChild(descriptor.value);
+      store->appendChild(descriptor.value);
     }
   }
   entity->getProperties()[name] = descriptor;
@@ -624,9 +603,10 @@ common::AutoPtr<JSValue>
 JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
                      const common::AutoPtr<JSValue> &field) {
   auto self = pack(ctx);
+  auto store = self->getStore();
   auto entity = self->getEntity<JSObjectEntity>();
   auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
-  if (descriptor && descriptor->value == field->getEntity()) {
+  if (descriptor && descriptor->value == field->getStore()) {
     return ctx->truly();
   }
   if (!descriptor) {
@@ -654,11 +634,11 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
   }
   if (descriptor) {
     if (descriptor->value != nullptr) {
-      if (descriptor->value != field->getEntity()) {
-        entity->removeChild(descriptor->value);
+      if (descriptor->value != field->getStore()) {
+        store->removeChild(descriptor->value);
         ctx->getScope()->getRoot()->appendChild(descriptor->value);
-        entity->appendChild((JSEntity *)field->getEntity());
-        descriptor->value = (JSEntity *)(field->getEntity());
+        store->appendChild((JSStore *)field->getStore());
+        descriptor->value = (JSStore *)(field->getStore());
       }
     } else {
       auto setter = ctx->createValue(descriptor->set);
@@ -668,12 +648,12 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
     entity->getProperties()[name] = JSObjectEntity::JSField{
         .configurable = true,
         .enumable = true,
-        .value = (JSEntity *)field->getEntity(),
+        .value = (JSStore *)field->getStore(),
         .writable = true,
         .get = nullptr,
         .set = nullptr,
     };
-    entity->appendChild((JSEntity *)field->getEntity());
+    store->appendChild((JSStore *)field->getStore());
   }
   return ctx->truly();
 }
@@ -681,6 +661,7 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
 common::AutoPtr<JSValue> JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
                                                  const std::wstring &name) {
   auto self = pack(ctx);
+  auto store = self->getStore();
   auto entity = self->getEntity<JSObjectEntity>();
   auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
   if (!descriptor) {
@@ -695,15 +676,15 @@ common::AutoPtr<JSValue> JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
         fmt::format(L"Cannot delete property '{}' of #<Object>", name));
   }
   if (descriptor->value) {
-    entity->removeChild(descriptor->value);
+    store->removeChild(descriptor->value);
     ctx->getScope()->getRoot()->appendChild(descriptor->value);
   }
   if (descriptor->get) {
-    entity->removeChild(descriptor->get);
+    store->removeChild(descriptor->get);
     ctx->getScope()->getRoot()->appendChild(descriptor->get);
   }
   if (descriptor->set) {
-    entity->removeChild(descriptor->set);
+    store->removeChild(descriptor->set);
     ctx->getScope()->getRoot()->appendChild(descriptor->set);
   }
   entity->getProperties().erase(name);
@@ -717,7 +698,7 @@ common::AutoPtr<JSValue> JSValue::getIndex(common::AutoPtr<JSContext> ctx,
     auto &items = entity->getItems();
     if (index < items.size()) {
       auto item = items[index];
-      if (item->getType() == JSValueType::JS_UNINITIALIZED) {
+      if (item->getEntity()->getType() == JSValueType::JS_UNINITIALIZED) {
         return ctx->undefined();
       }
       return ctx->createValue(items[index]);
@@ -731,24 +712,28 @@ JSValue::setIndex(common::AutoPtr<JSContext> ctx, const uint32_t &index,
                   const common::AutoPtr<JSValue> &field) {
   if (getType() == JSValueType::JS_ARRAY) {
     auto entity = getEntity<JSArrayEntity>();
+    auto store = getStore();
     if (entity->isFrozen() || !entity->isExtensible()) {
       throw error::JSTypeError(fmt::format(
           L"Cannot assign to read only property '{}' of object '{}'", index,
           convertToString(ctx)));
     }
     auto &items = entity->getItems();
-    entity->appendChild((JSEntity *)field->getEntity());
+    store->appendChild((JSStore *)field->getStore());
     if (index < items.size()) {
-      entity->removeChild(items[index]);
+      store->removeChild(items[index]);
+      ctx->getScope()->getRoot()->appendChild(items[index]);
     }
     while (items.size() < index) {
-      items.push_back(ctx->null()->getEntity());
+      items.push_back(ctx->null()->getStore());
+      store->appendChild(ctx->null()->getStore());
     }
     if (items.size() == index) {
-      items.push_back((JSEntity *)field->getEntity());
+      items.push_back((JSStore *)field->getStore());
     } else {
-      items[index] = (JSEntity *)field->getEntity();
+      items[index] = (JSStore *)field->getStore();
     }
+    store->appendChild((JSStore *)field->getStore());
     return ctx->truly();
   }
   return setProperty(ctx, fmt::format(L"{}", index), field);
@@ -772,8 +757,8 @@ JSValue::getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
                     key->getEntity<JSSymbolEntity>()->getDescription()));
   }
   auto &fields = getEntity<JSObjectEntity>()->getSymbolProperties();
-  if (fields.contains(key->getEntity())) {
-    return &fields.at(key->getEntity());
+  if (fields.contains(key->getStore())) {
+    return &fields.at(key->getStore());
   }
   return nullptr;
 }
@@ -796,13 +781,13 @@ JSValue::getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
                     key->getEntity<JSSymbolEntity>()->getDescription()));
   }
   auto self = pack(ctx);
-  auto entity = self->getEntity();
-  while (entity->getType() >= JSValueType::JS_OBJECT) {
-    auto &props = ((JSObjectEntity *)entity)->getSymbolProperties();
-    if (props.contains(key->getEntity())) {
-      return &props.at(key->getEntity());
+  auto entity = self->getEntity<JSObjectEntity>();
+  while (entity != nullptr) {
+    auto &props = entity->getSymbolProperties();
+    if (props.contains(key->getStore())) {
+      return &props.at(key->getStore());
     }
-    entity = ((JSObjectEntity *)entity)->getPrototype();
+    entity = entity->getPrototype()->getEntity().cast<JSObjectEntity>();
   }
   return nullptr;
 }
@@ -831,6 +816,7 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
                     L"accessors and a value or writable attribute, #<Object>"));
   }
   auto self = pack(ctx);
+  auto store = self->getStore();
   auto entity = self->getEntity<JSObjectEntity>();
   auto old = self->getOwnPropertyDescriptor(ctx, name);
   if (old != nullptr) {
@@ -849,43 +835,44 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
   if (old != nullptr) {
     if (old->get != descriptor.get) {
       if (old->get) {
-        entity->removeChild(old->get);
+        store->removeChild(old->get);
         ctx->getScope()->getRoot()->appendChild(old->get);
       }
       if (descriptor.get) {
-        entity->appendChild(descriptor.get);
+        store->appendChild(descriptor.get);
       }
     }
     if (old->set != descriptor.set) {
       if (old->set) {
-        entity->removeChild(old->set);
+        store->removeChild(old->set);
         ctx->getScope()->getRoot()->appendChild(old->set);
       }
       if (descriptor.set) {
-        entity->appendChild(descriptor.set);
+        store->appendChild(descriptor.set);
       }
     }
     if (old->value != descriptor.value) {
       if (old->value) {
-        entity->removeChild(old->value);
+        store->removeChild(old->value);
         ctx->getScope()->getRoot()->appendChild(old->value);
       }
       if (descriptor.value) {
-        entity->appendChild(descriptor.value);
+        store->appendChild(descriptor.value);
       }
     }
   } else {
     if (descriptor.get) {
-      entity->appendChild(descriptor.get);
+      store->appendChild(descriptor.get);
     }
     if (descriptor.set) {
-      entity->appendChild(descriptor.set);
+      store->appendChild(descriptor.set);
     }
     if (descriptor.value) {
-      entity->appendChild(descriptor.value);
+      store->appendChild(descriptor.value);
     }
   }
-  entity->getSymbolProperties()[key->getEntity()] = descriptor;
+  entity->getSymbolProperties()[key->getStore()] = descriptor;
+  store->appendChild(key->getStore());
   return ctx->truly();
 }
 
@@ -931,8 +918,9 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx,
   }
   auto self = pack(ctx);
   auto entity = self->getEntity<JSObjectEntity>();
+  auto store = self->getStore();
   auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
-  if (descriptor && descriptor->value == field->getEntity()) {
+  if (descriptor && descriptor->value == field->getStore()) {
     return ctx->truly();
   }
   if (!descriptor) {
@@ -964,26 +952,27 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx,
   }
   if (descriptor) {
     if (descriptor->value != nullptr) {
-      if (descriptor->value != field->getEntity()) {
-        entity->removeChild(descriptor->value);
+      if (descriptor->value != field->getStore()) {
+        store->removeChild(descriptor->value);
         ctx->getScope()->getRoot()->appendChild(descriptor->value);
-        entity->appendChild((JSEntity *)field->getEntity());
-        descriptor->value = (JSEntity *)(field->getEntity());
+        store->appendChild((JSStore *)field->getStore());
+        descriptor->value = (JSStore *)(field->getStore());
       }
     } else {
       auto setter = ctx->createValue(descriptor->set);
       return setter->apply(ctx, self, {field});
     }
   } else {
-    entity->getSymbolProperties()[key->getEntity()] = JSObjectEntity::JSField{
+    entity->getSymbolProperties()[key->getStore()] = JSObjectEntity::JSField{
         .configurable = true,
         .enumable = true,
-        .value = (JSEntity *)field->getEntity(),
+        .value = (JSStore *)field->getStore(),
         .writable = true,
         .get = nullptr,
         .set = nullptr,
     };
-    entity->appendChild((JSEntity *)field->getEntity());
+    store->appendChild((JSStore *)field->getStore());
+    store->appendChild((JSStore *)key->getStore());
   }
   return ctx->truly();
 }
@@ -997,6 +986,7 @@ JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
   }
   auto self = pack(ctx);
   auto entity = self->getEntity<JSObjectEntity>();
+  auto store = self->getStore();
   auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
   if (!descriptor) {
     return ctx->truly();
@@ -1012,24 +1002,26 @@ JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
                     key->getEntity<JSSymbolEntity>()->getDescription()));
   }
   if (descriptor->value) {
-    entity->removeChild(descriptor->value);
+    store->removeChild(descriptor->value);
     ctx->getScope()->getRoot()->appendChild(descriptor->value);
   }
   if (descriptor->get) {
-    entity->removeChild(descriptor->get);
+    store->removeChild(descriptor->get);
     ctx->getScope()->getRoot()->appendChild(descriptor->get);
   }
   if (descriptor->set) {
-    entity->removeChild(descriptor->set);
+    store->removeChild(descriptor->set);
     ctx->getScope()->getRoot()->appendChild(descriptor->set);
   }
-  entity->getSymbolProperties().erase(key->getEntity());
+  entity->getSymbolProperties().erase(key->getStore());
+  store->removeChild(key->getStore());
+  ctx->getScope()->getRoot()->appendChild(key->getStore());
   return ctx->truly();
 }
 
 common::AutoPtr<JSValue> JSValue::unaryPlus(common::AutoPtr<JSContext> ctx) {
   if (getType() == JSValueType::JS_INFINITY) {
-    return ctx->createInfinity(((JSInfinityEntity *)_entity)->isNegative());
+    return ctx->createInfinity(getEntity<JSInfinityEntity>()->isNegative());
   }
   auto value = convertToNumber(ctx);
   if (value.has_value()) {
@@ -1041,10 +1033,10 @@ common::AutoPtr<JSValue> JSValue::unaryPlus(common::AutoPtr<JSContext> ctx) {
 common::AutoPtr<JSValue>
 JSValue::unaryNetation(common::AutoPtr<JSContext> ctx) {
   if (getType() == JSValueType::JS_INFINITY) {
-    return ctx->createInfinity(!((JSInfinityEntity *)_entity)->isNegative());
+    return ctx->createInfinity(!getEntity<JSInfinityEntity>()->isNegative());
   }
   if (getType() == JSValueType::JS_BIGINT) {
-    return ctx->createBigInt(-((JSBigIntEntity *)_entity)->getValue());
+    return ctx->createBigInt(-getEntity<JSBigIntEntity>()->getValue());
   }
   auto value = convertToNumber(ctx);
   if (value.has_value()) {
@@ -1055,10 +1047,10 @@ JSValue::unaryNetation(common::AutoPtr<JSContext> ctx) {
 
 common::AutoPtr<JSValue> JSValue::increment(common::AutoPtr<JSContext> ctx) {
   if (getType() == JSValueType::JS_INFINITY) {
-    return ctx->createInfinity(((JSInfinityEntity *)_entity)->isNegative());
+    return ctx->createInfinity(getEntity<JSInfinityEntity>()->isNegative());
   }
   if (getType() == JSValueType::JS_BIGINT) {
-    auto &value = ((JSBigIntEntity *)_entity)->getValue();
+    auto &value = getEntity<JSBigIntEntity>()->getValue();
     value += 1;
     return ctx->createBigInt(value);
   }
@@ -1072,10 +1064,10 @@ common::AutoPtr<JSValue> JSValue::increment(common::AutoPtr<JSContext> ctx) {
 
 common::AutoPtr<JSValue> JSValue::decrement(common::AutoPtr<JSContext> ctx) {
   if (getType() == JSValueType::JS_INFINITY) {
-    return ctx->createInfinity(((JSInfinityEntity *)_entity)->isNegative());
+    return ctx->createInfinity(getEntity<JSInfinityEntity>()->isNegative());
   }
   if (getType() == JSValueType::JS_BIGINT) {
-    auto &value = ((JSBigIntEntity *)_entity)->getValue();
+    auto &value = getEntity<JSBigIntEntity>()->getValue();
     value -= 1;
     return ctx->createBigInt(value);
   }
@@ -1093,7 +1085,7 @@ common::AutoPtr<JSValue> JSValue::logicalNot(common::AutoPtr<JSContext> ctx) {
 
 common::AutoPtr<JSValue> JSValue::bitwiseNot(common::AutoPtr<JSContext> ctx) {
   if (getType() == JSValueType::JS_BIGINT) {
-    auto value = ((JSBigIntEntity *)_entity)->getValue();
+    auto value = getEntity<JSBigIntEntity>()->getValue();
     return ctx->createBigInt(~value);
   }
   auto num = convertToNumber(ctx);

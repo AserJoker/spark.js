@@ -12,23 +12,23 @@ class JSNativeFunctionEntity : public JSObjectEntity {
 private:
   std::wstring _name;
   std::function<JSFunction> _callee;
-  JSEntity *_bind;
-  common::Map<std::wstring, JSEntity *> _closure;
+  JSStore *_bind;
+  common::Map<std::wstring, JSStore *> _closure;
 
 public:
-  JSNativeFunctionEntity(JSEntity *funcProto, const std::wstring &name,
+  JSNativeFunctionEntity(JSStore *funcProto, const std::wstring &name,
                          const std::function<JSFunction> &callee,
-                         const common::Map<std::wstring, JSEntity *> &closure);
+                         const common::Map<std::wstring, JSStore *> &closure);
 
-  void bind(JSEntity *self);
+  void bind(JSStore *self);
 
-  const JSEntity *getBind(common::AutoPtr<JSContext> ctx) const;
+  const JSStore *getBind(common::AutoPtr<JSContext> ctx) const;
 
-  JSEntity *getBind(common::AutoPtr<JSContext> ctx);
+  JSStore *getBind(common::AutoPtr<JSContext> ctx);
 
   const std::function<JSFunction> &getCallee() const;
 
-  const common::Map<std::wstring, JSEntity *> &getClosure() const;
+  const common::Map<std::wstring, JSStore *> &getClosure() const;
 
   const std::wstring &getFunctionName() const;
 

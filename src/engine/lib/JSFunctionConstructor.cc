@@ -58,7 +58,7 @@ void JSFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx,
           .enumable = false,
           .value = nullptr,
           .writable = false,
-          .get = ctx->createNativeFunction(name)->getEntity(),
+          .get = ctx->createNativeFunction(name)->getStore(),
           .set = nullptr,
       });
 }

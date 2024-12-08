@@ -1,18 +1,19 @@
 #include "engine/lib/JSArrayConstructor.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSArrayEntity.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include "error/JSTypeError.hpp"
 #include <string>
 using namespace spark;
 using namespace spark::engine;
 JS_FUNC(JSArrayConstructor::constructor) {
-  JSArrayEntity *entity = nullptr;
+  JSStore *store = nullptr;
   if (self == nullptr) {
-    entity = new JSArrayEntity(
-        ctx->Array()->getProperty(ctx, L"prototype")->getEntity());
-    self = ctx->createValue(entity);
+    store = new JSStore(new JSArrayEntity(
+        ctx->Array()->getProperty(ctx, L"prototype")->getStore()));
+    self = ctx->createValue(store);
   } else {
-    entity = self->getEntity<JSArrayEntity>();
+    store = self->getStore();
   }
   if (args.size() == 1 && args[0]->getType() == JSValueType::JS_NUMBER) {
     int64_t length = (int64_t)args[0]->getNumber().value();
@@ -44,17 +45,18 @@ JS_FUNC(JSArrayConstructor::setLength) {
     throw error::JSTypeError(L"set length require a 'number' argument");
   }
   auto len = (int64_t)args[0]->getNumber().value();
+  auto store = self->getStore();
   auto entity = self->getEntity<JSArrayEntity>();
   while (entity->getItems().size() > len) {
     auto e = *entity->getItems().rbegin();
     ctx->getScope()->getRoot()->appendChild(e);
-    entity->removeChild(e);
+    store->removeChild(e);
     entity->getItems().pop_back();
   }
   while (entity->getItems().size() < len) {
-    auto e = ctx->undefined()->getEntity();
+    auto e = ctx->undefined()->getStore();
     entity->getItems().push_back(e);
-    entity->appendChild(e);
+    store->appendChild(e);
   }
   return getLength(ctx, self, {});
 }
@@ -108,15 +110,15 @@ JSArrayConstructor::initialize(common::AutoPtr<JSContext> ctx) {
       {
           .configurable = true,
           .enumable = false,
-          .get = ctx->createNativeFunction(getLength)->getEntity(),
-          .set = ctx->createNativeFunction(setLength)->getEntity(),
+          .get = ctx->createNativeFunction(getLength)->getStore(),
+          .set = ctx->createNativeFunction(setLength)->getStore(),
       });
   prototype->setPropertyDescriptor(
       ctx, ctx->Symbol()->getProperty(ctx, L"toStringTag"),
       {.configurable = true,
        .enumable = false,
        .get = ctx->createNativeFunction(toStringTag, L"[Symbol.toStringTag]")
-                  ->getEntity(),
+                  ->getStore(),
        .set = nullptr});
   prototype->setProperty(ctx, L"toString",
                          ctx->createNativeFunction(toString, L"toString"));

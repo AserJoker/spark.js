@@ -1,6 +1,5 @@
 #pragma once
 #include "compiler/base/JSModule.hpp"
-#include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include <string>
 #include <unordered_map>
@@ -11,19 +10,19 @@ private:
   bool _generator;
   uint32_t _address;
   uint32_t _length;
-  std::unordered_map<std::wstring, JSEntity *> _closure;
+  std::unordered_map<std::wstring, JSStore *> _closure;
   common::AutoPtr<compiler::JSModule> _module;
   std::wstring _name;
   std::wstring _source;
 
 public:
-  JSFunctionEntity(JSEntity *prototype,
+  JSFunctionEntity(JSStore *prototype,
                    const common::AutoPtr<compiler::JSModule> &module);
   void setAsync(bool async);
   void setGenerator(bool generator);
   void setAddress(uint32_t address);
   void setLength(uint32_t length);
-  void setClosure(const std::wstring &name, JSEntity *entity);
+  void setClosure(const std::wstring &name, JSStore *entity);
   void setFuncName(const std::wstring &name);
   void setSource(const std::wstring &name);
 
@@ -35,6 +34,6 @@ public:
   const std::wstring &getFunctionSource() const;
 
   const common::AutoPtr<compiler::JSModule> &getModule() const;
-  const std::unordered_map<std::wstring, JSEntity *> &getClosure() const;
+  const std::unordered_map<std::wstring, JSStore *> &getClosure() const;
 };
 }; // namespace spark::engine

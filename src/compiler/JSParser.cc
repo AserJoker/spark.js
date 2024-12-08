@@ -372,8 +372,7 @@ void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
                                common::AutoPtr<JSNode> identifier,
                                JSSourceDeclaration::TYPE type, bool isConst) {
   auto scope = _currentScope;
-  if (type == JSSourceDeclaration::TYPE::UNDEFINED ||
-      type == JSSourceDeclaration::TYPE::FUNCTION) {
+  if (type == JSSourceDeclaration::TYPE::UNDEFINED) {
     while (scope->parent &&
            scope->node->type != JSNodeType::DECLARATION_FUNCTION &&
            scope->node->type != JSNodeType::DECLARATION_ARROW_FUNCTION &&
@@ -1507,7 +1506,10 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"for")) {
     common::AutoPtr node = new JSForStatement;
-
+    auto parentScope = _currentScope;
+    node->scope = new JSSourceScope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
     node->type = JSNodeType::STATEMENT_FOR;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
@@ -1561,6 +1563,7 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
     if (node->body != nullptr) {
       node->body->addParent(node);
     }
+    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;
@@ -1577,6 +1580,7 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
   if (token != nullptr && token->location.isEqual(source, L"for")) {
     common::AutoPtr node = new JSForInStatement;
     node->type = JSNodeType::STATEMENT_FOR_IN;
+
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
     if (!token || !token->location.isEqual(source, L"(")) {
@@ -1615,7 +1619,10 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
       skipInvisible(filename, source, current);
       token = readKeywordToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"in")) {
-
+        auto parentScope = _currentScope;
+        node->scope = new JSSourceScope(parentScope);
+        node->scope->node = node.getRawPointer();
+        _currentScope = node->scope.getRawPointer();
         if (node->kind != JSDeclarationKind::UNKNOWN) {
           declareVariable(filename, source, node, node->declaration, type,
                           isConst);
@@ -1642,7 +1649,7 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
               {filename, current.line, current.column});
         }
         node->body->addParent(node);
-
+        _currentScope = parentScope;
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -1709,7 +1716,9 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
       skipInvisible(filename, source, current);
       token = readIdentifierToken(filename, source, current);
       if (token != nullptr && token->location.isEqual(source, L"of")) {
-
+        auto parentScope = _currentScope;
+        node->scope = new JSSourceScope(parentScope);
+        node->scope->node = node.getRawPointer();
         _currentScope = node->scope.getRawPointer();
         if (node->kind != JSDeclarationKind::UNKNOWN) {
           declareVariable(filename, source, node, node->declaration, type,
@@ -1736,6 +1745,7 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
               {filename, current.line, current.column});
         }
         node->body->addParent(node);
+        _currentScope = parentScope;
         node->location = getLocation(source, position, current);
         position = current;
         return node;
@@ -2412,6 +2422,10 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
   auto token = readSymbolToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"{")) {
     common::AutoPtr node = new JSBlockStatement;
+    auto parentScope = _currentScope;
+    node->scope = new JSSourceScope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
     skipNewLine(filename, source, current);
     auto statement = readStatement(filename, source, current);
     while (statement != nullptr) {
@@ -2427,6 +2441,7 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
+    _currentScope = parentScope;
     node->location = getLocation(source, position, current);
     position = current;
     return node;

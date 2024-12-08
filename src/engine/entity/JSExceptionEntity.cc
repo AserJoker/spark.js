@@ -1,28 +1,22 @@
 #include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/base/JSValueType.hpp"
-#include "engine/entity/JSObjectEntity.hpp"
+#include "engine/entity/JSEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include <fmt/xchar.h>
 #include <string>
 using namespace spark;
 using namespace spark::engine;
 
-JSExceptionEntity::JSExceptionEntity(JSEntity *prototype,
-                                     const std::wstring &type,
+JSExceptionEntity::JSExceptionEntity(const std::wstring &type,
                                      const std::wstring &message,
                                      const std::vector<JSLocation> &stack)
-    : JSObjectEntity(prototype), _errorType(type), _message(message),
-      _stack(stack), _target(nullptr) {
-  _type = JSValueType::JS_EXCEPTION;
-}
+    : JSEntity(JSValueType::JS_EXCEPTION), _errorType(type), _message(message),
+      _stack(stack), _target(nullptr) {}
 
-JSExceptionEntity::JSExceptionEntity(JSEntity *prototype, JSEntity *target)
-    : JSObjectEntity(prototype), _target(target) {
-  appendChild(target);
-  _type = JSValueType::JS_EXCEPTION;
-}
+JSExceptionEntity::JSExceptionEntity(JSStore *target)
+    : JSEntity(JSValueType::JS_EXCEPTION), _target(target) {}
 
-JSEntity *JSExceptionEntity::getTarget() { return _target; }
+JSStore *JSExceptionEntity::getTarget() { return _target; }
 
 const std::wstring &JSExceptionEntity::getMessage() const { return _message; }
 
@@ -36,7 +30,7 @@ const std::vector<JSLocation> &JSExceptionEntity::getStack() const {
 
 std::wstring JSExceptionEntity::toString(common::AutoPtr<JSContext> ctx) const {
   if (_target) {
-    return fmt::format(L"Uncaught {}", _target->toString(ctx));
+    return fmt::format(L"Uncaught {}", _target->getEntity()->toString(ctx));
   }
   std::wstring result =
       fmt::format(L"{}: {}", getExceptionType(), getMessage());

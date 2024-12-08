@@ -27,6 +27,7 @@
 #include "engine/lib/JSSymbolConstructor.hpp"
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSScope.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSSyntaxError.hpp"
 #include "error/JSTypeError.hpp"
@@ -52,28 +53,36 @@ JSContext::~JSContext() {
 
 void JSContext::initialize() {
   addRef();
-  _undefined = _scope->createValue(new JSUndefinedEntity(), L"undefined");
-  _null = _scope->createValue(new JSNullEntity(), L"null");
-  _NaN = _scope->createValue(new JSNaNEntity(), L"NaN");
+  _undefined =
+      _scope->createValue(new JSStore(new JSUndefinedEntity()), L"undefined");
+  _null = _scope->createValue(new JSStore(new JSNullEntity()), L"null");
+  _NaN = _scope->createValue(new JSStore(new JSNaNEntity()), L"NaN");
   _true = createBoolean(true);
   _false = createBoolean(false);
-  _uninitialized =
-      _scope->createValue(new JSEntity(JSValueType::JS_UNINITIALIZED));
+  _uninitialized = _scope->createValue(
+      new JSStore(new JSEntity(JSValueType::JS_UNINITIALIZED)));
 
-  auto objectPrototype = createValue(new JSObjectEntity(_null->getEntity()));
+  auto objectPrototype =
+      createValue(new JSStore(new JSObjectEntity(_null->getStore())));
+  objectPrototype->getStore()->appendChild(_null->getStore());
+
   auto functionPrototype =
-      createValue(new JSObjectEntity(objectPrototype->getEntity()));
+      createValue(new JSStore(new JSObjectEntity(objectPrototype->getStore())));
 
-  JSNativeFunctionEntity *ObjectConstructorEntity =
-      new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Object",
-                                 &JSObjectConstructor::constructor, {});
+  functionPrototype->getStore()->appendChild(objectPrototype->getStore());
+
+  JSStore *ObjectConstructorEntity = new JSStore(
+      new JSNativeFunctionEntity(functionPrototype->getStore(), L"Object",
+                                 &JSObjectConstructor::constructor, {}));
+  ObjectConstructorEntity->appendChild(functionPrototype->getStore());
   _Object = _scope->createValue(ObjectConstructorEntity, L"Object");
   _Object->setProperty(this, L"prototype", objectPrototype);
   objectPrototype->setProperty(this, L"constructor", _Object);
 
-  JSNativeFunctionEntity *FunctionConstructorEntity =
-      new JSNativeFunctionEntity(functionPrototype->getEntity(), L"Function",
-                                 &JSFunctionConstructor::constructor, {});
+  JSStore *FunctionConstructorEntity = new JSStore(
+      new JSNativeFunctionEntity(functionPrototype->getStore(), L"Function",
+                                 &JSFunctionConstructor::constructor, {}));
+  FunctionConstructorEntity->appendChild(functionPrototype->getStore());
   _Function = _scope->createValue(FunctionConstructorEntity, L"Function");
   _Function->setProperty(this, L"prototype", functionPrototype);
   functionPrototype->setProperty(this, L"constructor", _Function);
@@ -173,23 +182,20 @@ std::vector<JSLocation> JSContext::trace(const JSLocation &location) {
   return stack;
 }
 
-common::AutoPtr<JSValue> JSContext::createValue(JSEntity *entity,
+common::AutoPtr<JSValue> JSContext::createValue(JSStore *store,
                                                 const std::wstring &name) {
-  return _scope->createValue(entity, name);
+  return _scope->createValue(store, name);
 }
 
 common::AutoPtr<JSValue> JSContext::createValue(common::AutoPtr<JSValue> value,
                                                 const std::wstring &name) {
   switch (value->getType()) {
   case JSValueType::JS_NUMBER:
-    return createNumber(((JSNumberEntity *)(value->getEntity()))->getValue(),
-                        name);
+    return createNumber(value->getEntity<JSNumberEntity>()->getValue(), name);
   case JSValueType::JS_STRING:
-    return createString(((JSStringEntity *)(value->getEntity()))->getValue(),
-                        name);
+    return createString(value->getEntity<JSStringEntity>()->getValue(), name);
   case JSValueType::JS_BOOLEAN:
-    return createBoolean(((JSBooleanEntity *)(value->getEntity()))->getValue(),
-                         name);
+    return createBoolean(value->getEntity<JSBooleanEntity>()->getValue(), name);
   case JSValueType::JS_BIGINT:
     return createBigInt(value->getEntity<JSBigIntEntity>()->getValue(), name);
   case JSValueType::JS_INFINITY:
@@ -198,47 +204,49 @@ common::AutoPtr<JSValue> JSContext::createValue(common::AutoPtr<JSValue> value,
   default:
     break;
   }
-  return _scope->createValue(value->getEntity(), name);
+  return _scope->createValue(value->getStore(), name);
 }
 
 common::AutoPtr<JSValue> JSContext::createNumber(double value,
                                                  const std::wstring &name) {
-  return _scope->createValue(new JSNumberEntity(value), name);
+  return _scope->createValue(new JSStore(new JSNumberEntity(value)), name);
 }
 
 common::AutoPtr<JSValue> JSContext::createString(const std::wstring &value,
                                                  const std::wstring &name) {
-  return _scope->createValue(new JSStringEntity(value), name);
+  return _scope->createValue(new JSStore(new JSStringEntity(value)), name);
 }
 common::AutoPtr<JSValue> JSContext::createSymbol(const std::wstring &value,
                                                  const std::wstring &name) {
-  return _scope->createValue(new JSSymbolEntity(value), name);
+  return _scope->createValue(new JSStore(new JSSymbolEntity(value)), name);
 }
 
 common::AutoPtr<JSValue> JSContext::createBoolean(bool value,
                                                   const std::wstring &name) {
-  return _scope->createValue(new JSBooleanEntity(value), name);
+  return _scope->createValue(new JSStore(new JSBooleanEntity(value)), name);
 }
 
 common::AutoPtr<JSValue> JSContext::createBigInt(const common::BigInt<> &value,
                                                  const std::wstring &name) {
-  return _scope->createValue(new JSBigIntEntity(value), name);
+  return _scope->createValue(new JSStore(new JSBigIntEntity(value)), name);
 }
 
 common::AutoPtr<JSValue> JSContext::createInfinity(bool negative,
                                                    const std::wstring &name) {
-  return _scope->createValue(new JSInfinityEntity(negative), name);
+  return _scope->createValue(new JSStore(new JSInfinityEntity(negative)), name);
 }
 common::AutoPtr<JSValue>
 JSContext::createObject(common::AutoPtr<JSValue> prototype,
                         const std::wstring &name) {
-  JSEntity *proto = nullptr;
+  JSStore *proto = nullptr;
   if (prototype != nullptr) {
-    proto = prototype->getEntity();
+    proto = prototype->getStore();
   } else {
-    proto = _Object->getProperty(this, L"prototype")->getEntity();
+    proto = _Object->getProperty(this, L"prototype")->getStore();
   }
-  return _scope->createValue(new JSObjectEntity(proto), name);
+  auto res = _scope->createValue(new JSStore(new JSObjectEntity(proto)), name);
+  res->getStore()->appendChild(proto);
+  return res;
 }
 
 common::AutoPtr<JSValue> JSContext::createObject(const std::wstring &name) {
@@ -246,9 +254,7 @@ common::AutoPtr<JSValue> JSContext::createObject(const std::wstring &name) {
 }
 
 common::AutoPtr<JSValue> JSContext::createArray(const std::wstring &name) {
-  return _scope->createValue(
-      new JSArrayEntity(_Array->getProperty(this, L"prototype")->getEntity()),
-      name);
+  return constructObject(_Array, {}, {});
 }
 
 common::AutoPtr<JSValue>
@@ -264,14 +270,18 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
   auto prototype = constructor->getProperty(this, L"prototype");
   common::AutoPtr<JSValue> result;
   if (constructor == _Array) {
-    result = createValue(new JSArrayEntity(prototype->getEntity()));
+    result = createValue(new JSStore(new JSArrayEntity(prototype->getStore())));
+    result->getStore()->appendChild(prototype->getStore());
   } else if (constructor == _Function) {
-    result = createValue(new JSFunctionEntity(prototype->getEntity(), nullptr));
+    result = createValue(
+        new JSStore(new JSFunctionEntity(prototype->getStore(), nullptr)));
+    result->getStore()->appendChild(prototype->getStore());
   } else if (constructor == _Symbol) {
     throw error::JSTypeError(L"Symbol is not a constructor");
   } else {
     result = createObject(prototype, name);
   }
+  result->getStore()->appendChild(prototype->getStore());
   result->setProperty(this, L"constructor", constructor);
   constructor->apply(this, result, args, loc);
   return result;
@@ -281,52 +291,57 @@ common::AutoPtr<JSValue>
 JSContext::createNativeFunction(const std::function<JSFunction> &value,
                                 const std::wstring &funcname,
                                 const std::wstring &name) {
-  auto entity = new JSNativeFunctionEntity(
-      _Function->getProperty(this, L"prototype")->getEntity(), funcname, value,
-      {});
-  return _scope->createValue(entity, name);
+  auto prop = _Function->getProperty(this, L"prototype")->getStore();
+  auto store =
+      new JSStore(new JSNativeFunctionEntity(prop, funcname, value, {}));
+  store->appendChild(prop);
+  return _scope->createValue(store, name);
 }
 
 common::AutoPtr<JSValue> JSContext::createNativeFunction(
     const std::function<JSFunction> &value,
-    const common::Map<std::wstring, JSEntity *> closure,
+    const common::Map<std::wstring, JSStore *> closure,
     const std::wstring &funcname, const std::wstring &name) {
-  return _scope->createValue(
-      new JSNativeFunctionEntity(
-          _Function->getProperty(this, L"prototype")->getEntity(), funcname,
-          value, closure),
+  auto prop = _Function->getProperty(this, L"prototype")->getStore();
+  auto res = _scope->createValue(
+      new JSStore(new JSNativeFunctionEntity(prop, funcname, value, closure)),
       name);
+  res->getStore()->appendChild(prop);
+  return res;
 }
 common::AutoPtr<JSValue>
 JSContext::createFunction(const common::AutoPtr<compiler::JSModule> &module,
                           const std::wstring &name) {
-  return _scope->createValue(
-      new JSFunctionEntity(
-          _Function->getProperty(this, L"prototype")->getEntity(), module),
-      name);
+  auto prop = _Function->getProperty(this, L"prototype")->getStore();
+  auto res = _scope->createValue(
+      new JSStore(new JSFunctionEntity(prop, module)), name);
+  res->getStore()->appendChild(prop);
+  return res;
 }
 common::AutoPtr<JSValue>
 JSContext::createGenerator(const common::AutoPtr<compiler::JSModule> &module,
                            const std::wstring &name) {
-  auto entity = new JSFunctionEntity(
-      _GeneratorFunction->getProperty(this, L"prototype")->getEntity(), module);
-  entity->setGenerator(true);
-  return _scope->createValue(entity, name);
+  auto prop = _GeneratorFunction->getProperty(this, L"prototype")->getStore();
+  auto store = new JSStore(new JSFunctionEntity(prop, module));
+  auto res = _scope->createValue(store, name);
+  res->getEntity<JSFunctionEntity>()->setGenerator(true);
+  res->getStore()->appendChild(prop);
+  return res;
 }
 
 common::AutoPtr<JSValue>
 JSContext::createException(const std::wstring &type,
                            const std::wstring &message,
                            const JSLocation &location) {
-  return _scope->createValue(new JSExceptionEntity(
-      _Error->getProperty(this, L"prototype")->getEntity(), type, message,
-      trace(location)));
+  return _scope->createValue(
+      new JSStore(new JSExceptionEntity(type, message, trace(location))));
 }
 common::AutoPtr<JSValue>
 JSContext::createException(common::AutoPtr<JSValue> target) {
-  return _scope->createValue(new JSExceptionEntity(
-      _Error->getProperty(this, L"prototype")->getEntity(),
-      target->getEntity()));
+  auto res = _scope->createValue(
+      new JSStore(new JSExceptionEntity(target->getStore())));
+  res->getStore()->appendChild(target->getStore());
+  return res;
 }
 
 common::AutoPtr<JSValue> JSContext::undefined() { return _undefined; }

@@ -11,7 +11,7 @@ namespace spark::engine {
 class JSSymbolConstructor {
 private:
   struct JSSymbolOpaque : public common::Object {
-    std::unordered_map<std::wstring, JSEntity *> symbols;
+    std::unordered_map<std::wstring, JSStore *> symbols;
   };
 
 private:

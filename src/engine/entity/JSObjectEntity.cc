@@ -5,14 +5,13 @@
 #include <fmt/xchar.h>
 using namespace spark;
 using namespace spark::engine;
-JSObjectEntity::JSObjectEntity(JSEntity *prototype)
+JSObjectEntity::JSObjectEntity(JSStore *prototype)
     : JSEntity(JSValueType::JS_OBJECT), _prototype(prototype),
-      _extensible(true), _sealed(false), _frozen(false) {
-  appendChild(prototype);
-}
-const JSEntity *JSObjectEntity::getPrototype() const { return _prototype; }
+      _extensible(true), _sealed(false), _frozen(false) {}
 
-JSEntity *JSObjectEntity::getPrototype() { return _prototype; }
+const JSStore *JSObjectEntity::getPrototype() const { return _prototype; }
+
+JSStore *JSObjectEntity::getPrototype() { return _prototype; }
 
 bool JSObjectEntity::isExtensible() const { return _extensible; }
 
@@ -26,7 +25,7 @@ void JSObjectEntity::seal() { _sealed = true; }
 
 void JSObjectEntity::freeze() { _frozen = true; }
 
-const std::unordered_map<JSEntity *, JSObjectEntity::JSField> &
+const std::unordered_map<JSStore *, JSObjectEntity::JSField> &
 JSObjectEntity::getSymbolProperties() const {
   return _symbolFields;
 }
@@ -34,7 +33,7 @@ const std::unordered_map<std::wstring, JSObjectEntity::JSField> &
 JSObjectEntity::getProperties() const {
   return _fields;
 }
-std::unordered_map<JSEntity *, JSObjectEntity::JSField> &
+std::unordered_map<JSStore *, JSObjectEntity::JSField> &
 JSObjectEntity::getSymbolProperties() {
   return _symbolFields;
 }
@@ -46,11 +45,11 @@ JSObjectEntity::getProperties() {
 std::wstring JSObjectEntity::toString(common::AutoPtr<JSContext> ctx) const {
   std::wstring str = L"Object";
   auto symbol = ctx->Symbol()->getProperty(ctx, L"toStringTag");
-  if (_symbolFields.contains(symbol->getEntity())) {
-    str = ctx->getScope()
-              ->createValue(
-                  (JSEntity *)_symbolFields.at(symbol->getEntity()).value)
-              ->convertToString(ctx);
+  if (_symbolFields.contains(symbol->getStore())) {
+    str =
+        ctx->getScope()
+            ->createValue((JSStore *)_symbolFields.at(symbol->getStore()).value)
+            ->convertToString(ctx);
   }
   return fmt::format(L"[object {}]", str);
 }

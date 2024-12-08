@@ -1,4 +1,5 @@
 #pragma once
+#include "JSStore.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/BigInt.hpp"
 #include "common/Map.hpp"
@@ -53,7 +54,7 @@ private:
   common::AutoPtr<JSValue> _RegExp;
 
   // internal
-  std::unordered_map<std::wstring, JSEntity *> _symbols;
+  std::unordered_map<std::wstring, JSStore *> _symbols;
 
   common::AutoPtr<JSValue> _symbolValue;
   common::AutoPtr<JSValue> _symbolPack;
@@ -98,7 +99,7 @@ public:
 
   std::vector<JSLocation> trace(const JSLocation &location);
 
-  common::AutoPtr<JSValue> createValue(JSEntity *entity,
+  common::AutoPtr<JSValue> createValue(JSStore *entity,
                                        const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createValue(common::AutoPtr<JSValue> value,
@@ -140,7 +141,7 @@ public:
 
   common::AutoPtr<JSValue>
   createNativeFunction(const std::function<JSFunction> &value,
-                       const common::Map<std::wstring, JSEntity *> closure,
+                       const common::Map<std::wstring, JSStore *> closure,
                        const std::wstring &funcname = L"",
                        const std::wstring &name = L"");
 

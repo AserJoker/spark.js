@@ -18,8 +18,8 @@ JSIteratorConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   Iterator->setProperty(ctx, L"prototype", prototype);
 
   prototype->setProperty(
-      ctx, ctx->Symbol()->getProperty(ctx, L"Symbol.iterator"),
+      ctx, ctx->Symbol()->getProperty(ctx, L"iterator"),
       ctx->createNativeFunction(iterator, L"[Symbol.iterator]"));
-  
+
   return Iterator;
 }

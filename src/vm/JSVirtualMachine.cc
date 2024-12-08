@@ -135,8 +135,11 @@ JS_OPT(JSVirtualMachine::setFuncSource) {
 
 JS_OPT(JSVirtualMachine::setClosure) {
   auto name = args(module);
-  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
-  func->setClosure(name, ctx->load(name)->getEntity());
+  auto func = (*_ctx->stack.rbegin());
+  auto store = ctx->load(name)->getStore();
+  func->getEntity<engine::JSFunctionEntity>()->setClosure(
+      name, ctx->load(name)->getStore());
+  func->getStore()->appendChild(store);
 }
 
 JS_OPT(JSVirtualMachine::setField) {
@@ -169,26 +172,26 @@ JS_OPT(JSVirtualMachine::setAccessor) {
                                {
                                    .configurable = true,
                                    .enumable = true,
-                                   .value = ctx->undefined()->getEntity(),
+                                   .value = ctx->undefined()->getStore(),
                                    .writable = true,
                                });
     prop = obj->getOwnPropertyDescriptor(ctx, name);
   }
   if (prop->value) {
-    obj->getEntity()->removeChild(prop->value);
+    obj->getStore()->removeChild(prop->value);
     prop->value = nullptr;
   }
-  obj->getEntity()->appendChild(accessor->getEntity());
+  obj->getStore()->appendChild(accessor->getStore());
   if (type) {
-    if (prop->get && prop->get != accessor->getEntity()) {
-      obj->getEntity()->removeChild(prop->get);
+    if (prop->get && prop->get != accessor->getStore()) {
+      obj->getStore()->removeChild(prop->get);
     }
-    prop->get = accessor->getEntity();
+    prop->get = accessor->getStore();
   } else {
-    if (prop->set && prop->set != accessor->getEntity()) {
-      obj->getEntity()->removeChild(prop->set);
+    if (prop->set && prop->set != accessor->getStore()) {
+      obj->getStore()->removeChild(prop->set);
     }
-    prop->set = accessor->getEntity();
+    prop->set = accessor->getStore();
   }
   _ctx->stack.push_back(ctx->truly());
 }
@@ -285,8 +288,8 @@ JS_OPT(JSVirtualMachine::new_) {
 JS_OPT(JSVirtualMachine::yield) {
   auto value = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
-  _ctx->stack.push_back(
-      ctx->createValue(new engine::JSTaskEntity(value->getEntity(), _pc)));
+  _ctx->stack.push_back(ctx->createValue(
+      new engine::JSStore(new engine::JSTaskEntity(value->getStore(), _pc))));
   _pc = module->codes.size();
 }
 
@@ -315,11 +318,11 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
   auto done = val->getProperty(ctx, L"done");
   auto result = val->getProperty(ctx, L"value");
   if (done->convertToBoolean(ctx)) {
-    _ctx->stack.push_back(
-        ctx->createValue(new engine::JSTaskEntity(result->getEntity(), _pc)));
+    _ctx->stack.push_back(ctx->createValue(new engine::JSStore(
+        new engine::JSTaskEntity(result->getStore(), _pc))));
   } else {
-    _ctx->stack.push_back(ctx->createValue(
-        new engine::JSTaskEntity(result->getEntity(), _pc - sizeof(uint16_t))));
+    _ctx->stack.push_back(ctx->createValue(new engine::JSStore(
+        new engine::JSTaskEntity(result->getStore(), _pc - sizeof(uint16_t)))));
   }
   _pc = module->codes.size();
 }
@@ -870,7 +873,7 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
   if (!_ctx->stack.empty()) {
     value = *_ctx->stack.rbegin();
     if (ctx->getScope() != scope) {
-      auto entity = value->getEntity();
+      auto entity = value->getStore();
       value = scope->createValue(entity);
     }
   }
@@ -900,25 +903,25 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
       }
     }
   }
-  std::vector<engine::JSEntity *> arguments;
+  std::vector<engine::JSStore *> arguments;
   for (auto &arg : args) {
-    arguments.push_back(arg->getEntity());
+    arguments.push_back(arg->getStore());
   }
-  auto argv = ctx->createValue(
-      new engine::JSArgumentEntity(ctx->null()->getEntity(), arguments),
-      L"arguments");
+  auto argv = ctx->createValue(new engine::JSStore(new engine::JSArgumentEntity(
+                                   ctx->null()->getStore(), arguments)),
+                               L"arguments");
   argv->setPropertyDescriptor(
       ctx, L"length",
       {
           .configurable = true,
           .enumable = false,
-          .value = ctx->createNumber((double)arguments.size())->getEntity(),
+          .value = ctx->createNumber((double)arguments.size())->getStore(),
           .writable = true,
       });
   argv->setPropertyDescriptor(ctx, L"callee",
                               {.configurable = false,
                                .enumable = false,
-                               .value = func->getEntity(),
+                               .value = func->getStore(),
                                .writable = false});
   ctx->createValue(self, L"this");
   common::AutoPtr<engine::JSValue> result;
@@ -935,8 +938,8 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
       for (auto &[name, value] : closure) {
         scope->createValue(value, name);
       }
-      scope->createValue(self->getEntity(), L"this");
-      scope->createValue(argv->getEntity(), L"arguments");
+      scope->createValue(self->getStore(), L"this");
+      scope->createValue(argv->getStore(), L"arguments");
       result->setOpaque(JSCoroutineContext{
           .eval = new JSEvalContext,
           .scope = scope,
@@ -944,7 +947,7 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
           .funcname = func->getName(),
           .pc = entity->getAddress(),
       });
-      result->getEntity()->appendChild(func->getEntity());
+      result->getStore()->appendChild(func->getStore());
     } else {
       auto current = _ctx;
       _ctx = new JSEvalContext;
