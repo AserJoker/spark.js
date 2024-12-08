@@ -101,10 +101,24 @@ void JSGenerator::resolveClosure(JSGeneratorContext &ctx,
 void JSGenerator::pushLexScope(JSGeneratorContext &ctx,
                                common::AutoPtr<JSModule> &module,
                                const common::AutoPtr<JSSourceScope> &scope) {
-  generate(module, JSAsmOperator::PUSH_SCOPE);
   auto s = new JSLexScope;
   s->parent = ctx.currentScope;
   ctx.currentScope = s;
+  pushScope(ctx, module, scope);
+}
+
+void JSGenerator::popLexScope(JSGeneratorContext &ctx,
+                              common::AutoPtr<JSModule> &module) {
+  auto old = ctx.currentScope;
+  ctx.currentScope = ctx.currentScope->parent;
+  delete old;
+  popScope(ctx, module);
+}
+
+void JSGenerator::pushScope(JSGeneratorContext &ctx,
+                            common::AutoPtr<JSModule> &module,
+                            const common::AutoPtr<JSSourceScope> &scope) {
+  generate(module, JSAsmOperator::PUSH_SCOPE);
   std::vector<JSSourceDeclaration> closures;
   for (auto &declar : scope->declarations) {
     resolveDeclaration(ctx, module, declar);
@@ -117,11 +131,8 @@ void JSGenerator::pushLexScope(JSGeneratorContext &ctx,
   }
 }
 
-void JSGenerator::popLexScope(JSGeneratorContext &ctx,
-                              common::AutoPtr<JSModule> &module) {
-  auto old = ctx.currentScope;
-  ctx.currentScope = ctx.currentScope->parent;
-  delete old;
+void JSGenerator::popScope(JSGeneratorContext &ctx,
+                           common::AutoPtr<JSModule> &module) {
   generate(module, JSAsmOperator::POP_SCOPE);
 }
 
@@ -262,11 +273,11 @@ void JSGenerator::resolveStatementBlock(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
                                         const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSBlockStatement>();
-  pushLexScope(ctx, module, n->scope);
+  pushScope(ctx, module, n->scope);
   for (auto &sts : n->body) {
     resolveNode(ctx, module, sts);
   }
-  popLexScope(ctx, module);
+  popScope(ctx, module);
 }
 
 void JSGenerator::resolveStatementDebugger(

@@ -50,6 +50,11 @@ private:
 
   void popLexScope(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module);
 
+  void pushScope(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
+                 const common::AutoPtr<JSSourceScope> &scope);
+
+  void popScope(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module);
+
 private:
   void resolvePrivateName(JSGeneratorContext &ctx,
                           common::AutoPtr<JSModule> &module,
