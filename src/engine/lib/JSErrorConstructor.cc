@@ -7,8 +7,9 @@ JS_FUNC(JSErrorConstructor::constructor) {
   if (args.empty()) {
     self->setProperty(ctx, L"message", ctx->createString(L""));
   } else {
-    self->setProperty(ctx, L"message",
-                      ctx->createString(args[0]->convertToString(ctx)));
+    self->setProperty(
+        ctx, L"message",
+        ctx->createString(args[0]->toString(ctx)->getString().value()));
   }
   auto trace =
       ctx->trace({.filename = 0, .line = 0, .column = 0, .funcname = L"Error"});
@@ -29,7 +30,7 @@ JS_FUNC(JSErrorConstructor::toString) {
 
   auto message = self->getProperty(ctx, L"message");
   std::wstring result;
-  auto msg = message->convertToString(ctx);
+  auto msg = message->toString(ctx)->getString().value();
   if (!message->isUndefined() && !msg.empty()) {
     result = fmt::format(L"Error: {}", msg);
   } else {
@@ -37,7 +38,7 @@ JS_FUNC(JSErrorConstructor::toString) {
   }
   auto stack = self->getProperty(ctx, L"stack");
   if (!stack->isUndefined()) {
-    result += L"\n" + stack->convertToString(ctx);
+    result += L"\n" + stack->toString(ctx)->getString().value();
   }
   return ctx->createString(result);
 }

@@ -12,7 +12,7 @@ JS_FUNC(JSSymbolConstructor::constructor) {
   if (args.empty()) {
     return ctx->createSymbol();
   } else {
-    return ctx->createSymbol(args[0]->convertToString(ctx));
+    return ctx->createSymbol(args[0]->toString(ctx)->getString().value());
   }
 }
 
@@ -47,9 +47,9 @@ JS_FUNC(JSSymbolConstructor::valueOf) {
 JS_FUNC(JSSymbolConstructor::_for) {
   std::wstring key;
   if (args.empty()) {
-    key = ctx->undefined()->convertToString(ctx);
+    key = ctx->undefined()->toString(ctx)->getString().value();
   } else {
-    key = args[0]->convertToString(ctx);
+    key = args[0]->toString(ctx)->getString().value();
   }
   auto &symbols =
       ctx->Symbol()->getOpaque<common::AutoPtr<JSSymbolOpaque>>()->symbols;
@@ -65,9 +65,9 @@ JS_FUNC(JSSymbolConstructor::_for) {
 JS_FUNC(JSSymbolConstructor::forKey) {
   std::wstring key;
   if (args.empty()) {
-    key = ctx->undefined()->convertToString(ctx);
+    key = ctx->undefined()->toString(ctx)->getString().value();
   } else {
-    key = args[0]->convertToString(ctx);
+    key = args[0]->toString(ctx)->getString().value();
   }
   auto &symbols =
       ctx->Symbol()->getOpaque<common::AutoPtr<JSSymbolOpaque>>()->symbols;

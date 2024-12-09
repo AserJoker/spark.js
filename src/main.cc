@@ -20,9 +20,9 @@ using namespace spark::engine;
 
 JS_FUNC(print) {
   if (args.empty()) {
-    fmt::print(L"{}", ctx->undefined()->convertToString(ctx));
+    fmt::print(L"{}", ctx->undefined()->toString(ctx)->getString().value());
   } else {
-    fmt::print(L"{}\n", args[0]->convertToString(ctx));
+    fmt::print(L"{}\n", args[0]->toString(ctx)->getString().value());
   }
   return ctx->undefined();
 }
@@ -341,9 +341,9 @@ int main(int argc, char *argv[]) {
     write(module);
     auto res = ctx->getRuntime()->getVirtualMachine()->eval(ctx, module);
     if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
-      fmt::print(L"Uncaught {}\n", res->convertToString(ctx));
+      fmt::print(L"Uncaught {}\n", res->toString(ctx)->getString().value());
     } else {
-      fmt::print(L"{}\n", res->convertToString(ctx));
+      fmt::print(L"{}\n", res->toString(ctx)->getString().value());
     }
   } catch (error::JSError &e) {
     std::cout << e.what();

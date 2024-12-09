@@ -311,12 +311,13 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
   }
   auto val = next->apply(ctx, gen);
   if (val->getType() != engine::JSValueType::JS_OBJECT) {
-    throw error::JSTypeError(fmt::format(
-        L"Iterator result '{}' is not an object", val->convertToString(ctx)));
+    throw error::JSTypeError(
+        fmt::format(L"Iterator result '{}' is not an object",
+                    val->toString(ctx)->getString().value()));
   }
   auto done = val->getProperty(ctx, L"done");
   auto result = val->getProperty(ctx, L"value");
-  if (done->convertToBoolean(ctx)) {
+  if (done->toBoolean(ctx)->getBoolean().value()) {
     _ctx->stack.push_back(ctx->createValue(new engine::JSStore(
         new engine::JSTaskEntity(result->getStore(), _pc))));
   } else {
@@ -586,7 +587,7 @@ JS_OPT(JSVirtualMachine::jmp) {
 JS_OPT(JSVirtualMachine::jfalse) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
-  if (!value->convertToBoolean(ctx)) {
+  if (!value->toBoolean(ctx)->getBoolean().value()) {
     _pc = offset;
   }
 }
@@ -594,7 +595,7 @@ JS_OPT(JSVirtualMachine::jfalse) {
 JS_OPT(JSVirtualMachine::jtrue) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
-  if (value->convertToBoolean(ctx)) {
+  if (value->toBoolean(ctx)->getBoolean().value()) {
     _pc = offset;
   }
 }

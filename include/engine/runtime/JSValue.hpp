@@ -30,7 +30,7 @@ public:
   std::wstring getName() const;
 
   template <class T = JSEntity> common::AutoPtr<T> getEntity() {
-    return (T*)_store->getEntity().getRawPointer();
+    return (T *)_store->getEntity().getRawPointer();
   }
 
   template <class T = JSEntity> const common::AutoPtr<T> getEntity() const {
@@ -84,16 +84,16 @@ public:
         std::vector<common::AutoPtr<JSValue>> args = {},
         const JSLocation &location = {});
 
-  std::wstring convertToString(common::AutoPtr<JSContext> ctx);
-
   common::AutoPtr<JSValue> toPrimitive(common::AutoPtr<JSContext> ctx,
                                        const std::wstring &hint = L"default");
 
   common::AutoPtr<JSValue> pack(common::AutoPtr<JSContext> ctx);
 
-  std::optional<double> convertToNumber(common::AutoPtr<JSContext> ctx);
+  common::AutoPtr<JSValue> toNumber(common::AutoPtr<JSContext> ctx);
 
-  bool convertToBoolean(common::AutoPtr<JSContext> ctx);
+  common::AutoPtr<JSValue> toBoolean(common::AutoPtr<JSContext> ctx);
+
+  common::AutoPtr<JSValue> toString(common::AutoPtr<JSContext> ctx);
 
   common::AutoPtr<JSValue> getPrototype(common::AutoPtr<JSContext> ctx);
 

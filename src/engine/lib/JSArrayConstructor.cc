@@ -66,9 +66,9 @@ JS_FUNC(JSArrayConstructor::toStringTag) { return ctx->createString(L"Array"); }
 JS_FUNC(JSArrayConstructor::join) {
   std::wstring separator = L",";
   if (args.size() > 0) {
-    separator = args[0]->convertToString(ctx);
+    separator = args[0]->toString(ctx)->getString().value();
   }
-  auto len = self->getProperty(ctx, L"length")->convertToNumber(ctx);
+  auto len = self->getProperty(ctx, L"length")->toNumber(ctx)->getNumber();
   if (!len.has_value()) {
     return ctx->createString();
   }
@@ -77,7 +77,7 @@ JS_FUNC(JSArrayConstructor::join) {
   for (size_t index = 0; index < length; index++) {
     auto item = self->getProperty(ctx, ctx->createNumber(index));
     if (!item->isNull() && !item->isUndefined()) {
-      result += item->convertToString(ctx);
+      result += item->toString(ctx)->getString().value();
     }
     if (index != length - 1) {
       result += separator;

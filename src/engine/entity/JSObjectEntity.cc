@@ -49,7 +49,9 @@ std::wstring JSObjectEntity::toString(common::AutoPtr<JSContext> ctx) const {
     str =
         ctx->getScope()
             ->createValue((JSStore *)_symbolFields.at(symbol->getStore()).value)
-            ->convertToString(ctx);
+            ->toString(ctx)
+            ->getString()
+            .value();
   }
   return fmt::format(L"[object {}]", str);
 }
