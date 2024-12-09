@@ -72,6 +72,8 @@ private:
   JS_OPT(yield);
   JS_OPT(yieldDelegate);
   JS_OPT(await);
+  JS_OPT(void_);
+  JS_OPT(typeof_);
   JS_OPT(pushScope);
   JS_OPT(popScope);
   JS_OPT(call);
@@ -90,6 +92,12 @@ private:
   JS_OPT(mod);
   JS_OPT(add);
   JS_OPT(sub);
+  JS_OPT(inc);
+  JS_OPT(dec);
+  JS_OPT(plus);
+  JS_OPT(netation);
+  JS_OPT(not_);
+  JS_OPT(logicalNot);
   JS_OPT(ushr);
   JS_OPT(shr);
   JS_OPT(shl);

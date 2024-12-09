@@ -2,6 +2,7 @@
 #include "common/AutoPtr.hpp"
 #include "compiler/base/JSNode.hpp"
 #include "compiler/base/JSNodeType.hpp"
+#include "error/JSSyntaxError.hpp"
 #include "vm/JSAsmOperator.hpp"
 #include <cstdint>
 #include <fmt/xchar.h>
@@ -130,10 +131,12 @@ void JSGenerator::pushScope(JSGeneratorContext &ctx,
   for (auto &declar : closures) {
     resolveClosure(ctx, module, declar);
   }
+  ctx.scopeChain++;
 }
 
 void JSGenerator::popScope(JSGeneratorContext &ctx,
                            common::AutoPtr<JSModule> &module) {
+  ctx.scopeChain--;
   generate(module, vm::JSAsmOperator::POP_SCOPE);
 }
 
@@ -325,15 +328,90 @@ void JSGenerator::resolveExpressionYieldDelegate(
 
 void JSGenerator::resolveStatementLabel(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
+                                        const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSLabelStatement>();
+  auto label = n->label.cast<JSIdentifierLiteral>()->value;
+  if (n->statement->type == JSNodeType::STATEMENT_FOR) {
+    resolveStatementFor(ctx, module, n->statement, label);
+  } else if (n->statement->type == JSNodeType::STATEMENT_FOR_IN) {
+    resolveStatementForIn(ctx, module, n->statement, label);
+  } else if (n->statement->type == JSNodeType::STATEMENT_FOR_OF) {
+    resolveStatementForOf(ctx, module, n->statement, label);
+  } else if (n->statement->type == JSNodeType::STATEMENT_FOR_AWAIT_OF) {
+    resolveStatementForAwaitOf(ctx, module, n->statement, label);
+  } else if (n->statement->type == JSNodeType::STATEMENT_WHILE) {
+    resolveStatementWhile(ctx, module, n->statement, label);
+  } else if (n->statement->type == JSNodeType::STATEMENT_DO_WHILE) {
+    resolveStatementWhile(ctx, module, n->statement, label);
+  } else {
+    _labels.push_back({{label, ctx.scopeChain}, {}});
+    resolveNode(ctx, module, n->statement);
+    auto &chunk = *_labels.rbegin();
+    for (auto &[jmpnode, offset] : chunk.second) {
+      *(uint32_t *)(module->codes.data() + offset) =
+          (uint32_t)module->codes.size();
+    }
+    _labels.pop_back();
+  }
+}
 
 void JSGenerator::resolveStatementBreak(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
+                                        const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSBreakStatement>();
+  std::wstring label;
+  if (n->label != nullptr) {
+    label = n->label.cast<JSIdentifierLiteral>()->value;
+  }
+  auto it = _labels.rbegin();
+  for (; it != _labels.rend(); it++) {
+    if (it->first.first == label) {
+      while (ctx.scopeChain != it->first.second) {
+        popScope(ctx, module);
+      }
+      it->second.push_back({(JSNode *)node.getRawPointer(),
+                            module->codes.size() + sizeof(uint16_t)});
+      break;
+    }
+  }
+  if (it == _labels.rend()) {
+    if (label.empty()) {
+      throw error::JSSyntaxError(L"Illegal break statement");
+    } else {
+      throw error::JSSyntaxError(fmt::format(L"Undefined label '{}'", label));
+    }
+  }
+  generate(module, vm::JSAsmOperator::JMP, 0U);
+}
 
 void JSGenerator::resolveStatementContinue(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSContinueStatement>();
+  std::wstring label;
+  if (n->label != nullptr) {
+    label = n->label.cast<JSIdentifierLiteral>()->value;
+  }
+  auto it = _labels.rbegin();
+  for (; it != _labels.rend(); it++) {
+    if (it->first.first == label) {
+      while (it->first.second != ctx.scopeChain) {
+        popScope(ctx, module);
+      }
+      it->second.push_back({(JSNode *)node.getRawPointer(),
+                            module->codes.size() + sizeof(uint16_t)});
+      break;
+    }
+  }
+  if (it == _labels.rend()) {
+    if (label.empty()) {
+      throw error::JSSyntaxError(L"Illegal continue statement");
+    } else {
+      throw error::JSSyntaxError(fmt::format(L"Undefined label '{}'", label));
+    }
+  }
+  generate(module, vm::JSAsmOperator::JMP, 0U);
+}
 
 void JSGenerator::resolveStatementIf(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
@@ -349,6 +427,8 @@ void JSGenerator::resolveStatementIf(JSGeneratorContext &ctx,
     *(uint32_t *)(module->codes.data() + alt) = (uint32_t)module->codes.size();
     resolveNode(ctx, module, n->consequent);
     *(uint32_t *)(module->codes.data() + end) = (uint32_t)module->codes.size();
+  } else {
+    *(uint32_t *)(module->codes.data() + alt) = (uint32_t)module->codes.size();
   }
 }
 
@@ -423,28 +503,102 @@ void JSGenerator::resolveStatementTryCatch(
 
 void JSGenerator::resolveStatementWhile(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
+                                        const common::AutoPtr<JSNode> &node,
+                                        const std::wstring &label) {
+  auto n = node.cast<JSWhileStatement>();
+  _labels.push_back({{label, ctx.scopeChain}, {}});
+  auto start = (uint32_t)module->codes.size();
+  resolveNode(ctx, module, n->condition);
+  auto endOffset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JFALSE, 0U);
+  resolveNode(ctx, module, n->body);
+  generate(module, vm::JSAsmOperator::JMP, start);
+  auto end = (uint32_t)module->codes.size();
+  *(uint32_t *)(module->codes.data() + endOffset) = end;
+  auto &chunk = *_labels.rbegin();
+  for (auto &[node, offset] : chunk.second) {
+    if (node->type == JSNodeType::STATEMENT_BREAK) {
+      *(uint32_t *)(module->codes.data() + offset) = end;
+    } else {
+      *(uint32_t *)(module->codes.data() + offset) = start;
+    }
+  }
+  _labels.pop_back();
+}
 
 void JSGenerator::resolveStatementDoWhile(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
-                                          const common::AutoPtr<JSNode> &node) {
+                                          const common::AutoPtr<JSNode> &node,
+                                          const std::wstring &label) {
+  auto n = node.cast<JSDoWhileStatement>();
+  _labels.push_back({{label, ctx.scopeChain}, {}});
+  auto start = (uint32_t)module->codes.size();
+  resolveNode(ctx, module, n->body);
+  resolveNode(ctx, module, n->condition);
+  auto condition = (uint32_t)module->codes.size();
+  generate(module, vm::JSAsmOperator::JTRUE, start);
+  auto end = (uint32_t)module->codes.size();
+  auto &chunk = *_labels.rbegin();
+  for (auto &[node, offset] : chunk.second) {
+    if (node->type == JSNodeType::STATEMENT_BREAK) {
+      *(uint32_t *)(module->codes.data() + offset) = end;
+    } else {
+      *(uint32_t *)(module->codes.data() + offset) = condition;
+    }
+  }
+  _labels.pop_back();
 }
 
 void JSGenerator::resolveStatementFor(JSGeneratorContext &ctx,
                                       common::AutoPtr<JSModule> &module,
-                                      const common::AutoPtr<JSNode> &node) {}
+                                      const common::AutoPtr<JSNode> &node,
+                                      const std::wstring &label) {
+  auto n = node.cast<JSForStatement>();
+  _labels.push_back({{label, ctx.scopeChain}, {}});
+  pushScope(ctx, module, n->scope);
+  if (n->init != nullptr) {
+    resolveNode(ctx, module, n->init);
+  }
+  auto start = (uint32_t)module->codes.size();
+  if (n->condition != nullptr) {
+    resolveNode(ctx, module, n->condition);
+  } else {
+    generate(module, vm::JSAsmOperator::PUSH_TRUE);
+  }
+  auto endOffset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JFALSE, 0U);
+  resolveNode(ctx, module, n->body);
+  if (n->update != nullptr) {
+    resolveNode(ctx, module, n->update);
+  }
+  generate(module, vm::JSAsmOperator::JMP, start);
+  auto end = (uint32_t)module->codes.size();
+  *(uint32_t *)(module->codes.data() + endOffset) = end;
+  auto &chunk = *_labels.rbegin();
+  for (auto &[node, offset] : chunk.second) {
+    if (node->type == JSNodeType::STATEMENT_BREAK) {
+      *(uint32_t *)(module->codes.data() + offset) = end;
+    } else {
+      *(uint32_t *)(module->codes.data() + offset) = start;
+    }
+  }
+  popScope(ctx, module);
+  _labels.pop_back();
+}
 
 void JSGenerator::resolveStatementForIn(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
+                                        const common::AutoPtr<JSNode> &node,
+                                        const std::wstring &label) {}
 
 void JSGenerator::resolveStatementForOf(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
+                                        const common::AutoPtr<JSNode> &node,
+                                        const std::wstring &label) {}
 
 void JSGenerator::resolveStatementForAwaitOf(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node, const std::wstring &label) {}
 
 void JSGenerator::resolveVariableDeclaration(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
@@ -559,11 +713,34 @@ void JSGenerator::resolveObjectAccessor(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveExpressionUnary(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSUnaryExpression>();
+  resolveNode(ctx, module, n->right);
+  if (n->opt == L"!") {
+    generate(module, vm::JSAsmOperator::LNOT);
+  } else if (n->opt == L"~") {
+    generate(module, vm::JSAsmOperator::NOT);
+  } else if (n->opt == L"++") {
+    generate(module, vm::JSAsmOperator::INC, 0U);
+  } else if (n->opt == L"--") {
+    generate(module, vm::JSAsmOperator::DEC, 0U);
+  } else if (n->opt == L"+") {
+    generate(module, vm::JSAsmOperator::PLUS);
+  } else if (n->opt == L"-") {
+    generate(module, vm::JSAsmOperator::NETA);
+  }
+}
 
 void JSGenerator::resolveExpressionUpdate(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
                                           const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSUpdateExpression>();
+  resolveNode(ctx, module, n->left);
+  if (n->opt == L"++") {
+    generate(module, vm::JSAsmOperator::INC, 1U);
+  } else if (n->opt == L"--") {
+    generate(module, vm::JSAsmOperator::DEC, 1U);
+  }
 }
 
 void JSGenerator::resolveExpressionBinary(JSGeneratorContext &ctx,
@@ -722,20 +899,34 @@ void JSGenerator::resolveExpressionDelete(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveExpressionAwait(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSAwaitExpression>();
+  resolveNode(ctx, module, n->right);
+  generate(module, vm::JSAsmOperator::AWAIT);
+}
 
 void JSGenerator::resolveExpressionVoid(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
+                                        const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSVoidExpression>();
+  resolveNode(ctx, module, n->right);
+  generate(module, vm::JSAsmOperator::VOID);
+}
 
 void JSGenerator::resolveExpressionTypeof(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
                                           const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSTypeofExpression>();
+  resolveNode(ctx, module, n->right);
+  generate(module, vm::JSAsmOperator::TYPE_OF);
 }
 
 void JSGenerator::resolveExpressionGroup(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSGroupExpression>();
+  resolveNode(ctx, module, n->expression);
+}
 
 void JSGenerator::resolveExpressionAssigment(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,

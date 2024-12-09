@@ -1,5 +1,5 @@
 "use strict";
-let a = 1
-{
-  var b = 1
+const obj = { a: 1, b: 2, c: 3 };
+for (const key in obj) {
+  console.log(key)
 }

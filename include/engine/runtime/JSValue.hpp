@@ -152,9 +152,9 @@ public:
 
   common::AutoPtr<JSValue> unaryNetation(common::AutoPtr<JSContext> ctx); // -a
 
-  common::AutoPtr<JSValue> increment(common::AutoPtr<JSContext> ctx); // ++a
+  void increment(common::AutoPtr<JSContext> ctx); // ++a
 
-  common::AutoPtr<JSValue> decrement(common::AutoPtr<JSContext> ctx); // --a
+  void decrement(common::AutoPtr<JSContext> ctx); // --a
 
   common::AutoPtr<JSValue> logicalNot(common::AutoPtr<JSContext> ctx); // !a
 

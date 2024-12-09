@@ -107,7 +107,7 @@ JS_OPT(JSVirtualMachine::pushValue) {
   auto offset = argi(module);
   if (offset <= _ctx->stack.size()) {
     auto value = _ctx->stack[_ctx->stack.size() - offset];
-    _ctx->stack.push_back(value);
+    _ctx->stack.push_back(ctx->createValue(value));
   } else {
     _ctx->stack.push_back(ctx->undefined());
   }
@@ -339,6 +339,18 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
 
 JS_OPT(JSVirtualMachine::await) {}
 
+JS_OPT(JSVirtualMachine::void_) {
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(ctx->undefined());
+}
+
+JS_OPT(JSVirtualMachine::typeof_) {
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(ctx->createString(value->getTypeName()));
+}
+
 JS_OPT(JSVirtualMachine::pushScope) {
   ctx->pushScope();
   _ctx->stackTops.push_back(_ctx->stack.size());
@@ -452,6 +464,50 @@ JS_OPT(JSVirtualMachine::sub) {
   auto arg1 = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   _ctx->stack.push_back(arg1->sub(ctx, arg2));
+}
+JS_OPT(JSVirtualMachine::inc) {
+  auto dir = argi(module);
+  auto val = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  if (dir == 1) {
+    _ctx->stack.push_back(ctx->createValue(val));
+  }
+  val->increment(ctx);
+  if (dir == 0) {
+    _ctx->stack.push_back(ctx->createValue(val));
+  }
+}
+JS_OPT(JSVirtualMachine::dec) {
+  auto dir = argi(module);
+  auto val = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  if (dir == 1) {
+    _ctx->stack.push_back(ctx->createValue(val));
+  }
+  val->decrement(ctx);
+  if (dir == 0) {
+    _ctx->stack.push_back(ctx->createValue(val));
+  }
+}
+JS_OPT(JSVirtualMachine::plus) {
+  auto val = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(val->unaryPlus(ctx));
+}
+JS_OPT(JSVirtualMachine::netation) {
+  auto val = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(val->unaryNetation(ctx));
+}
+JS_OPT(JSVirtualMachine::not_) {
+  auto val = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(val->bitwiseNot(ctx));
+}
+JS_OPT(JSVirtualMachine::logicalNot) {
+  auto val = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(val->logicalNot(ctx));
 }
 JS_OPT(JSVirtualMachine::ushr) {
   auto arg2 = *_ctx->stack.rbegin();
@@ -773,6 +829,12 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case vm::JSAsmOperator::AWAIT:
         await(ctx, module);
         break;
+      case vm::JSAsmOperator::VOID:
+        void_(ctx, module);
+        break;
+      case vm::JSAsmOperator::TYPE_OF:
+        typeof_(ctx, module);
+        break;
       case vm::JSAsmOperator::PUSH_SCOPE:
         pushScope(ctx, module);
         break;
@@ -802,6 +864,24 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::SUB:
         sub(ctx, module);
+        break;
+      case vm::JSAsmOperator::INC:
+        inc(ctx, module);
+        break;
+      case vm::JSAsmOperator::DEC:
+        dec(ctx, module);
+        break;
+      case vm::JSAsmOperator::PLUS:
+        plus(ctx, module);
+        break;
+      case vm::JSAsmOperator::NETA:
+        netation(ctx, module);
+        break;
+      case vm::JSAsmOperator::NOT:
+        not_(ctx, module);
+        break;
+      case vm::JSAsmOperator::LNOT:
+        logicalNot(ctx, module);
         break;
       case vm::JSAsmOperator::USHR:
         ushr(ctx, module);

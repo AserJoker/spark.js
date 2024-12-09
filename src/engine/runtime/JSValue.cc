@@ -8,6 +8,7 @@
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
+#include "engine/entity/JSNaNEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
@@ -228,6 +229,7 @@ common::AutoPtr<JSValue> JSValue::toNumber(common::AutoPtr<JSContext> ctx) {
   case JSValueType::JS_NAN:
   case JSValueType::JS_INFINITY:
   case JSValueType::JS_NUMBER:
+    return this;
   case JSValueType::JS_BOOLEAN:
     value = getEntity<JSBooleanEntity>()->getValue() ? 1 : 0;
     break;
@@ -346,8 +348,10 @@ common::AutoPtr<JSValue> JSValue::toNumber(common::AutoPtr<JSContext> ctx) {
         value = std::stold(snum);
         break;
       }
+      return ctx->createNumber(value);
+    } else {
+      return ctx->NaN();
     }
-    break;
   }
   case JSValueType::JS_BIGINT:
     throw error::JSTypeError(L"Cannot convert a BigInt value to a number");
@@ -1082,38 +1086,34 @@ JSValue::unaryNetation(common::AutoPtr<JSContext> ctx) {
   return ctx->NaN();
 }
 
-common::AutoPtr<JSValue> JSValue::increment(common::AutoPtr<JSContext> ctx) {
+void JSValue::increment(common::AutoPtr<JSContext> ctx) {
   if (getType() == JSValueType::JS_INFINITY) {
-    return ctx->createInfinity(getEntity<JSInfinityEntity>()->isNegative());
   }
   if (getType() == JSValueType::JS_BIGINT) {
     auto &value = getEntity<JSBigIntEntity>()->getValue();
     value += 1;
-    return ctx->createBigInt(value);
   }
   auto value = toNumber(ctx)->getNumber();
   if (value.has_value()) {
     setNumber(value.value() + 1);
-    return ctx->createNumber(value.value() + 1);
+  } else {
+    setEntity(new JSNaNEntity());
   }
-  return ctx->NaN();
 }
 
-common::AutoPtr<JSValue> JSValue::decrement(common::AutoPtr<JSContext> ctx) {
+void JSValue::decrement(common::AutoPtr<JSContext> ctx) {
   if (getType() == JSValueType::JS_INFINITY) {
-    return ctx->createInfinity(getEntity<JSInfinityEntity>()->isNegative());
   }
   if (getType() == JSValueType::JS_BIGINT) {
     auto &value = getEntity<JSBigIntEntity>()->getValue();
     value -= 1;
-    return ctx->createBigInt(value);
   }
   auto value = toNumber(ctx)->getNumber();
   if (value.has_value()) {
     setNumber(value.value() - 1);
-    return ctx->createNumber(value.value() - 1);
+  } else {
+    setEntity(new JSNaNEntity());
   }
-  return ctx->NaN();
 }
 
 common::AutoPtr<JSValue> JSValue::logicalNot(common::AutoPtr<JSContext> ctx) {

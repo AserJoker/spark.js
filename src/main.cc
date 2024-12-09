@@ -217,6 +217,12 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::YIELD_DELEGATE:
       out << L"yield_delegate";
       break;
+    case vm::JSAsmOperator::VOID:
+      out << L"void";
+      break;
+    case vm::JSAsmOperator::TYPE_OF:
+      out << L"typeof";
+      break;
     case vm::JSAsmOperator::AWAIT:
       out << L"await";
       break;
@@ -283,8 +289,28 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::SUB:
       out << L"sub";
       break;
+    case vm::JSAsmOperator::INC:
+      out << L"inc " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::DEC:
+      out << L"dec " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
     case vm::JSAsmOperator::USHR:
       out << L"ushr";
+      break;
+    case vm::JSAsmOperator::NOT:
+      out << L"not";
+      break;
+    case vm::JSAsmOperator::LNOT:
+      out << L"lnot";
+      break;
+    case vm::JSAsmOperator::PLUS:
+      out << L"plus";
+      break;
+    case vm::JSAsmOperator::NETA:
+      out << L"netation";
       break;
     case vm::JSAsmOperator::SHR:
       out << L"shr";

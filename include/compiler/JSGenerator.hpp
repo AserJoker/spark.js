@@ -20,7 +20,11 @@ private:
 
   struct JSGeneratorContext {
     JSLexScope *currentScope;
-    JSGeneratorContext() { currentScope = nullptr; }
+    size_t scopeChain;
+    JSGeneratorContext() {
+      currentScope = nullptr;
+      scopeChain = 0;
+    }
     ~JSGeneratorContext() {
       while (currentScope) {
         auto tmp = currentScope;
@@ -29,6 +33,10 @@ private:
       }
     }
   };
+
+  std::vector<std::pair<std::pair<std::wstring, size_t>,
+                        std::vector<std::pair<JSNode *, size_t>>>>
+      _labels;
 
 private:
   void resolveDeclaration(JSGeneratorContext &ctx,
@@ -177,27 +185,33 @@ private:
 
   void resolveStatementWhile(JSGeneratorContext &ctx,
                              common::AutoPtr<JSModule> &module,
-                             const common::AutoPtr<JSNode> &node);
+                             const common::AutoPtr<JSNode> &node,
+                             const std::wstring &label = L"");
 
   void resolveStatementDoWhile(JSGeneratorContext &ctx,
                                common::AutoPtr<JSModule> &module,
-                               const common::AutoPtr<JSNode> &node);
+                               const common::AutoPtr<JSNode> &node,
+                               const std::wstring &label = L"");
 
   void resolveStatementFor(JSGeneratorContext &ctx,
                            common::AutoPtr<JSModule> &module,
-                           const common::AutoPtr<JSNode> &node);
+                           const common::AutoPtr<JSNode> &node,
+                           const std::wstring &label = L"");
 
   void resolveStatementForIn(JSGeneratorContext &ctx,
                              common::AutoPtr<JSModule> &module,
-                             const common::AutoPtr<JSNode> &node);
+                             const common::AutoPtr<JSNode> &node,
+                             const std::wstring &label = L"");
 
   void resolveStatementForOf(JSGeneratorContext &ctx,
                              common::AutoPtr<JSModule> &module,
-                             const common::AutoPtr<JSNode> &node);
+                             const common::AutoPtr<JSNode> &node,
+                             const std::wstring &label = L"");
 
   void resolveStatementForAwaitOf(JSGeneratorContext &ctx,
                                   common::AutoPtr<JSModule> &module,
-                                  const common::AutoPtr<JSNode> &node);
+                                  const common::AutoPtr<JSNode> &node,
+                                  const std::wstring &label = L"");
 
   void resolveVariableDeclaration(JSGeneratorContext &ctx,
                                   common::AutoPtr<JSModule> &module,
