@@ -2,7 +2,6 @@
 #include "common/AutoPtr.hpp"
 #include "compiler/base/JSAsmOperator.hpp"
 #include "engine/base/JSValueType.hpp"
-#include "engine/entity/JSArgumentEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
@@ -94,7 +93,7 @@ JS_OPT(JSVirtualMachine::pushSuper) {}
 JS_OPT(JSVirtualMachine::pushArgument) {
   auto arguments = ctx->load(L"arguments");
   auto index = argi(module);
-  _ctx->stack.push_back(arguments->getIndex(ctx, index));
+  _ctx->stack.push_back(arguments->getProperty(ctx, fmt::format(L"{}", index)));
 }
 
 JS_OPT(JSVirtualMachine::pushBigint) {
@@ -556,7 +555,7 @@ JS_OPT(JSVirtualMachine::xor_) {
 
 JS_OPT(JSVirtualMachine::tryStart) {
   auto handle = argi(module);
-  _ctx->errorStacks = new JSErrorFrame(_ctx->errorStacks);
+  _ctx->errorStacks = new JSErrorFrame(_ctx->errorStacks, ctx->getScope());
   _ctx->errorStacks->handle = handle;
 }
 
@@ -613,7 +612,14 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         }
         auto handle = _ctx->errorStacks->handle;
         auto defer = _ctx->errorStacks->defer;
+        auto scope = _ctx->errorStacks->scope;
         _ctx->errorStacks = _ctx->errorStacks->parent;
+        scope->getRootScope()->getRoot()->appendChild(result->getStore());
+        _ctx->stack.pop_back();
+        while (ctx->getScope() != scope) {
+          popScope(ctx, module);
+        }
+        _ctx->stack.push_back(result);
         if (result->getType() == engine::JSValueType::JS_EXCEPTION) {
           if (handle != 0) {
             _pc = handle;
@@ -903,26 +909,17 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
       }
     }
   }
-  std::vector<engine::JSStore *> arguments;
-  for (auto &arg : args) {
-    arguments.push_back(arg->getStore());
+
+  auto arguments = ctx->createValue(
+      new engine::JSStore(new engine::JSObjectEntity(ctx->null()->getStore())),
+      L"arguments");
+
+  for (size_t index = 0; index < args.size(); index++) {
+    arguments->setProperty(ctx, fmt::format(L"{}", index), args[index]);
   }
-  auto argv = ctx->createValue(new engine::JSStore(new engine::JSArgumentEntity(
-                                   ctx->null()->getStore(), arguments)),
-                               L"arguments");
-  argv->setPropertyDescriptor(
-      ctx, L"length",
-      {
-          .configurable = true,
-          .enumable = false,
-          .value = ctx->createNumber((double)arguments.size())->getStore(),
-          .writable = true,
-      });
-  argv->setPropertyDescriptor(ctx, L"callee",
-                              {.configurable = false,
-                               .enumable = false,
-                               .value = func->getStore(),
-                               .writable = false});
+
+  arguments->setProperty(ctx, L"length", ctx->createNumber(args.size()));
+
   ctx->createValue(self, L"this");
   common::AutoPtr<engine::JSValue> result;
   if (func->getType() == engine::JSValueType::JS_NATIVE_FUNCTION) {
@@ -939,7 +936,7 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
         scope->createValue(value, name);
       }
       scope->createValue(self->getStore(), L"this");
-      scope->createValue(argv->getStore(), L"arguments");
+      scope->createValue(arguments->getStore(), L"arguments");
       result->setOpaque(JSCoroutineContext{
           .eval = new JSEvalContext,
           .scope = scope,

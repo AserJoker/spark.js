@@ -250,7 +250,6 @@ std::wstring JSValue::convertToString(common::AutoPtr<JSContext> ctx) {
   case JSValueType::JS_OBJECT:
   case JSValueType::JS_NATIVE_FUNCTION:
   case JSValueType::JS_CLASS:
-  case JSValueType::JS_ARGUMENT:
   case JSValueType::JS_ARRAY:
   case JSValueType::JS_FUNCTION:
     return toPrimitive(ctx)->convertToString(ctx);
@@ -445,7 +444,6 @@ std::wstring JSValue::getTypeName() {
   case JSValueType::JS_INTERNAL:
   case JSValueType::JS_EXCEPTION:
   case JSValueType::JS_OBJECT:
-  case JSValueType::JS_ARGUMENT:
   case JSValueType::JS_NULL:
   case JSValueType::JS_ARRAY:
   case JSValueType::JS_REGEXP:
