@@ -1,5 +1,5 @@
 #pragma once
-namespace spark::compiler {
+namespace spark::vm {
 enum class JSAsmOperator {
   PUSH_NULL = 0,
   PUSH_UNDEFINED,
@@ -17,8 +17,9 @@ enum class JSAsmOperator {
   PUSH_ARGUMENT,
   PUSH_BIGINT,
   PUSH_REGEX,
-  SET_ADDRESS,
-  SET_ASYNC,
+  PUSH_VALUE,
+  SET_FUNC_ADDRESS,
+  SET_FUNC_ASYNC,
   SET_FUNC_NAME,
   SET_FUNC_LEN,
   SET_FUNC_SOURCE,
@@ -43,7 +44,6 @@ enum class JSAsmOperator {
   YIELD_DELEGATE,
   AWAIT,
   NEW,
-  NC,
   PUSH_SCOPE,
   POP_SCOPE,
   CALL,
@@ -51,6 +51,7 @@ enum class JSAsmOperator {
   JMP,
   JFALSE,
   JTRUE,
+  JNOT_NULL,
   TRY,
   DEFER,
   END_DEFER,

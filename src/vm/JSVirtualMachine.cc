@@ -1,6 +1,5 @@
 #include "vm/JSVirtualMachine.hpp"
 #include "common/AutoPtr.hpp"
-#include "compiler/base/JSAsmOperator.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
@@ -12,6 +11,7 @@
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
 #include "error/JSTypeError.hpp"
+#include "vm/JSAsmOperator.hpp"
 #include "vm/JSCoroutineContext.hpp"
 #include "vm/JSErrorFrame.hpp"
 #include "vm/JSEvalContext.hpp"
@@ -21,11 +21,11 @@ using namespace spark;
 using namespace spark::vm;
 JSVirtualMachine::JSVirtualMachine() { _ctx = new JSEvalContext; }
 
-compiler::JSAsmOperator
+vm::JSAsmOperator
 JSVirtualMachine::next(const common::AutoPtr<compiler::JSModule> &module) {
   auto codes = module->codes.data() + _pc;
   _pc += sizeof(uint16_t);
-  return (compiler::JSAsmOperator) * (uint16_t *)codes;
+  return (vm::JSAsmOperator) * (uint16_t *)codes;
 }
 
 uint32_t
@@ -102,6 +102,16 @@ JS_OPT(JSVirtualMachine::pushBigint) {
 }
 
 JS_OPT(JSVirtualMachine::pushRegex) {}
+
+JS_OPT(JSVirtualMachine::pushValue) {
+  auto offset = argi(module);
+  if (offset <= _ctx->stack.size()) {
+    auto value = _ctx->stack[_ctx->stack.size() - offset];
+    _ctx->stack.push_back(value);
+  } else {
+    _ctx->stack.push_back(ctx->undefined());
+  }
+}
 
 JS_OPT(JSVirtualMachine::setAddress) {
   auto addr = argi(module);
@@ -328,18 +338,6 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
 }
 
 JS_OPT(JSVirtualMachine::await) {}
-
-JS_OPT(JSVirtualMachine::nc) {
-  auto arg2 = *_ctx->stack.rbegin();
-  _ctx->stack.pop_back();
-  auto arg1 = *_ctx->stack.rbegin();
-  _ctx->stack.pop_back();
-  if (arg1->isNull() || arg1->isUndefined()) {
-    _ctx->stack.push_back(arg2);
-  } else {
-    _ctx->stack.push_back(arg1);
-  }
-}
 
 JS_OPT(JSVirtualMachine::pushScope) {
   ctx->pushScope();
@@ -587,6 +585,7 @@ JS_OPT(JSVirtualMachine::jmp) {
 JS_OPT(JSVirtualMachine::jfalse) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   if (!value->toBoolean(ctx)->getBoolean().value()) {
     _pc = offset;
   }
@@ -595,7 +594,17 @@ JS_OPT(JSVirtualMachine::jfalse) {
 JS_OPT(JSVirtualMachine::jtrue) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   if (value->toBoolean(ctx)->getBoolean().value()) {
+    _pc = offset;
+  }
+}
+
+JS_OPT(JSVirtualMachine::jnotNull) {
+  auto offset = argi(module);
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  if (!value->isNull() && !value->isUndefined()) {
     _pc = offset;
   }
 }
@@ -638,226 +647,229 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
     try {
       auto code = next(module);
       switch (code) {
-      case compiler::JSAsmOperator::PUSH_NULL:
+      case vm::JSAsmOperator::PUSH_NULL:
         pushNull(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_UNDEFINED:
+      case vm::JSAsmOperator::PUSH_UNDEFINED:
         pushUndefined(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_TRUE:
+      case vm::JSAsmOperator::PUSH_TRUE:
         pushTrue(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_FALSE:
+      case vm::JSAsmOperator::PUSH_FALSE:
         pushFalse(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_UNINITIALIZED:
+      case vm::JSAsmOperator::PUSH_UNINITIALIZED:
         pushUninitialized(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH:
+      case vm::JSAsmOperator::PUSH:
         push(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_OBJECT:
+      case vm::JSAsmOperator::PUSH_OBJECT:
         pushObject(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_ARRAY:
+      case vm::JSAsmOperator::PUSH_ARRAY:
         pushArray(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_FUNCTION:
+      case vm::JSAsmOperator::PUSH_FUNCTION:
         pushFunction(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_GENERATOR:
+      case vm::JSAsmOperator::PUSH_GENERATOR:
         pushGenerator(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_ARROW:
+      case vm::JSAsmOperator::PUSH_ARROW:
         pushArrow(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_THIS:
+      case vm::JSAsmOperator::PUSH_THIS:
         pushThis(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_SUPER:
+      case vm::JSAsmOperator::PUSH_SUPER:
         pushSuper(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_ARGUMENT:
+      case vm::JSAsmOperator::PUSH_ARGUMENT:
         pushArgument(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_BIGINT:
+      case vm::JSAsmOperator::PUSH_BIGINT:
         pushBigint(ctx, module);
         break;
-      case compiler::JSAsmOperator::PUSH_REGEX:
+      case vm::JSAsmOperator::PUSH_REGEX:
         pushRegex(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_ADDRESS:
+      case vm::JSAsmOperator::PUSH_VALUE:
+        pushValue(ctx, module);
+        break;
+      case vm::JSAsmOperator::SET_FUNC_ADDRESS:
         setAddress(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_ASYNC:
+      case vm::JSAsmOperator::SET_FUNC_ASYNC:
         setAsync(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_FUNC_NAME:
+      case vm::JSAsmOperator::SET_FUNC_NAME:
         setFuncName(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_FUNC_LEN:
+      case vm::JSAsmOperator::SET_FUNC_LEN:
         setFuncLen(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_FUNC_SOURCE:
+      case vm::JSAsmOperator::SET_FUNC_SOURCE:
         setFuncSource(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_CLOSURE:
+      case vm::JSAsmOperator::SET_CLOSURE:
         setClosure(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_FIELD:
+      case vm::JSAsmOperator::SET_FIELD:
         setField(ctx, module);
         break;
-      case compiler::JSAsmOperator::GET_FIELD:
+      case vm::JSAsmOperator::GET_FIELD:
         getField(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_ACCESSOR:
+      case vm::JSAsmOperator::SET_ACCESSOR:
         setAccessor(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_REGEX_HAS_INDICES:
+      case vm::JSAsmOperator::SET_REGEX_HAS_INDICES:
         setRegexHasIndices(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_REGEX_GLOBAL:
+      case vm::JSAsmOperator::SET_REGEX_GLOBAL:
         setRegexGlobal(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_REGEX_IGNORE_CASES:
+      case vm::JSAsmOperator::SET_REGEX_IGNORE_CASES:
         setRegexIgnoreCases(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_REGEX_MULTILINE:
+      case vm::JSAsmOperator::SET_REGEX_MULTILINE:
         setRegexMultiline(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_REGEX_DOT_ALL:
+      case vm::JSAsmOperator::SET_REGEX_DOT_ALL:
         setRegexDotAll(ctx, module);
         break;
-      case compiler::JSAsmOperator::SET_REGEX_STICKY:
+      case vm::JSAsmOperator::SET_REGEX_STICKY:
         setRegexSticky(ctx, module);
         break;
-      case compiler::JSAsmOperator::POP:
+      case vm::JSAsmOperator::POP:
         pop(ctx, module);
         break;
-      case compiler::JSAsmOperator::STORE_CONST:
+      case vm::JSAsmOperator::STORE_CONST:
         storeConst(ctx, module);
         break;
-      case compiler::JSAsmOperator::STORE:
+      case vm::JSAsmOperator::STORE:
         store(ctx, module);
         break;
-      case compiler::JSAsmOperator::LOAD:
+      case vm::JSAsmOperator::LOAD:
         load(ctx, module);
         break;
-      case compiler::JSAsmOperator::LOAD_CONST:
+      case vm::JSAsmOperator::LOAD_CONST:
         loadConst(ctx, module);
         break;
-      case compiler::JSAsmOperator::RET:
+      case vm::JSAsmOperator::RET:
         ret(ctx, module);
         break;
-      case compiler::JSAsmOperator::THROW:
+      case vm::JSAsmOperator::THROW:
         throw_(ctx, module);
         break;
-      case compiler::JSAsmOperator::YIELD:
+      case vm::JSAsmOperator::YIELD:
         yield(ctx, module);
         break;
-      case compiler::JSAsmOperator::YIELD_DELEGATE:
+      case vm::JSAsmOperator::YIELD_DELEGATE:
         yieldDelegate(ctx, module);
         break;
-      case compiler::JSAsmOperator::AWAIT:
+      case vm::JSAsmOperator::AWAIT:
         await(ctx, module);
         break;
-      case compiler::JSAsmOperator::NC:
-        nc(ctx, module);
-        break;
-      case compiler::JSAsmOperator::PUSH_SCOPE:
+      case vm::JSAsmOperator::PUSH_SCOPE:
         pushScope(ctx, module);
         break;
-      case compiler::JSAsmOperator::POP_SCOPE:
+      case vm::JSAsmOperator::POP_SCOPE:
         popScope(ctx, module);
         break;
-      case compiler::JSAsmOperator::CALL:
+      case vm::JSAsmOperator::CALL:
         call(ctx, module);
         break;
-      case compiler::JSAsmOperator::MEMBER_CALL:
+      case vm::JSAsmOperator::MEMBER_CALL:
         memberCall(ctx, module);
         break;
-      case compiler::JSAsmOperator::POW:
+      case vm::JSAsmOperator::POW:
         pow(ctx, module);
         break;
-      case compiler::JSAsmOperator::MUL:
+      case vm::JSAsmOperator::MUL:
         mul(ctx, module);
         break;
-      case compiler::JSAsmOperator::DIV:
+      case vm::JSAsmOperator::DIV:
         div(ctx, module);
         break;
-      case compiler::JSAsmOperator::MOD:
+      case vm::JSAsmOperator::MOD:
         mod(ctx, module);
         break;
-      case compiler::JSAsmOperator::ADD:
+      case vm::JSAsmOperator::ADD:
         add(ctx, module);
         break;
-      case compiler::JSAsmOperator::SUB:
+      case vm::JSAsmOperator::SUB:
         sub(ctx, module);
         break;
-      case compiler::JSAsmOperator::USHR:
+      case vm::JSAsmOperator::USHR:
         ushr(ctx, module);
         break;
-      case compiler::JSAsmOperator::SHR:
+      case vm::JSAsmOperator::SHR:
         shr(ctx, module);
         break;
-      case compiler::JSAsmOperator::SHL:
+      case vm::JSAsmOperator::SHL:
         shl(ctx, module);
         break;
-      case compiler::JSAsmOperator::GE:
+      case vm::JSAsmOperator::GE:
         ge(ctx, module);
         break;
-      case compiler::JSAsmOperator::LE:
+      case vm::JSAsmOperator::LE:
         le(ctx, module);
         break;
-      case compiler::JSAsmOperator::GT:
+      case vm::JSAsmOperator::GT:
         gt(ctx, module);
         break;
-      case compiler::JSAsmOperator::LT:
+      case vm::JSAsmOperator::LT:
         lt(ctx, module);
         break;
-      case compiler::JSAsmOperator::SEQ:
+      case vm::JSAsmOperator::SEQ:
         seq(ctx, module);
         break;
-      case compiler::JSAsmOperator::SNE:
+      case vm::JSAsmOperator::SNE:
         sne(ctx, module);
         break;
-      case compiler::JSAsmOperator::EQ:
+      case vm::JSAsmOperator::EQ:
         eq(ctx, module);
         break;
-      case compiler::JSAsmOperator::NE:
+      case vm::JSAsmOperator::NE:
         ne(ctx, module);
         break;
-      case compiler::JSAsmOperator::AND:
+      case vm::JSAsmOperator::AND:
         and_(ctx, module);
         break;
-      case compiler::JSAsmOperator::OR:
+      case vm::JSAsmOperator::OR:
         or_(ctx, module);
         break;
-      case compiler::JSAsmOperator::XOR:
+      case vm::JSAsmOperator::XOR:
         xor_(ctx, module);
         break;
-      case compiler::JSAsmOperator::JMP:
+      case vm::JSAsmOperator::JMP:
         jmp(ctx, module);
         break;
-      case compiler::JSAsmOperator::JFALSE:
+      case vm::JSAsmOperator::JFALSE:
         jfalse(ctx, module);
         break;
-      case compiler::JSAsmOperator::JTRUE:
+      case vm::JSAsmOperator::JTRUE:
         jtrue(ctx, module);
         break;
-      case compiler::JSAsmOperator::TRY:
+      case vm::JSAsmOperator::JNOT_NULL:
+        jnotNull(ctx, module);
+        break;
+      case vm::JSAsmOperator::TRY:
         tryStart(ctx, module);
         break;
-      case compiler::JSAsmOperator::DEFER:
+      case vm::JSAsmOperator::DEFER:
         defer(ctx, module);
         break;
-      case compiler::JSAsmOperator::END_DEFER:
+      case vm::JSAsmOperator::END_DEFER:
         deferEnd(ctx, module);
         break;
-      case compiler::JSAsmOperator::END_TRY:
+      case vm::JSAsmOperator::END_TRY:
         tryEnd(ctx, module);
         break;
-      case compiler::JSAsmOperator::NEW:
+      case vm::JSAsmOperator::NEW:
         new_(ctx, module);
         break;
       }

@@ -1,12 +1,13 @@
 #pragma once
-#include "base/JSAsmOperator.hpp"
 #include "base/JSModule.hpp"
 #include "base/JSNode.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/Object.hpp"
+#include "vm/JSAsmOperator.hpp"
 #include <string>
 #include <unordered_map>
 #include <vector>
+
 namespace spark::compiler {
 class JSGenerator : public common::Object {
 private:
@@ -409,7 +410,7 @@ private:
   void resolveNode(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
                    const common::AutoPtr<JSNode> &node);
 
-  void generate(common::AutoPtr<JSModule> &module, const JSAsmOperator &opt,
+  void generate(common::AutoPtr<JSModule> &module, const vm::JSAsmOperator &opt,
                 uint32_t arg) {
     auto size = module->codes.size();
     module->codes.push_back(0);
@@ -427,7 +428,7 @@ private:
     *(uint32_t *)buffer = arg;
   }
 
-  void generate(common::AutoPtr<JSModule> &module, const JSAsmOperator &opt,
+  void generate(common::AutoPtr<JSModule> &module, const vm::JSAsmOperator &opt,
                 double arg) {
     auto size = module->codes.size();
     module->codes.push_back(0);
@@ -447,7 +448,8 @@ private:
     *(uint64_t *)buffer = *(uint64_t *)&arg;
   }
 
-  void generate(common::AutoPtr<JSModule> &module, const JSAsmOperator &opt) {
+  void generate(common::AutoPtr<JSModule> &module,
+                const vm::JSAsmOperator &opt) {
     auto size = module->codes.size();
     module->codes.resize(size + sizeof(uint16_t), 0);
     auto buffer = module->codes.data() + size;

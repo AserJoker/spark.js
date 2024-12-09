@@ -1,11 +1,12 @@
 #pragma once
+#include "JSAsmOperator.hpp"
 #include "JSEvalContext.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/Object.hpp"
-#include "compiler/base/JSAsmOperator.hpp"
 #include "compiler/base/JSModule.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include <string>
+
 #define JS_OPT(name)                                                           \
   void name(common::AutoPtr<engine::JSContext> ctx,                            \
             const common::AutoPtr<compiler::JSModule> &module)
@@ -19,8 +20,7 @@ private:
   size_t _pc;
 
 private:
-  compiler::JSAsmOperator
-  next(const common::AutoPtr<compiler::JSModule> &module);
+  vm::JSAsmOperator next(const common::AutoPtr<compiler::JSModule> &module);
 
   uint32_t argi(const common::AutoPtr<compiler::JSModule> &module);
 
@@ -45,6 +45,7 @@ private:
   JS_OPT(pushArgument);
   JS_OPT(pushBigint);
   JS_OPT(pushRegex);
+  JS_OPT(pushValue);
   JS_OPT(setAddress);
   JS_OPT(setAsync);
   JS_OPT(setFuncName);
@@ -71,7 +72,6 @@ private:
   JS_OPT(yield);
   JS_OPT(yieldDelegate);
   JS_OPT(await);
-  JS_OPT(nc);
   JS_OPT(pushScope);
   JS_OPT(popScope);
   JS_OPT(call);
@@ -83,6 +83,7 @@ private:
   JS_OPT(jmp);
   JS_OPT(jfalse);
   JS_OPT(jtrue);
+  JS_OPT(jnotNull);
   JS_OPT(pow);
   JS_OPT(mul);
   JS_OPT(div);

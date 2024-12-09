@@ -1,5 +1,4 @@
 #include "common/AutoPtr.hpp"
-#include "compiler/base/JSAsmOperator.hpp"
 #include "compiler/base/JSModule.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
@@ -7,6 +6,7 @@
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
+#include "vm/JSAsmOperator.hpp"
 #include <cstdint>
 #include <exception>
 #include <fmt/xchar.h>
@@ -71,253 +71,258 @@ void write(common::AutoPtr<compiler::JSModule> module) {
   size_t offset = 0;
   auto buffer = module->codes.data();
   while (offset < module->codes.size()) {
-    auto code = (compiler::JSAsmOperator) * (uint16_t *)(buffer + offset);
+    auto code = (vm::JSAsmOperator) * (uint16_t *)(buffer + offset);
     out << fmt::format(L"{:<8} :", offset);
     offset += sizeof(uint16_t);
     switch (code) {
-    case compiler::JSAsmOperator::PUSH_NULL:
+    case vm::JSAsmOperator::PUSH_NULL:
       out << L"push_null";
       break;
-    case compiler::JSAsmOperator::PUSH_UNDEFINED:
+    case vm::JSAsmOperator::PUSH_UNDEFINED:
       out << L"push_undefined";
       break;
-    case compiler::JSAsmOperator::PUSH_TRUE:
+    case vm::JSAsmOperator::PUSH_TRUE:
       out << L"push_true";
       break;
-    case compiler::JSAsmOperator::PUSH_FALSE:
+    case vm::JSAsmOperator::PUSH_FALSE:
       out << L"push_false";
       break;
-    case compiler::JSAsmOperator::PUSH_UNINITIALIZED:
+    case vm::JSAsmOperator::PUSH_UNINITIALIZED:
       out << L"push_uninitialized";
       break;
-    case compiler::JSAsmOperator::PUSH:
+    case vm::JSAsmOperator::PUSH:
       out << L"push " << *(double *)(buffer + offset);
       offset += sizeof(double);
       break;
-    case compiler::JSAsmOperator::PUSH_OBJECT:
+    case vm::JSAsmOperator::PUSH_OBJECT:
       out << L"push_object";
       break;
-    case compiler::JSAsmOperator::PUSH_ARRAY:
+    case vm::JSAsmOperator::PUSH_ARRAY:
       out << L"push_array";
       break;
-    case compiler::JSAsmOperator::PUSH_FUNCTION:
+    case vm::JSAsmOperator::PUSH_FUNCTION:
       out << L"push_function";
       break;
-    case compiler::JSAsmOperator::PUSH_GENERATOR:
+    case vm::JSAsmOperator::PUSH_GENERATOR:
       out << L"push_generator";
       break;
-    case compiler::JSAsmOperator::PUSH_ARROW:
+    case vm::JSAsmOperator::PUSH_ARROW:
       out << L"push_arrow";
       break;
-    case compiler::JSAsmOperator::PUSH_THIS:
+    case vm::JSAsmOperator::PUSH_THIS:
       out << L"push_this";
       break;
-    case compiler::JSAsmOperator::PUSH_SUPER:
+    case vm::JSAsmOperator::PUSH_SUPER:
       out << L"push_super";
       break;
-    case compiler::JSAsmOperator::PUSH_ARGUMENT:
+    case vm::JSAsmOperator::PUSH_VALUE:
+      out << L"push_value " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::PUSH_ARGUMENT:
       out << L"push_argument " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::PUSH_BIGINT:
+    case vm::JSAsmOperator::PUSH_BIGINT:
       out << L"push_bigint " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::PUSH_REGEX:
+    case vm::JSAsmOperator::PUSH_REGEX:
       out << L"push_regex " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::SET_ADDRESS:
+    case vm::JSAsmOperator::SET_FUNC_ADDRESS:
       out << L"set_address " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::SET_ASYNC:
+    case vm::JSAsmOperator::SET_FUNC_ASYNC:
       out << L"set_async";
       break;
-    case compiler::JSAsmOperator::SET_FUNC_NAME:
+    case vm::JSAsmOperator::SET_FUNC_NAME:
       out << L"set_func_name " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::SET_FUNC_LEN:
+    case vm::JSAsmOperator::SET_FUNC_LEN:
       out << L"set_func_len " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::SET_FUNC_SOURCE:
+    case vm::JSAsmOperator::SET_FUNC_SOURCE:
       out << L"set_func_source " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::SET_CLOSURE:
+    case vm::JSAsmOperator::SET_CLOSURE:
       out << L"set_closure " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::SET_FIELD:
+    case vm::JSAsmOperator::SET_FIELD:
       out << L"set_field";
       break;
-    case compiler::JSAsmOperator::GET_FIELD:
+    case vm::JSAsmOperator::GET_FIELD:
       out << L"get_field";
       break;
-    case compiler::JSAsmOperator::SET_ACCESSOR:
+    case vm::JSAsmOperator::SET_ACCESSOR:
       out << L"set_accessor " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::SET_REGEX_HAS_INDICES:
+    case vm::JSAsmOperator::SET_REGEX_HAS_INDICES:
       out << L"set_regex_has_indices";
       break;
-    case compiler::JSAsmOperator::SET_REGEX_GLOBAL:
+    case vm::JSAsmOperator::SET_REGEX_GLOBAL:
       out << L"set_regex_global";
       break;
-    case compiler::JSAsmOperator::SET_REGEX_IGNORE_CASES:
+    case vm::JSAsmOperator::SET_REGEX_IGNORE_CASES:
       out << L"set_regex_ignore_cases";
       break;
-    case compiler::JSAsmOperator::SET_REGEX_MULTILINE:
+    case vm::JSAsmOperator::SET_REGEX_MULTILINE:
       out << L"set_regex_multiline";
       break;
-    case compiler::JSAsmOperator::SET_REGEX_DOT_ALL:
+    case vm::JSAsmOperator::SET_REGEX_DOT_ALL:
       out << L"set_regex_dot_all";
       break;
-    case compiler::JSAsmOperator::SET_REGEX_STICKY:
+    case vm::JSAsmOperator::SET_REGEX_STICKY:
       out << L"set_regex_sticky";
       break;
-    case compiler::JSAsmOperator::POP:
+    case vm::JSAsmOperator::POP:
       out << L"pop " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::STORE_CONST:
+    case vm::JSAsmOperator::STORE_CONST:
       out << L"store_const " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::STORE:
+    case vm::JSAsmOperator::STORE:
       out << L"store " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::LOAD:
+    case vm::JSAsmOperator::LOAD:
       out << L"load " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::LOAD_CONST:
+    case vm::JSAsmOperator::LOAD_CONST:
       out << L"load_const " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::RET:
+    case vm::JSAsmOperator::RET:
       out << L"ret";
       break;
-    case compiler::JSAsmOperator::END_DEFER:
+    case vm::JSAsmOperator::END_DEFER:
       out << L"end_defer";
       break;
-    case compiler::JSAsmOperator::THROW:
+    case vm::JSAsmOperator::THROW:
       out << L"throw";
       break;
-    case compiler::JSAsmOperator::YIELD:
+    case vm::JSAsmOperator::YIELD:
       out << L"yield";
       break;
-    case compiler::JSAsmOperator::YIELD_DELEGATE:
+    case vm::JSAsmOperator::YIELD_DELEGATE:
       out << L"yield_delegate";
       break;
-    case compiler::JSAsmOperator::AWAIT:
+    case vm::JSAsmOperator::AWAIT:
       out << L"await";
       break;
-    case compiler::JSAsmOperator::NC:
-      out << L"nc";
-      break;
-    case compiler::JSAsmOperator::PUSH_SCOPE:
+    case vm::JSAsmOperator::PUSH_SCOPE:
       out << L"push_scope";
       break;
-    case compiler::JSAsmOperator::POP_SCOPE:
+    case vm::JSAsmOperator::POP_SCOPE:
       out << L"pop_scope";
       break;
-    case compiler::JSAsmOperator::CALL:
+    case vm::JSAsmOperator::CALL:
       out << L"call " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::MEMBER_CALL:
+    case vm::JSAsmOperator::MEMBER_CALL:
       out << L"member_call " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::JMP:
+    case vm::JSAsmOperator::JMP:
       out << L"jmp " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::JFALSE:
+    case vm::JSAsmOperator::JFALSE:
       out << L"jfalse " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::TRY:
+    case vm::JSAsmOperator::JNOT_NULL:
+      out << L"jnotNull " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::TRY:
       out << L"try " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::DEFER:
+    case vm::JSAsmOperator::DEFER:
       out << L"defer " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::END_TRY:
+    case vm::JSAsmOperator::END_TRY:
       out << L"endtry";
       break;
-    case compiler::JSAsmOperator::ADD:
+    case vm::JSAsmOperator::ADD:
       out << L"add";
       break;
-    case compiler::JSAsmOperator::NEW:
+    case vm::JSAsmOperator::NEW:
       out << L"new " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::JTRUE:
+    case vm::JSAsmOperator::JTRUE:
       out << L"jtrue " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case compiler::JSAsmOperator::POW:
+    case vm::JSAsmOperator::POW:
       out << L"pow";
       break;
-    case compiler::JSAsmOperator::MUL:
+    case vm::JSAsmOperator::MUL:
       out << L"mul";
       break;
-    case compiler::JSAsmOperator::DIV:
+    case vm::JSAsmOperator::DIV:
       out << L"div";
       break;
-    case compiler::JSAsmOperator::MOD:
+    case vm::JSAsmOperator::MOD:
       out << L"mod";
       break;
-    case compiler::JSAsmOperator::SUB:
+    case vm::JSAsmOperator::SUB:
       out << L"sub";
       break;
-    case compiler::JSAsmOperator::USHR:
+    case vm::JSAsmOperator::USHR:
       out << L"ushr";
       break;
-    case compiler::JSAsmOperator::SHR:
+    case vm::JSAsmOperator::SHR:
       out << L"shr";
       break;
-    case compiler::JSAsmOperator::SHL:
+    case vm::JSAsmOperator::SHL:
       out << L"shl";
       break;
-    case compiler::JSAsmOperator::GE:
+    case vm::JSAsmOperator::GE:
       out << L"ge";
       break;
-    case compiler::JSAsmOperator::LE:
+    case vm::JSAsmOperator::LE:
       out << L"le";
       break;
-    case compiler::JSAsmOperator::GT:
+    case vm::JSAsmOperator::GT:
       out << L"gt";
       break;
-    case compiler::JSAsmOperator::LT:
+    case vm::JSAsmOperator::LT:
       out << L"lt";
       break;
-    case compiler::JSAsmOperator::SEQ:
+    case vm::JSAsmOperator::SEQ:
       out << L"seq";
       break;
-    case compiler::JSAsmOperator::SNE:
+    case vm::JSAsmOperator::SNE:
       out << L"sne";
       break;
-    case compiler::JSAsmOperator::EQ:
+    case vm::JSAsmOperator::EQ:
       out << L"eq";
       break;
-    case compiler::JSAsmOperator::NE:
+    case vm::JSAsmOperator::NE:
       out << L"ne";
       break;
-    case compiler::JSAsmOperator::AND:
+    case vm::JSAsmOperator::AND:
       out << L"and";
       break;
-    case compiler::JSAsmOperator::OR:
+    case vm::JSAsmOperator::OR:
       out << L"or";
       break;
-    case compiler::JSAsmOperator::XOR:
+    case vm::JSAsmOperator::XOR:
       out << L"xor";
       break;
     }
