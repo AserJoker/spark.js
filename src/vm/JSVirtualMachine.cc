@@ -303,23 +303,34 @@ JS_OPT(JSVirtualMachine::yield) {
 }
 
 JS_OPT(JSVirtualMachine::yieldDelegate) {
+  auto arg = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto gen = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   auto value = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
-  auto iterator =
-      value->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
-  if (iterator->getType() != engine::JSValueType::JS_FUNCTION) {
-    throw error::JSTypeError(L"yield delegate require iterator");
-  }
-  auto gen = iterator->apply(ctx, value);
-  if (gen->getType() != engine::JSValueType::JS_OBJECT) {
-    throw error::JSTypeError(
-        L"Result of the Symbol.iterator method is not an object");
+  auto nextpc = _pc;
+  if (gen->isUndefined()) {
+    auto iterator =
+        value->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
+    if (iterator->getType() != engine::JSValueType::JS_FUNCTION) {
+      throw error::JSTypeError(L"yield delegate require iterator");
+    }
+    gen = iterator->apply(ctx, value);
+    if (gen->getType() != engine::JSValueType::JS_OBJECT) {
+      throw error::JSTypeError(
+          L"Result of the Symbol.iterator method is not an object");
+    }
   }
   auto next = gen->getProperty(ctx, L"next");
   if (next->getType() != engine::JSValueType::JS_FUNCTION) {
     throw error::JSTypeError(L"yield delegate require iterator");
   }
-  auto val = next->apply(ctx, gen);
+  std::vector<common::AutoPtr<engine::JSValue>> args;
+  if (!arg->isUndefined()) {
+    args.push_back(arg);
+  }
+  auto val = next->apply(ctx, gen, args);
   if (val->getType() != engine::JSValueType::JS_OBJECT) {
     throw error::JSTypeError(
         fmt::format(L"Iterator result '{}' is not an object",
@@ -329,10 +340,13 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
   auto result = val->getProperty(ctx, L"value");
   if (done->toBoolean(ctx)->getBoolean().value()) {
     _ctx->stack.push_back(ctx->createValue(new engine::JSStore(
-        new engine::JSTaskEntity(result->getStore(), _pc))));
+        new engine::JSTaskEntity(result->getStore(), nextpc))));
   } else {
-    _ctx->stack.push_back(ctx->createValue(new engine::JSStore(
-        new engine::JSTaskEntity(result->getStore(), _pc - sizeof(uint16_t)))));
+    _ctx->stack.push_back(value);
+    _ctx->stack.push_back(gen);
+    _ctx->stack.push_back(
+        ctx->createValue(new engine::JSStore(new engine::JSTaskEntity(
+            result->getStore(), nextpc - sizeof(uint16_t)))));
   }
   _pc = module->codes.size();
 }

@@ -323,6 +323,8 @@ void JSGenerator::resolveExpressionYieldDelegate(
   } else {
     generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
   }
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // generator
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // argument
   generate(module, vm::JSAsmOperator::YIELD_DELEGATE);
 }
 
