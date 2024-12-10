@@ -164,6 +164,9 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"set_accessor " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
+    case vm::JSAsmOperator::MERGE:
+      out << L"merge";
+      break;
     case vm::JSAsmOperator::SET_REGEX_HAS_INDICES:
       out << L"set_regex_has_indices";
       break;
@@ -358,7 +361,8 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"rest_array";
       break;
     case vm::JSAsmOperator::REST_OBJECT:
-      out << L"rest_object";
+      out << L"rest_object " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
       break;
     }
     out << std::endl;

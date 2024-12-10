@@ -2383,6 +2383,20 @@ JSParser::readDecorator(uint32_t filename, const std::wstring &source,
 common::AutoPtr<JSNode>
 JSParser::readExpression(uint32_t filename, const std::wstring &source,
                          JSSourceLocation::Position &position) {
+  auto current = position;
+  auto left = readObjectPattern(filename, source, current);
+  if (left == nullptr) {
+    left = readArrayPattern(filename, source, current);
+  }
+  if (left != nullptr) {
+    auto node = readAssigmentExpression(filename, source, current);
+    if (node != nullptr) {
+      node.cast<JSBinaryExpression>()->left = left;
+      left->addParent(node);
+      position = current;
+      return node;
+    }
+  }
   return readRValue(filename, source, position, 999);
 }
 
@@ -3148,7 +3162,7 @@ JSParser::readRestExpression(uint32_t filename, const std::wstring &source,
     common::AutoPtr node = new JSBinaryExpression;
     node->level = 19;
     node->opt = L"...";
-    node->type = JSNodeType::EXPRESSION_BINARY;
+    node->type = JSNodeType::EXPRESSION_REST;
     node->right = readRValue(filename, source, current, 999);
     if (!node->right) {
       throw error::JSSyntaxError(
@@ -3827,6 +3841,12 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
     next = current;
     skipInvisible(filename, source, current);
     token = readSymbolToken(filename, source, current);
+  }
+  if (node->implement == nullptr &&
+      node->identifier->type != JSNodeType::LITERAL_IDENTITY) {
+    throw error::JSSyntaxError(
+        formatException(L"Unexcepted token", filename, source, current),
+        {filename, current.line, current.column});
   }
   if (token != nullptr) {
     if (token->location.isEqual(source, L",") ||
@@ -4648,9 +4668,7 @@ JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
       identifier = readIdentifierLiteral(filename, source, current);
     }
     if (!identifier) {
-      throw error::JSSyntaxError(
-          formatException(L"Unexcepted token", filename, source, current),
-          {filename, current.line, current.column});
+      return nullptr;
     }
     common::AutoPtr node = new JSRestPatternItem;
     node->identifier = identifier;
@@ -4688,9 +4706,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
     }
   }
   if (!identifier) {
-    throw error::JSSyntaxError(
-        formatException(L"Unexcepted token", filename, source, current),
-        {filename, current.line, current.column});
+    return nullptr;
   }
   node->identifier = identifier;
   identifier->addParent(node);
@@ -4707,9 +4723,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
         match = readArrayPattern(filename, source, current);
       }
       if (!match) {
-        throw error::JSSyntaxError(
-            formatException(L"Unexcepted token", filename, source, current),
-            {filename, current.line, current.column});
+        return nullptr;
       }
       node->match = match;
       match->addParent(node);
@@ -4743,9 +4757,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
     }
     current = next;
   }
-  throw error::JSSyntaxError(
-      formatException(L"Unexcepted token", filename, source, current),
-      {filename, current.line, current.column});
+  return nullptr;
 }
 
 common::AutoPtr<JSNode>

@@ -15,7 +15,10 @@
 #include "vm/JSCoroutineContext.hpp"
 #include "vm/JSErrorFrame.hpp"
 #include "vm/JSEvalContext.hpp"
+#include <algorithm>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 using namespace spark;
 using namespace spark::vm;
@@ -177,13 +180,7 @@ JS_OPT(JSVirtualMachine::setAccessor) {
   auto obj = *_ctx->stack.rbegin();
   auto prop = obj->getOwnPropertyDescriptor(ctx, name);
   if (!prop) {
-    obj->setPropertyDescriptor(ctx, name,
-                               {
-                                   .configurable = true,
-                                   .enumable = true,
-                                   .value = ctx->undefined()->getStore(),
-                                   .writable = true,
-                               });
+    obj->setPropertyDescriptor(ctx, name, ctx->undefined(), true, true);
     prop = obj->getOwnPropertyDescriptor(ctx, name);
   }
   if (prop->value) {
@@ -203,6 +200,27 @@ JS_OPT(JSVirtualMachine::setAccessor) {
     prop->set = accessor->getStore();
   }
   _ctx->stack.push_back(ctx->truly());
+}
+
+JS_OPT(JSVirtualMachine::merge) {
+  auto obj1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto obj = *_ctx->stack.rbegin();
+  if (obj->getType() == engine::JSValueType::JS_OBJECT) {
+    auto entity = obj1->getEntity<engine::JSObjectEntity>();
+    while (entity != nullptr) {
+      auto props = entity->getProperties();
+      for (auto &[key, field] : props) {
+        if (field.enumable) {
+          obj->setProperty(ctx, key, obj1->getProperty(ctx, key));
+        }
+      }
+      obj1 = obj1->getPrototype(ctx);
+      entity = obj1->getEntity<engine::JSObjectEntity>();
+    }
+  } else {
+    throw error::JSError(L"not implement");
+  }
 }
 
 JS_OPT(JSVirtualMachine::setRegexHasIndices) {}
@@ -425,7 +443,32 @@ JS_OPT(JSVirtualMachine::restArray) {
   _pc = pc;
 }
 
-JS_OPT(JSVirtualMachine::restObject) {}
+JS_OPT(JSVirtualMachine::restObject) {
+  auto size = argi(module);
+  std::vector<std::wstring> keys;
+  for (uint32_t i = 0; i < size; i++) {
+    auto val = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
+    keys.push_back(val->toString(ctx)->getString().value());
+  }
+  auto obj = *_ctx->stack.rbegin();
+  auto res = ctx->createObject();
+  auto entity = obj->getEntity<engine::JSObjectEntity>();
+  while (entity != nullptr) {
+    auto props = entity->getProperties();
+    for (auto &[key, field] : props) {
+      if (field.enumable) {
+        auto it = std::find(keys.begin(), keys.end(), key);
+        if (it == keys.end()) {
+          res->setProperty(ctx, key, obj->getProperty(ctx, key));
+        }
+      }
+    }
+    obj = obj->getPrototype(ctx);
+    entity = obj->getEntity<engine::JSObjectEntity>();
+  }
+  _ctx->stack.push_back(res);
+}
 
 JS_OPT(JSVirtualMachine::await) {}
 
@@ -732,8 +775,9 @@ JS_OPT(JSVirtualMachine::jfalse) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
   if (!value->toBoolean(ctx)->getBoolean().value()) {
-    _ctx->stack.pop_back();
     _pc = offset;
+  } else {
+    _ctx->stack.pop_back();
   }
 }
 
@@ -741,8 +785,9 @@ JS_OPT(JSVirtualMachine::jtrue) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
   if (value->toBoolean(ctx)->getBoolean().value()) {
-    _ctx->stack.pop_back();
     _pc = offset;
+  } else {
+    _ctx->stack.pop_back();
   }
 }
 
@@ -750,8 +795,9 @@ JS_OPT(JSVirtualMachine::jnotNull) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
   if (!value->isNull() && !value->isUndefined()) {
-    _ctx->stack.pop_back();
     _pc = offset;
+  } else {
+    _ctx->stack.pop_back();
   }
 }
 
@@ -870,6 +916,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::SET_ACCESSOR:
         setAccessor(ctx, module);
+        break;
+      case vm::JSAsmOperator::MERGE:
+        merge(ctx, module);
         break;
       case vm::JSAsmOperator::SET_REGEX_HAS_INDICES:
         setRegexHasIndices(ctx, module);
@@ -1107,10 +1156,18 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
       L"arguments");
 
   for (size_t index = 0; index < args.size(); index++) {
-    arguments->setProperty(ctx, fmt::format(L"{}", index), args[index]);
+    arguments->setPropertyDescriptor(ctx, fmt::format(L"{}", index),
+                                     args[index]);
   }
 
-  arguments->setProperty(ctx, L"length", ctx->createNumber(args.size()));
+  arguments->setPropertyDescriptor(ctx, L"length",
+                                   ctx->createNumber(args.size()));
+
+  arguments->setPropertyDescriptor(ctx,
+                                   ctx->Symbol()->getProperty(ctx, L"iterator"),
+                                   ctx->Array()
+                                       ->getProperty(ctx, L"prototype")
+                                       ->getProperty(ctx, L"values"));
 
   ctx->createValue(self, L"this");
   common::AutoPtr<engine::JSValue> result;

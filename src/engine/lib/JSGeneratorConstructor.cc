@@ -80,14 +80,14 @@ common::AutoPtr<JSValue>
 JSGeneratorConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   auto prototype =
       ctx->createObject(ctx->Iterator()->getProperty(ctx, L"prototype"));
-  auto Generator = ctx->createNativeFunction(constructor,L"Generator");
-  Generator->setProperty(ctx, L"prototype", prototype);
-  prototype->setProperty(ctx, L"constructor", Generator);
-  prototype->setProperty(ctx, L"next",
-                         ctx->createNativeFunction(next, L"next"));
-  prototype->setProperty(ctx, L"throw",
-                         ctx->createNativeFunction(throw_, L"throw"));
-  prototype->setProperty(ctx, L"return",
-                         ctx->createNativeFunction(return_, L"return"));
+  auto Generator = ctx->createNativeFunction(constructor, L"Generator");
+  Generator->setPropertyDescriptor(ctx, L"prototype", prototype);
+  prototype->setPropertyDescriptor(ctx, L"constructor", Generator);
+  prototype->setPropertyDescriptor(ctx, L"next",
+                                   ctx->createNativeFunction(next, L"next"));
+  prototype->setPropertyDescriptor(ctx, L"throw",
+                                   ctx->createNativeFunction(throw_, L"throw"));
+  prototype->setPropertyDescriptor(
+      ctx, L"return", ctx->createNativeFunction(return_, L"return"));
   return Generator;
 }

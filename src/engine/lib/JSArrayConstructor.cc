@@ -143,33 +143,34 @@ JSArrayConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   auto Array = ctx->createNativeFunction(constructor, L"Array", L"Array");
   ctx->pushScope();
   auto prototype = ctx->createObject();
-  prototype->setProperty(ctx, L"constructor", Array);
-  Array->setProperty(ctx, L"prototype", prototype);
+
+  prototype->setPropertyDescriptor(ctx, L"constructor", Array, true, false);
+
+  Array->setPropertyDescriptor(ctx, L"prototype", prototype, true, false);
+
   prototype->setPropertyDescriptor(
-      ctx, L"length",
-      {
-          .configurable = true,
-          .enumable = false,
-          .get = ctx->createNativeFunction(getLength)->getStore(),
-          .set = ctx->createNativeFunction(setLength)->getStore(),
-      });
+      ctx, L"length", ctx->createNativeFunction(getLength),
+      ctx->createNativeFunction(setLength), true, false);
+
   prototype->setPropertyDescriptor(
       ctx, ctx->Symbol()->getProperty(ctx, L"toStringTag"),
-      {.configurable = true,
-       .enumable = false,
-       .get = ctx->createNativeFunction(toStringTag, L"[Symbol.toStringTag]")
-                  ->getStore(),
-       .set = nullptr});
-  prototype->setProperty(ctx, L"toString",
-                         ctx->createNativeFunction(toString, L"toString"));
+      ctx->createNativeFunction(toStringTag, L"[Symbol.toStringTag]"), true,
+      false);
 
-  prototype->setProperty(ctx, L"join",
-                         ctx->createNativeFunction(join, L"join"));
+  prototype->setPropertyDescriptor(
+      ctx, L"toString", ctx->createNativeFunction(toString, L"toString"), true,
+      false);
+
+  prototype->setPropertyDescriptor(
+      ctx, L"join", ctx->createNativeFunction(join, L"join"), true, false);
+
   auto values =
       ctx->createNativeFunction(JSArrayConstructor::values, L"values");
-  prototype->setProperty(ctx, L"values", values);
-  prototype->setProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"),
-                         values);
+
+  prototype->setPropertyDescriptor(ctx, L"values", values, true, false);
+
+  prototype->setPropertyDescriptor(
+      ctx, ctx->Symbol()->getProperty(ctx, L"iterator"), values, true, false);
   ctx->popScope();
   return Array;
 }

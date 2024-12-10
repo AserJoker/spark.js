@@ -627,6 +627,37 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
   return ctx->truly();
 }
 
+common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
+    common::AutoPtr<JSContext> ctx, const std::wstring &name,
+    const common::AutoPtr<JSValue> &value, bool configurable, bool enumable,
+    bool writable) {
+  return setPropertyDescriptor(ctx, name,
+                               JSObjectEntity::JSField{
+                                   .configurable = configurable,
+                                   .enumable = enumable,
+                                   .value = (JSStore *)value->getStore(),
+                                   .writable = writable,
+                                   .get = nullptr,
+                                   .set = nullptr,
+                               });
+}
+
+common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
+    common::AutoPtr<JSContext> ctx, const std::wstring &name,
+    const common::AutoPtr<JSValue> &get, const common::AutoPtr<JSValue> &set,
+    bool configurable, bool enumable) {
+  return setPropertyDescriptor(
+      ctx, name,
+      JSObjectEntity::JSField{
+          .configurable = configurable,
+          .enumable = enumable,
+          .value = nullptr,
+          .writable = false,
+          .get = get != nullptr ? (JSStore *)get->getStore() : nullptr,
+          .set = set != nullptr ? (JSStore *)set->getStore() : nullptr,
+      });
+}
+
 common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
                                               const std::wstring &name) {
   auto self = pack(ctx);
@@ -921,7 +952,35 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
   store->appendChild(key->getStore());
   return ctx->truly();
 }
+common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
+    common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> name,
+    const common::AutoPtr<JSValue> &value, bool configurable, bool enumable,
+    bool writable) {
+  return setPropertyDescriptor(ctx, name,
+                               JSObjectEntity::JSField{
+                                   .configurable = configurable,
+                                   .enumable = enumable,
+                                   .value = (JSStore *)value->getStore(),
+                                   .writable = writable,
+                                   .get = nullptr,
+                                   .set = nullptr,
+                               });
+}
 
+common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
+    common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> name,
+    const common::AutoPtr<JSValue> &get, const common::AutoPtr<JSValue> &set,
+    bool configurable, bool enumable) {
+  return setPropertyDescriptor(ctx, name,
+                               JSObjectEntity::JSField{
+                                   .configurable = configurable,
+                                   .enumable = enumable,
+                                   .value = nullptr,
+                                   .writable = false,
+                                   .get = (JSStore *)get->getStore(),
+                                   .set = (JSStore *)set->getStore(),
+                               });
+}
 common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
                                               common::AutoPtr<JSValue> name) {
   auto key = name->toPrimitive(ctx);

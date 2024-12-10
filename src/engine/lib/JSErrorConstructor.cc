@@ -47,9 +47,9 @@ common::AutoPtr<JSValue>
 JSErrorConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   auto prototype = ctx->createObject();
   auto Error = ctx->createNativeFunction(&constructor, L"Error", L"Error");
-  Error->setProperty(ctx, L"prototype", prototype);
-  prototype->setProperty(ctx, L"constructor", prototype);
-  prototype->setProperty(ctx, L"toString",
-                         ctx->createNativeFunction(toString, L"toString"));
+  Error->setPropertyDescriptor(ctx, L"prototype", prototype);
+  prototype->setPropertyDescriptor(ctx, L"constructor", prototype);
+  prototype->setPropertyDescriptor(
+      ctx, L"toString", ctx->createNativeFunction(toString, L"toString"));
   return Error;
 }

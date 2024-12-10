@@ -650,6 +650,55 @@ void JSGenerator::resolveVariableIdentifier(
     }
     generate(module, vm::JSAsmOperator::POP, 1U); // generator
     generate(module, vm::JSAsmOperator::POP, 1U);
+  } else if (node->type == JSNodeType::PATTERN_OBJECT) {
+    common::AutoPtr<JSRestPatternItem> rest;
+    auto obj = node.cast<JSObjectPattern>();
+    uint32_t index = 0;
+    for (auto &item : obj->items) {
+      if (item->type == JSNodeType::PATTERN_REST_ITEM) {
+        rest = item.cast<JSRestPatternItem>();
+      } else {
+        auto oitem = item.cast<JSObjectPatternItem>();
+        if (oitem->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+          generate(module, vm::JSAsmOperator::LOAD_CONST,
+                   resolveConstant(
+                       ctx, module,
+                       oitem->identifier.cast<JSIdentifierLiteral>()->value));
+
+        } else {
+          resolveNode(ctx, module, oitem->identifier);
+        }
+        generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U + index);
+        generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+        generate(module, vm::JSAsmOperator::GET_FIELD);
+        if (oitem->value != nullptr) {
+          auto offset = module->codes.size() + sizeof(uint16_t);
+          generate(module, vm::JSAsmOperator::JNOT_NULL, 0U);
+          generate(module, vm::JSAsmOperator::POP, 1U);
+          resolveNode(ctx, module, oitem->value);
+          *(uint32_t *)(module->codes.data() + offset) =
+              (uint32_t)module->codes.size();
+        }
+        if (oitem->match == nullptr) {
+          if (oitem->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+            generate(module, vm::JSAsmOperator::STORE,
+                     resolveConstant(
+                         ctx, module,
+                         oitem->identifier.cast<JSIdentifierLiteral>()->value));
+          } else {
+            throw error::JSSyntaxError(L"Unexcepted object pattern");
+          }
+        } else {
+          resolveVariableIdentifier(ctx, module, oitem->match);
+        }
+        index++;
+      }
+    }
+    if (rest != nullptr) {
+      generate(module, vm::JSAsmOperator::REST_OBJECT, index);
+      resolveVariableIdentifier(ctx, module, rest->identifier);
+    }
+    generate(module, vm::JSAsmOperator::POP, 1U);
   }
 }
 
@@ -671,6 +720,8 @@ void JSGenerator::resolveObjectProperty(JSGeneratorContext &ctx,
   auto n = node.cast<JSObjectProperty>();
   if (n->implement != nullptr) {
     resolveNode(ctx, module, n->implement);
+  } else {
+    resolveNode(ctx, module, n->identifier);
   }
   if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
     generate(module, vm::JSAsmOperator::LOAD_CONST,
@@ -962,12 +1013,7 @@ void JSGenerator::resolveExpressionAssigment(
   auto n = node.cast<JSBinaryExpression>();
   auto host = n->left;
   auto value = n->right;
-  if (host->type == JSNodeType::LITERAL_IDENTITY) {
-    resolveNode(ctx, module, value);
-    generate(
-        module, vm::JSAsmOperator::STORE,
-        resolveConstant(ctx, module, host.cast<JSIdentifierLiteral>()->value));
-  } else if (host->type == JSNodeType::EXPRESSION_MEMBER) {
+  if (host->type == JSNodeType::EXPRESSION_MEMBER) {
     auto h = host.cast<JSMemberExpression>();
     resolveNode(ctx, module, h->left);
     resolveNode(ctx, module, value);
@@ -982,6 +1028,9 @@ void JSGenerator::resolveExpressionAssigment(
     resolveNode(ctx, module, h->right);
     generate(module, vm::JSAsmOperator::SET_FIELD);
     generate(module, vm::JSAsmOperator::POP, 1U);
+  } else {
+    resolveNode(ctx, module, value);
+    resolveVariableIdentifier(ctx, module, host);
   }
 }
 
@@ -1167,7 +1216,13 @@ void JSGenerator::resolveDeclarationObject(
   auto n = node.cast<JSObjectDeclaration>();
   generate(module, vm::JSAsmOperator::PUSH_OBJECT);
   for (auto &prop : n->properties) {
-    resolveNode(ctx, module, prop);
+    if (prop->type == JSNodeType::EXPRESSION_REST) {
+      auto n = prop.cast<JSBinaryExpression>();
+      resolveNode(ctx, module, n->right);
+      generate(module, vm::JSAsmOperator::MERGE);
+    } else {
+      resolveNode(ctx, module, prop);
+    }
   }
 }
 

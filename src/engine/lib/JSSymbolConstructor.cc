@@ -1,7 +1,6 @@
 #include "engine/lib/JSSymbolConstructor.hpp"
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSValueType.hpp"
-#include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSSymbolEntity.hpp"
 #include "error/JSTypeError.hpp"
 #include <fmt/xchar.h>
@@ -109,70 +108,72 @@ void JSSymbolConstructor::initialize(common::AutoPtr<JSContext> ctx,
                                      common::AutoPtr<JSValue> Symbol,
                                      common::AutoPtr<JSValue> prototype) {
 
-  Symbol->setProperty(ctx, L"asyncIterator",
-                      ctx->createSymbol(L"Symbol.asyncIterator"));
+  Symbol->setPropertyDescriptor(ctx, L"asyncIterator",
+                                ctx->createSymbol(L"Symbol.asyncIterator"));
 
-  Symbol->setProperty(ctx, L"hasInstance",
-                      ctx->createSymbol(L"Symbol.hasInstance"));
+  Symbol->setPropertyDescriptor(ctx, L"hasInstance",
+                                ctx->createSymbol(L"Symbol.hasInstance"));
 
-  Symbol->setProperty(ctx, L"isConcatSpreadable",
-                      ctx->createSymbol(L"Symbol.isConcatSpreadable"));
+  Symbol->setPropertyDescriptor(
+      ctx, L"isConcatSpreadable",
+      ctx->createSymbol(L"Symbol.isConcatSpreadable"));
 
-  Symbol->setProperty(ctx, L"iterator", ctx->createSymbol(L"Symbol.iterator"));
+  Symbol->setPropertyDescriptor(ctx, L"iterator",
+                                ctx->createSymbol(L"Symbol.iterator"));
 
-  Symbol->setProperty(ctx, L"match", ctx->createSymbol(L"Symbol.matchAll"));
+  Symbol->setPropertyDescriptor(ctx, L"match",
+                                ctx->createSymbol(L"Symbol.matchAll"));
 
-  Symbol->setProperty(ctx, L"replace", ctx->createSymbol(L"Symbol.replace"));
+  Symbol->setPropertyDescriptor(ctx, L"replace",
+                                ctx->createSymbol(L"Symbol.replace"));
 
-  Symbol->setProperty(ctx, L"search", ctx->createSymbol(L"Symbol.search"));
+  Symbol->setPropertyDescriptor(ctx, L"search",
+                                ctx->createSymbol(L"Symbol.search"));
 
-  Symbol->setProperty(ctx, L"species", ctx->createSymbol(L"Symbol.species"));
+  Symbol->setPropertyDescriptor(ctx, L"species",
+                                ctx->createSymbol(L"Symbol.species"));
 
-  Symbol->setProperty(ctx, L"split", ctx->createSymbol(L"Symbol.split"));
+  Symbol->setPropertyDescriptor(ctx, L"split",
+                                ctx->createSymbol(L"Symbol.split"));
 
   auto toPrimitive = ctx->createSymbol(L"Symbol.toPrimitive");
 
-  Symbol->setProperty(ctx, L"toPrimitive", toPrimitive);
+  Symbol->setPropertyDescriptor(ctx, L"toPrimitive", toPrimitive);
 
   auto toStringTag = ctx->createSymbol(L"Symbol.toStringTag");
 
-  Symbol->setProperty(ctx, L"toStringTag", toStringTag);
+  Symbol->setPropertyDescriptor(ctx, L"toStringTag", toStringTag);
 
-  Symbol->setProperty(ctx, L"unscopables",
-                      ctx->createSymbol(L"Symbol.unscopables"));
+  Symbol->setPropertyDescriptor(ctx, L"unscopables",
+                                ctx->createSymbol(L"Symbol.unscopables"));
 
-  prototype->setProperty(
+  prototype->setPropertyDescriptor(
       ctx, L"toString",
       ctx->createNativeFunction(&JSSymbolConstructor::toString, L"toString"));
 
-  prototype->setProperty(
+  prototype->setPropertyDescriptor(
       ctx, L"valueOf",
       ctx->createNativeFunction(&JSSymbolConstructor::valueOf, L"valueOf"));
 
-  prototype->setProperty(
+  prototype->setPropertyDescriptor(
       ctx, L"for",
       ctx->createNativeFunction(&JSSymbolConstructor::_for, L"for"));
 
-  prototype->setProperty(
+  prototype->setPropertyDescriptor(
       ctx, L"forKey",
       ctx->createNativeFunction(&JSSymbolConstructor::forKey, L"forKey"));
 
   prototype->setPropertyDescriptor(
       ctx, L"description",
-      JSObjectEntity::JSField{
-          .configurable = false,
-          .enumable = false,
-          .value = nullptr,
-          .writable = false,
-          .get = ctx->createNativeFunction(&JSSymbolConstructor::description)
-                     ->getStore(),
-          .set = nullptr});
+      ctx->createNativeFunction(&JSSymbolConstructor::description), nullptr);
 
-  prototype->setProperty(
+  prototype->setPropertyDescriptor(
       ctx, toPrimitive,
       ctx->createNativeFunction(&JSSymbolConstructor::toPrimitive,
                                 L"[Symbol.toPrimitive]"));
-  prototype->setProperty(ctx, toStringTag, ctx->createString(L"Symbol"));
+
+  prototype->setPropertyDescriptor(ctx, toStringTag,
+                                   ctx->createString(L"Symbol"));
 
   Symbol->setOpaque<common::AutoPtr<JSSymbolOpaque>>(new JSSymbolOpaque);
 }

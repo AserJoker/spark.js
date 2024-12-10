@@ -45,20 +45,13 @@ JS_FUNC(JSFunctionConstructor::call) {
 void JSFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx,
                                        common::AutoPtr<JSValue> Function,
                                        common::AutoPtr<JSValue> prototype) {
-  prototype->setProperty(ctx, L"toString",
-                         ctx->createNativeFunction(toString, L"toString"));
-
-  prototype->setProperty(ctx, ctx->Symbol()->getProperty(ctx, L"toStringTag"),
-                         ctx->createString(L"Function"));
+  prototype->setPropertyDescriptor(
+      ctx, L"toString", ctx->createNativeFunction(toString, L"toString"));
 
   prototype->setPropertyDescriptor(
-      ctx, L"name",
-      {
-          .configurable = true,
-          .enumable = false,
-          .value = nullptr,
-          .writable = false,
-          .get = ctx->createNativeFunction(name)->getStore(),
-          .set = nullptr,
-      });
+      ctx, ctx->Symbol()->getProperty(ctx, L"toStringTag"),
+      ctx->createString(L"Function"));
+
+  prototype->setPropertyDescriptor(ctx, L"name",
+                                   ctx->createNativeFunction(name), nullptr);
 }

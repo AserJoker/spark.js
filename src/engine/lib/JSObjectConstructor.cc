@@ -53,13 +53,13 @@ JS_FUNC(JSObjectConstructor::constructor) {
 void JSObjectConstructor::initialize(common::AutoPtr<JSContext> ctx,
                                      common::AutoPtr<JSValue> Object,
                                      common::AutoPtr<JSValue> prototype) {
-  prototype->setProperty(
+  prototype->setPropertyDescriptor(
       ctx, L"toString",
       ctx->createNativeFunction(&JSObjectConstructor::toString, L"toString"));
 
-  prototype->setProperty(
+  prototype->setPropertyDescriptor(
       ctx, L"valueOf",
       ctx->createNativeFunction(&JSObjectConstructor::valueOf, L"valueOf"));
 
-  prototype->setProperty(ctx, L"constructor", Object);
+  prototype->setPropertyDescriptor(ctx, L"constructor", Object);
 }

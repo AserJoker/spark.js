@@ -30,11 +30,11 @@ public:
   std::wstring getName() const;
 
   template <class T = JSEntity> common::AutoPtr<T> getEntity() {
-    return (T *)_store->getEntity().getRawPointer();
+    return _store->getEntity().cast<T>();
   }
 
   template <class T = JSEntity> const common::AutoPtr<T> getEntity() const {
-    return (T *)_store->getEntity().getRawPointer();
+    return _store->getEntity().cast<T>();
   }
 
   JSStore *getStore();
@@ -113,6 +113,16 @@ public:
                         const std::wstring &name,
                         const JSObjectEntity::JSField &descriptor);
 
+  common::AutoPtr<JSValue> setPropertyDescriptor(
+      common::AutoPtr<JSContext> ctx, const std::wstring &name,
+      const common::AutoPtr<JSValue> &value, bool configurable = true,
+      bool enumable = false, bool writable = true);
+
+  common::AutoPtr<JSValue> setPropertyDescriptor(
+      common::AutoPtr<JSContext> ctx, const std::wstring &name,
+      const common::AutoPtr<JSValue> &get, const common::AutoPtr<JSValue> &set,
+      bool configurable = true, bool enumable = false);
+
   common::AutoPtr<JSValue> getProperty(common::AutoPtr<JSContext> ctx,
                                        const std::wstring &name);
 
@@ -141,6 +151,16 @@ public:
   setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
                         common::AutoPtr<JSValue> name,
                         const JSObjectEntity::JSField &descriptor);
+
+  common::AutoPtr<JSValue> setPropertyDescriptor(
+      common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> name,
+      const common::AutoPtr<JSValue> &value, bool configurable = true,
+      bool enumable = false, bool writable = true);
+
+  common::AutoPtr<JSValue> setPropertyDescriptor(
+      common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> name,
+      const common::AutoPtr<JSValue> &get, const common::AutoPtr<JSValue> &set,
+      bool configurable = true, bool enumable = false);
 
   common::AutoPtr<JSValue> getProperty(common::AutoPtr<JSContext> ctx,
                                        common::AutoPtr<JSValue> name);

@@ -12,7 +12,7 @@ JSGeneratorFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   auto prototype = ctx->Function()->getProperty(ctx, L"prototype");
   auto GeneratorFunction =
       ctx->createNativeFunction(constructor, L"GeneratorFunction");
-  GeneratorFunction->setProperty(ctx, L"prototype", prototype);
-  prototype->setProperty(ctx, L"constructor", GeneratorFunction);
+  GeneratorFunction->setPropertyDescriptor(ctx, L"prototype", prototype);
+  prototype->setPropertyDescriptor(ctx, L"constructor", GeneratorFunction);
   return GeneratorFunction;
 }

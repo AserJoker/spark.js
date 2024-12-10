@@ -68,22 +68,22 @@ void JSContext::initialize() {
                                  &JSObjectConstructor::constructor, {}));
   ObjectConstructorEntity->appendChild(functionPrototype->getStore());
   _Object = _scope->createValue(ObjectConstructorEntity, L"Object");
-  _Object->setProperty(this, L"prototype", objectPrototype);
-  objectPrototype->setProperty(this, L"constructor", _Object);
+  _Object->setPropertyDescriptor(this, L"prototype", objectPrototype);
+  objectPrototype->setPropertyDescriptor(this, L"constructor", _Object);
 
   JSStore *FunctionConstructorEntity = new JSStore(
       new JSNativeFunctionEntity(functionPrototype->getStore(), L"Function",
                                  &JSFunctionConstructor::constructor, {}));
   FunctionConstructorEntity->appendChild(functionPrototype->getStore());
   _Function = _scope->createValue(FunctionConstructorEntity, L"Function");
-  _Function->setProperty(this, L"prototype", functionPrototype);
-  functionPrototype->setProperty(this, L"constructor", _Function);
+  _Function->setPropertyDescriptor(this, L"prototype", functionPrototype);
+  functionPrototype->setPropertyDescriptor(this, L"constructor", _Function);
 
   auto symbolPrototype = createObject();
   _Symbol = createNativeFunction(JSSymbolConstructor::constructor, L"Symbol",
                                  L"Symbol");
-  _Symbol->setProperty(this, L"prototype", symbolPrototype);
-  symbolPrototype->setProperty(this, L"constructor", _Symbol);
+  _Symbol->setPropertyDescriptor(this, L"prototype", symbolPrototype);
+  symbolPrototype->setPropertyDescriptor(this, L"constructor", _Symbol);
 
   _symbolValue = createSymbol();
   _symbolPack = createSymbol();
@@ -274,7 +274,7 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
     result = createObject(prototype, name);
   }
   result->getStore()->appendChild(prototype->getStore());
-  result->setProperty(this, L"constructor", constructor);
+  result->setPropertyDescriptor(this, L"constructor", constructor);
   constructor->apply(this, result, args, loc);
   return result;
 }

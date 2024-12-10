@@ -55,6 +55,7 @@ private:
   JS_OPT(setField);
   JS_OPT(getField);
   JS_OPT(setAccessor);
+  JS_OPT(merge);
   JS_OPT(setRegexHasIndices);
   JS_OPT(setRegexGlobal);
   JS_OPT(setRegexIgnoreCases);

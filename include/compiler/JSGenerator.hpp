@@ -220,7 +220,7 @@ private:
   void resolveVariableDeclarator(JSGeneratorContext &ctx,
                                  common::AutoPtr<JSModule> &module,
                                  const common::AutoPtr<JSNode> &node);
-  
+
   void resolveVariableIdentifier(JSGeneratorContext &ctx,
                                  common::AutoPtr<JSModule> &module,
                                  const common::AutoPtr<JSNode> &node);
