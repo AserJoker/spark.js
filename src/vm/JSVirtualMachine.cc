@@ -422,6 +422,7 @@ JS_OPT(JSVirtualMachine::restArray) {
     arr->setIndex(ctx, index++, val);
   }
   _ctx->stack.push_back(arr);
+  _pc = pc;
 }
 
 JS_OPT(JSVirtualMachine::restObject) {}
