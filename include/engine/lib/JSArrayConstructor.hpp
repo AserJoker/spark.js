@@ -21,7 +21,6 @@ private:
   static JS_FUNC(join);
   static JS_FUNC(values);
   static JS_FUNC(iterator_next);
-  static JS_FUNC(iterator_return);
 
 public:
   static JS_FUNC(constructor);

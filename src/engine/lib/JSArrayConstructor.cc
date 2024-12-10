@@ -99,13 +99,16 @@ JS_FUNC(JSArrayConstructor::values) {
 
   obj->setProperty(ctx, L"next",
                    ctx->createNativeFunction(iterator_next, L"next"));
-
-  obj->setProperty(ctx, L"return",
-                   ctx->createNativeFunction(iterator_return, L"return"));
   return obj;
 }
 
 JS_FUNC(JSArrayConstructor::iterator_next) {
+  if (!self->hasOpaque<JSArrayIteratorContext>()) {
+    throw error::JSTypeError(
+        fmt::format(L" Method Array Iterator.prototype.next called on "
+                    L"incompatible receiver {}",
+                    self->toString(ctx)->getString().value()));
+  }
   auto ictx = self->getOpaque<JSArrayIteratorContext>();
   auto result = ctx->createObject();
   if (ictx.value != nullptr) {
@@ -120,14 +123,6 @@ JS_FUNC(JSArrayConstructor::iterator_next) {
     ictx.value = ctx->undefined();
     result->setProperty(ctx, L"done", ctx->truly());
   }
-  return result;
-}
-
-JS_FUNC(JSArrayConstructor::iterator_return) {
-  auto ictx = self->getOpaque<JSArrayIteratorContext>();
-  auto result = ctx->createObject();
-  ictx.value = ctx->undefined();
-  result->setProperty(ctx, L"done", ctx->truly());
   return result;
 }
 

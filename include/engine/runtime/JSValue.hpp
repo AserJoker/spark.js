@@ -55,7 +55,7 @@ public:
 
   template <class T> T &getOpaque() { return getEntity()->getOpaque<T>(); }
 
-  template <class T> bool &hasOpaque() { return getEntity()->hasOpaque<T>(); }
+  template <class T> bool hasOpaque() { return getEntity()->hasOpaque<T>(); }
 
   template <class T> const T &getOpaque() const {
     return getEntity()->getOpaque<T>();

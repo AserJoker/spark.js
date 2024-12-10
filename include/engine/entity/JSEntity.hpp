@@ -49,16 +49,8 @@ public:
     return impl->_value;
   }
 
-  template <class T> const T &getOpaque() const {
-    auto impl = dynamic_cast<OpaqueImpl<T>>(_opaque);
-    if (!impl) {
-      throw std::bad_cast();
-    }
-    return impl->_value;
-  }
-
   template <class T> const bool hasOpaque() const {
-    auto impl = dynamic_cast<OpaqueImpl<T>>(_opaque);
+    auto impl = dynamic_cast<OpaqueImpl<T>*>((Opaque *)_opaque);
     if (!impl) {
       return false;
     }
