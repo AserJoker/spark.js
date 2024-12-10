@@ -351,6 +351,15 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::XOR:
       out << L"xor";
       break;
+    case vm::JSAsmOperator::NEXT:
+      out << L"next";
+      break;
+    case vm::JSAsmOperator::REST_ARRAY:
+      out << L"rest_array";
+      break;
+    case vm::JSAsmOperator::REST_OBJECT:
+      out << L"rest_object";
+      break;
     }
     out << std::endl;
   }

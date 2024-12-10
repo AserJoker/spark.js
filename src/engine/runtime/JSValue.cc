@@ -101,6 +101,11 @@ bool JSValue::isInfinity() const {
 
 bool JSValue::isNaN() const { return getType() == JSValueType::JS_NAN; }
 
+bool JSValue::isFunction() const {
+  return getType() == JSValueType::JS_FUNCTION ||
+         getType() == JSValueType::JS_NATIVE_FUNCTION;
+}
+
 void JSValue::setNumber(double value) {
   if (getType() != JSValueType::JS_NUMBER) {
     _store->setEntity(new JSNumberEntity(value));

@@ -33,6 +33,7 @@
 #include "error/JSTypeError.hpp"
 #include <string>
 
+
 using namespace spark;
 using namespace spark::engine;
 
@@ -362,6 +363,8 @@ common::AutoPtr<JSValue> JSContext::Error() { return _Error; }
 common::AutoPtr<JSValue> JSContext::Array() { return _Array; }
 
 common::AutoPtr<JSValue> JSContext::Iterator() { return _Iterator; }
+
+common::AutoPtr<JSValue> JSContext::ArrayIterator() { return _ArrayIterator; }
 
 common::AutoPtr<JSValue> JSContext::GeneratorFunction() {
   return _GeneratorFunction;

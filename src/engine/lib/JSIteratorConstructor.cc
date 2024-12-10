@@ -11,7 +11,7 @@ common::AutoPtr<JSValue>
 JSIteratorConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   auto prototype = ctx->createObject();
 
-  auto Iterator = ctx->createNativeFunction(constructor);
+  auto Iterator = ctx->createNativeFunction(constructor,L"Iterator");
 
   prototype->setProperty(ctx, L"constructor", Iterator);
 

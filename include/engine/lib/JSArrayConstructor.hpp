@@ -7,11 +7,21 @@
 namespace spark::engine {
 class JSArrayConstructor {
 private:
+  struct JSArrayIteratorContext {
+    common::AutoPtr<JSValue> value;
+    common::AutoPtr<JSValue> array;
+    common::AutoPtr<JSValue> index;
+  };
+
+private:
   static JS_FUNC(toString);
   static JS_FUNC(getLength);
   static JS_FUNC(setLength);
   static JS_FUNC(toStringTag);
   static JS_FUNC(join);
+  static JS_FUNC(values);
+  static JS_FUNC(iterator_next);
+  static JS_FUNC(iterator_return);
 
 public:
   static JS_FUNC(constructor);

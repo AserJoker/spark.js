@@ -313,7 +313,7 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
   if (gen->isUndefined()) {
     auto iterator =
         value->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
-    if (iterator->getType() != engine::JSValueType::JS_FUNCTION) {
+    if (!iterator->isFunction()) {
       throw error::JSTypeError(L"yield delegate require iterator");
     }
     gen = iterator->apply(ctx, value);
@@ -323,7 +323,7 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
     }
   }
   auto next = gen->getProperty(ctx, L"next");
-  if (next->getType() != engine::JSValueType::JS_FUNCTION) {
+  if (!next->isFunction()) {
     throw error::JSTypeError(L"yield delegate require iterator");
   }
   std::vector<common::AutoPtr<engine::JSValue>> args;
@@ -339,17 +339,92 @@ JS_OPT(JSVirtualMachine::yieldDelegate) {
   auto done = val->getProperty(ctx, L"done");
   auto result = val->getProperty(ctx, L"value");
   if (done->toBoolean(ctx)->getBoolean().value()) {
-    _ctx->stack.push_back(ctx->createValue(new engine::JSStore(
-        new engine::JSTaskEntity(result->getStore(), nextpc))));
+    _pc = nextpc;
   } else {
     _ctx->stack.push_back(value);
     _ctx->stack.push_back(gen);
     _ctx->stack.push_back(
         ctx->createValue(new engine::JSStore(new engine::JSTaskEntity(
             result->getStore(), nextpc - sizeof(uint16_t)))));
+    _pc = module->codes.size();
   }
-  _pc = module->codes.size();
 }
+
+JS_OPT(JSVirtualMachine::next) {
+  auto gen = *_ctx->stack.rbegin();
+  auto pc = _pc;
+  if (gen->isUndefined()) {
+    _ctx->stack.pop_back();
+    auto value = *_ctx->stack.rbegin();
+    auto iterator =
+        value->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
+    if (!iterator->isFunction()) {
+      throw error::JSTypeError(L"array pattern require iterator");
+    }
+    gen = iterator->apply(ctx, value);
+    if (gen->getType() != engine::JSValueType::JS_OBJECT) {
+      throw error::JSTypeError(
+          L"Result of the Symbol.iterator method is not an object");
+    }
+    _ctx->stack.push_back(gen);
+  }
+  auto next = gen->getProperty(ctx, L"next");
+  if (!next->isFunction()) {
+    throw error::JSTypeError(L"array pattern require iterator");
+  }
+  auto res = next->apply(ctx, gen);
+  if (res->getType() != engine::JSValueType::JS_OBJECT) {
+    throw error::JSTypeError(
+        fmt::format(L"Iterator result '{}' is not an object",
+                    res->toString(ctx)->getString().value()));
+  }
+  auto val = res->getProperty(ctx, L"value");
+  _ctx->stack.push_back(val);
+  _pc = pc;
+}
+
+JS_OPT(JSVirtualMachine::restArray) {
+  auto gen = *_ctx->stack.rbegin();
+  auto pc = _pc;
+  if (gen->isUndefined()) {
+    _ctx->stack.pop_back();
+    auto value = *_ctx->stack.rbegin();
+    auto iterator =
+        value->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
+    if (!iterator->isFunction()) {
+      throw error::JSTypeError(L"array pattern require iterator");
+    }
+    gen = iterator->apply(ctx, value);
+    if (gen->getType() != engine::JSValueType::JS_OBJECT) {
+      throw error::JSTypeError(
+          L"Result of the Symbol.iterator method is not an object");
+    }
+    _ctx->stack.push_back(gen);
+  }
+  auto next = gen->getProperty(ctx, L"next");
+  if (!next->isFunction()) {
+    throw error::JSTypeError(L"array pattern require iterator");
+  }
+  auto arr = ctx->createArray();
+  uint32_t index = 0;
+  for (;;) {
+    auto res = next->apply(ctx, gen);
+    if (res->getType() != engine::JSValueType::JS_OBJECT) {
+      throw error::JSTypeError(
+          fmt::format(L"Iterator result '{}' is not an object",
+                      res->toString(ctx)->getString().value()));
+    }
+    auto val = res->getProperty(ctx, L"value");
+    auto done = res->getProperty(ctx, L"done");
+    if (done->toBoolean(ctx)->getBoolean().value()) {
+      break;
+    }
+    arr->setIndex(ctx, index++, val);
+  }
+  _ctx->stack.push_back(arr);
+}
+
+JS_OPT(JSVirtualMachine::restObject) {}
 
 JS_OPT(JSVirtualMachine::await) {}
 
@@ -655,8 +730,8 @@ JS_OPT(JSVirtualMachine::jmp) {
 JS_OPT(JSVirtualMachine::jfalse) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
-  _ctx->stack.pop_back();
   if (!value->toBoolean(ctx)->getBoolean().value()) {
+    _ctx->stack.pop_back();
     _pc = offset;
   }
 }
@@ -664,8 +739,8 @@ JS_OPT(JSVirtualMachine::jfalse) {
 JS_OPT(JSVirtualMachine::jtrue) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
-  _ctx->stack.pop_back();
   if (value->toBoolean(ctx)->getBoolean().value()) {
+    _ctx->stack.pop_back();
     _pc = offset;
   }
 }
@@ -673,8 +748,8 @@ JS_OPT(JSVirtualMachine::jtrue) {
 JS_OPT(JSVirtualMachine::jnotNull) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
-  _ctx->stack.pop_back();
   if (!value->isNull() && !value->isUndefined()) {
+    _ctx->stack.pop_back();
     _pc = offset;
   }
 }
@@ -839,6 +914,15 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::YIELD_DELEGATE:
         yieldDelegate(ctx, module);
+        break;
+      case vm::JSAsmOperator::NEXT:
+        next(ctx, module);
+        break;
+      case vm::JSAsmOperator::REST_ARRAY:
+        restArray(ctx, module);
+        break;
+      case vm::JSAsmOperator::REST_OBJECT:
+        restObject(ctx, module);
         break;
       case vm::JSAsmOperator::AWAIT:
         await(ctx, module);

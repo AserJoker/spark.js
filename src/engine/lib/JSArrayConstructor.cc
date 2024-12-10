@@ -86,6 +86,51 @@ JS_FUNC(JSArrayConstructor::join) {
   return ctx->createString(result);
 }
 
+JS_FUNC(JSArrayConstructor::values) {
+  auto obj = ctx->createObject();
+  auto index = ctx->createNumber();
+  obj->setOpaque(JSArrayIteratorContext{
+      .value = nullptr,
+      .array = self,
+      .index = index,
+  });
+  obj->getStore()->appendChild(self->getStore());
+  obj->getStore()->appendChild(index->getStore());
+
+  obj->setProperty(ctx, L"next",
+                   ctx->createNativeFunction(iterator_next, L"next"));
+
+  obj->setProperty(ctx, L"return",
+                   ctx->createNativeFunction(iterator_return, L"return"));
+  return obj;
+}
+
+JS_FUNC(JSArrayConstructor::iterator_next) {
+  auto ictx = self->getOpaque<JSArrayIteratorContext>();
+  auto result = ctx->createObject();
+  if (ictx.value != nullptr) {
+    result->setProperty(ctx, L"done", ctx->truly());
+  }
+  auto length = ictx.array->getProperty(ctx, L"length");
+  if (ictx.index->lt(ctx, length)->getBoolean().value()) {
+    result->setProperty(ctx, L"value",
+                        ictx.array->getProperty(ctx, ictx.index));
+    ictx.index->increment(ctx);
+  } else {
+    ictx.value = ctx->undefined();
+    result->setProperty(ctx, L"done", ctx->truly());
+  }
+  return result;
+}
+
+JS_FUNC(JSArrayConstructor::iterator_return) {
+  auto ictx = self->getOpaque<JSArrayIteratorContext>();
+  auto result = ctx->createObject();
+  ictx.value = ctx->undefined();
+  result->setProperty(ctx, L"done", ctx->truly());
+  return result;
+}
+
 JS_FUNC(JSArrayConstructor::toString) {
   auto join = self->getProperty(ctx, L"join");
   if (join->getType() == JSValueType::JS_FUNCTION ||
@@ -122,8 +167,14 @@ JSArrayConstructor::initialize(common::AutoPtr<JSContext> ctx) {
        .set = nullptr});
   prototype->setProperty(ctx, L"toString",
                          ctx->createNativeFunction(toString, L"toString"));
+
   prototype->setProperty(ctx, L"join",
                          ctx->createNativeFunction(join, L"join"));
+  auto values =
+      ctx->createNativeFunction(JSArrayConstructor::values, L"values");
+  prototype->setProperty(ctx, L"values", values);
+  prototype->setProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"),
+                         values);
   ctx->popScope();
   return Array;
 }

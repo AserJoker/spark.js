@@ -80,7 +80,7 @@ common::AutoPtr<JSValue>
 JSGeneratorConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   auto prototype =
       ctx->createObject(ctx->Iterator()->getProperty(ctx, L"prototype"));
-  auto Generator = ctx->createNativeFunction(constructor);
+  auto Generator = ctx->createNativeFunction(constructor,L"Generator");
   Generator->setProperty(ctx, L"prototype", prototype);
   prototype->setProperty(ctx, L"constructor", Generator);
   prototype->setProperty(ctx, L"next",

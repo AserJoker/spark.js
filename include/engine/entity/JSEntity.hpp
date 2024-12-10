@@ -57,6 +57,14 @@ public:
     return impl->_value;
   }
 
+  template <class T> const bool hasOpaque() const {
+    auto impl = dynamic_cast<OpaqueImpl<T>>(_opaque);
+    if (!impl) {
+      return false;
+    }
+    return true;
+  }
+
   virtual std::wstring toString(common::AutoPtr<JSContext> ctx) const;
 
   virtual std::optional<double> toNumber(common::AutoPtr<JSContext> ctx) const;

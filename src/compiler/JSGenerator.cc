@@ -616,10 +616,40 @@ void JSGenerator::resolveVariableDeclarator(
   } else {
     generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
   }
-  if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
-    auto name = resolveConstant(
-        ctx, module, n->identifier.cast<JSIdentifierLiteral>()->value);
+  resolveVariableIdentifier(ctx, module, n->identifier);
+}
+
+void JSGenerator::resolveVariableIdentifier(
+    JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
+    const common::AutoPtr<JSNode> &node) {
+  if (node->type == JSNodeType::LITERAL_IDENTITY) {
+    auto name =
+        resolveConstant(ctx, module, node.cast<JSIdentifierLiteral>()->value);
     generate(module, vm::JSAsmOperator::STORE, name);
+  } else if (node->type == JSNodeType::PATTERN_ARRAY) {
+    auto arr = node.cast<JSArrayPattern>();
+    generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // generator
+    for (auto &item : arr->items) {
+      if (item->type == JSNodeType::PATTERN_ARRAY_ITEM) {
+        generate(module, vm::JSAsmOperator::NEXT);
+        auto aitem = item.cast<JSArrayPatternItem>();
+        if (aitem->value != nullptr) {
+          auto offset = module->codes.size() + sizeof(uint16_t);
+          generate(module, vm::JSAsmOperator::JNOT_NULL, 0U);
+          generate(module, vm::JSAsmOperator::POP, 1U);
+          resolveNode(ctx, module, aitem->value);
+          *(uint32_t *)(module->codes.data() + offset) =
+              (uint32_t)module->codes.size();
+        }
+        resolveVariableIdentifier(ctx, module, aitem->identifier);
+      } else if (item->type == JSNodeType::PATTERN_REST_ITEM) {
+        auto aitem = item.cast<JSRestPatternItem>();
+        generate(module, vm::JSAsmOperator::REST_ARRAY);
+        resolveVariableIdentifier(ctx, module, aitem->identifier);
+      }
+    }
+    generate(module, vm::JSAsmOperator::POP, 1U); // generator
+    generate(module, vm::JSAsmOperator::POP, 1U);
   }
 }
 

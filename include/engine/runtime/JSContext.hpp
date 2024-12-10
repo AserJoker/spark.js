@@ -36,6 +36,7 @@ private:
   common::AutoPtr<JSValue> _GeneratorFunction;
   common::AutoPtr<JSValue> _Generator;
   common::AutoPtr<JSValue> _Iterator;
+  common::AutoPtr<JSValue> _ArrayIterator;
   common::AutoPtr<JSValue> _Array;
   common::AutoPtr<JSValue> _Error;
   common::AutoPtr<JSValue> _Symbol;
@@ -172,6 +173,8 @@ public:
   common::AutoPtr<JSValue> Array();
 
   common::AutoPtr<JSValue> Iterator();
+
+  common::AutoPtr<JSValue> ArrayIterator();
 
   common::AutoPtr<JSValue> GeneratorFunction();
 

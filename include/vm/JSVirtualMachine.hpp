@@ -71,6 +71,9 @@ private:
   JS_OPT(new_);
   JS_OPT(yield);
   JS_OPT(yieldDelegate);
+  JS_OPT(next);
+  JS_OPT(restArray);
+  JS_OPT(restObject);
   JS_OPT(await);
   JS_OPT(void_);
   JS_OPT(typeof_);
