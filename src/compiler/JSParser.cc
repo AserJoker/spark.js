@@ -1,6 +1,7 @@
 #include "compiler/JSParser.hpp"
 #include "common/AutoPtr.hpp"
 #include "compiler/base/JSNode.hpp"
+#include "compiler/base/JSNodeType.hpp"
 #include "error/JSSyntaxError.hpp"
 #include <algorithm>
 #include <array>
@@ -1791,6 +1792,12 @@ JSParser::readYieldExpression(uint32_t filename, const std::wstring &source,
     skipInvisible(filename, source, current, &isNewLine);
     if (!isNewLine) {
       node->value = readExpressions(filename, source, current);
+    }
+    if (node->value == nullptr &&
+        node->type == JSNodeType::EXPRESSION_YIELD_DELEGATE) {
+      throw error::JSSyntaxError(
+          formatException(L"yield delegate required a iteratorable expression",
+                          filename, source, current));
     }
     if (node->value != nullptr) {
       node->value->addParent(node);

@@ -318,11 +318,7 @@ void JSGenerator::resolveExpressionYieldDelegate(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSYieldDelegateExpression>();
-  if (n->value != nullptr) {
-    resolveNode(ctx, module, n->value);
-  } else {
-    throw error::JSSyntaxError(L"yield delegate required a iteratorable");
-  }
+  resolveNode(ctx, module, n->value);
   generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // generator
   generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // argument
   generate(module, vm::JSAsmOperator::YIELD_DELEGATE);
