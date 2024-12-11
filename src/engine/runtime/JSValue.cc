@@ -873,17 +873,17 @@ void JSValue::setBind(common::AutoPtr<JSContext> ctx,
   if (isFunction()) {
     _store->appendChild(bind->getStore());
     if (getType() == JSValueType::JS_FUNCTION) {
-      auto bind = getEntity<JSFunctionEntity>()->getBind();
-      if (bind) {
-        _store->removeChild(bind);
+      auto current = getEntity<JSFunctionEntity>()->getBind();
+      if (current) {
+        _store->removeChild(current);
       }
-      getEntity<JSFunctionEntity>()->bind(bind);
+      getEntity<JSFunctionEntity>()->bind(bind->getStore());
     } else {
-      auto bind = getEntity<JSNativeFunctionEntity>()->getBind();
-      if (bind) {
-        _store->removeChild(bind);
+      auto current = getEntity<JSNativeFunctionEntity>()->getBind();
+      if (current) {
+        _store->removeChild(current);
       }
-      getEntity<JSNativeFunctionEntity>()->bind(bind);
+      getEntity<JSNativeFunctionEntity>()->bind(bind->getStore());
     }
   }
 }
