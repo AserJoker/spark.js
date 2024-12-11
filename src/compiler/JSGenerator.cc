@@ -77,6 +77,10 @@ void JSGenerator::resolveClosure(JSGeneratorContext &ctx,
     auto item = *workflow.begin();
     workflow.erase(workflow.begin());
     for (auto &binding : item->bindings) {
+      if (binding.name == L"arguments" || binding.name == L"this" ||
+          binding.name == L"super") {
+        continue;
+      }
       auto it = item->declarations.begin();
       for (; it != item->declarations.end(); it++) {
         if (&*it == binding.declaration) {
@@ -1118,12 +1122,23 @@ void JSGenerator::resolveDeclarationFunction(
   auto offset = ctx.currentScope->functionAddr.at(n->id);
   *(uint32_t *)(module->codes.data() + offset) = (uint32_t)module->codes.size();
   pushLexScope(ctx, module, node->scope);
-  uint32_t index = 0;
-  for (auto &arg : n->arguments) {
-    auto a = arg.cast<JSParameterDeclaration>();
-    generate(module, vm::JSAsmOperator::PUSH_ARGUMENT, index);
-    resolveDeclarationParameter(ctx, module, arg);
-    index++;
+  if (n->arguments.size()) {
+    generate(module, vm::JSAsmOperator::LOAD,
+             resolveConstant(ctx, module, L"arguments"));
+    generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+    for (auto &arg : n->arguments) {
+      if (arg->type == JSNodeType::DECLARATION_PARAMETER) {
+        auto a = arg.cast<JSParameterDeclaration>();
+        generate(module, vm::JSAsmOperator::NEXT);
+        resolveDeclarationParameter(ctx, module, arg);
+      } else {
+        auto a = arg.cast<JSRestPatternItem>();
+        generate(module, vm::JSAsmOperator::REST_ARRAY);
+        resolveVariableIdentifier(ctx, module, a->identifier);
+      }
+    }
+    generate(module, vm::JSAsmOperator::POP, 1U);
+    generate(module, vm::JSAsmOperator::POP, 1U);
   }
   resolveNode(ctx, module, n->body);
   popLexScope(ctx, module);
@@ -1197,13 +1212,7 @@ void JSGenerator::resolveDeclarationParameter(
     resolveNode(ctx, module, a->value);
     *(uint32_t *)(module->codes.data() + pin) = (uint32_t)module->codes.size();
   }
-  if (a->identifier->type == JSNodeType::LITERAL_IDENTITY) {
-    generate(module, vm::JSAsmOperator::STORE,
-             resolveConstant(ctx, module,
-                             a->identifier.cast<JSIdentifierLiteral>()->value));
-  } else {
-    generate(module, vm::JSAsmOperator::POP, 1U);
-  }
+  resolveVariableIdentifier(ctx, module, a->identifier);
 }
 
 void JSGenerator::resolveDeclarationObject(

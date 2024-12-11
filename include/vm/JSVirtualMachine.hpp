@@ -42,7 +42,6 @@ private:
   JS_OPT(pushArrow);
   JS_OPT(pushThis);
   JS_OPT(pushSuper);
-  JS_OPT(pushArgument);
   JS_OPT(pushBigint);
   JS_OPT(pushRegex);
   JS_OPT(pushValue);

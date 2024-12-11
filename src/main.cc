@@ -119,10 +119,6 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"push_value " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case vm::JSAsmOperator::PUSH_ARGUMENT:
-      out << L"push_argument " << *(uint32_t *)(buffer + offset);
-      offset += sizeof(uint32_t);
-      break;
     case vm::JSAsmOperator::PUSH_BIGINT:
       out << L"push_bigint " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);

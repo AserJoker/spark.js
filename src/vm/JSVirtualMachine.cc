@@ -95,12 +95,6 @@ JS_OPT(JSVirtualMachine::pushThis) {
 
 JS_OPT(JSVirtualMachine::pushSuper) {}
 
-JS_OPT(JSVirtualMachine::pushArgument) {
-  auto arguments = ctx->load(L"arguments");
-  auto index = argi(module);
-  _ctx->stack.push_back(arguments->getProperty(ctx, fmt::format(L"{}", index)));
-}
-
 JS_OPT(JSVirtualMachine::pushBigint) {
   auto s = args(module);
   _ctx->stack.push_back(ctx->createBigInt(s));
@@ -909,9 +903,6 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::PUSH_SUPER:
         pushSuper(ctx, module);
-        break;
-      case vm::JSAsmOperator::PUSH_ARGUMENT:
-        pushArgument(ctx, module);
         break;
       case vm::JSAsmOperator::PUSH_BIGINT:
         pushBigint(ctx, module);

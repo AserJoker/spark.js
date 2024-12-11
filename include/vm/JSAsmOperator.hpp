@@ -14,7 +14,6 @@ enum class JSAsmOperator {
   PUSH_ARROW,
   PUSH_THIS,
   PUSH_SUPER,
-  PUSH_ARGUMENT,
   PUSH_BIGINT,
   PUSH_REGEX,
   PUSH_VALUE,
