@@ -318,6 +318,7 @@ void JSGenerator::resolveExpressionYield(JSGeneratorContext &ctx,
   }
   generate(module, vm::JSAsmOperator::YIELD);
 }
+
 void JSGenerator::resolveExpressionYieldDelegate(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
@@ -626,6 +627,7 @@ void JSGenerator::resolveStatementForIn(JSGeneratorContext &ctx,
   generate(module, vm::JSAsmOperator::POP, 1U);
   generate(module, vm::JSAsmOperator::POP, 1U);
   generate(module, vm::JSAsmOperator::POP, 1U);
+  end = (uint32_t)module->codes.size();
   auto &chunk = *_labels.rbegin();
   for (auto &[node, offset] : chunk.second) {
     if (node->type == JSNodeType::STATEMENT_BREAK) {
@@ -666,6 +668,7 @@ void JSGenerator::resolveStatementForOf(JSGeneratorContext &ctx,
   generate(module, vm::JSAsmOperator::POP, 1U);
   generate(module, vm::JSAsmOperator::POP, 1U);
   generate(module, vm::JSAsmOperator::POP, 1U);
+  end = (uint32_t)module->codes.size();
   auto &chunk = *_labels.rbegin();
   for (auto &[node, offset] : chunk.second) {
     if (node->type == JSNodeType::STATEMENT_BREAK) {
