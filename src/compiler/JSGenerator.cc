@@ -432,6 +432,7 @@ void JSGenerator::resolveStatementIf(JSGeneratorContext &ctx,
   } else {
     *(uint32_t *)(module->codes.data() + alt) = (uint32_t)module->codes.size();
   }
+  generate(module, vm::JSAsmOperator::POP, 1U);
 }
 
 void JSGenerator::resolveStatementSwitch(JSGeneratorContext &ctx,
@@ -513,10 +514,12 @@ void JSGenerator::resolveStatementWhile(JSGeneratorContext &ctx,
   resolveNode(ctx, module, n->condition);
   auto endOffset = module->codes.size() + sizeof(uint16_t);
   generate(module, vm::JSAsmOperator::JFALSE, 0U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
   resolveNode(ctx, module, n->body);
   generate(module, vm::JSAsmOperator::JMP, start);
   auto end = (uint32_t)module->codes.size();
   *(uint32_t *)(module->codes.data() + endOffset) = end;
+  generate(module, vm::JSAsmOperator::POP, 1U);
   auto &chunk = *_labels.rbegin();
   for (auto &[node, offset] : chunk.second) {
     if (node->type == JSNodeType::STATEMENT_BREAK) {
@@ -534,11 +537,14 @@ void JSGenerator::resolveStatementDoWhile(JSGeneratorContext &ctx,
                                           const std::wstring &label) {
   auto n = node.cast<JSDoWhileStatement>();
   _labels.push_back({{label, ctx.scopeChain}, {}});
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
   auto start = (uint32_t)module->codes.size();
+  generate(module, vm::JSAsmOperator::POP, 1U);
   resolveNode(ctx, module, n->body);
   resolveNode(ctx, module, n->condition);
   auto condition = (uint32_t)module->codes.size();
   generate(module, vm::JSAsmOperator::JTRUE, start);
+  generate(module, vm::JSAsmOperator::POP, 1U);
   auto end = (uint32_t)module->codes.size();
   auto &chunk = *_labels.rbegin();
   for (auto &[node, offset] : chunk.second) {
@@ -569,6 +575,7 @@ void JSGenerator::resolveStatementFor(JSGeneratorContext &ctx,
   }
   auto endOffset = module->codes.size() + sizeof(uint16_t);
   generate(module, vm::JSAsmOperator::JFALSE, 0U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
   resolveNode(ctx, module, n->body);
   if (n->update != nullptr) {
     resolveNode(ctx, module, n->update);
@@ -576,6 +583,7 @@ void JSGenerator::resolveStatementFor(JSGeneratorContext &ctx,
   generate(module, vm::JSAsmOperator::JMP, start);
   auto end = (uint32_t)module->codes.size();
   *(uint32_t *)(module->codes.data() + endOffset) = end;
+  generate(module, vm::JSAsmOperator::POP, 1U);
   auto &chunk = *_labels.rbegin();
   for (auto &[node, offset] : chunk.second) {
     if (node->type == JSNodeType::STATEMENT_BREAK) {
@@ -591,12 +599,83 @@ void JSGenerator::resolveStatementFor(JSGeneratorContext &ctx,
 void JSGenerator::resolveStatementForIn(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
                                         const common::AutoPtr<JSNode> &node,
-                                        const std::wstring &label) {}
+                                        const std::wstring &label) {
+  auto n = node.cast<JSForInStatement>();
+  _labels.push_back({{label, ctx.scopeChain}, {}});
+  resolveNode(ctx, module, n->expression);
+  generate(module, vm::JSAsmOperator::GET_KEYS);
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // gen
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // res
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // done
+  auto start = (uint32_t)module->codes.size();
+  generate(module, vm::JSAsmOperator::POP, 1U); // remove done
+  generate(module, vm::JSAsmOperator::POP, 1U); // remove res
+  generate(module, vm::JSAsmOperator::NEXT);
+  pushScope(ctx, module, n->scope);
+  auto endOffset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JTRUE, 0U);
+  generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+  resolveVariableIdentifier(ctx, module, n->declaration);
+  resolveNode(ctx, module, n->body);
+  popScope(ctx, module);
+  generate(module, vm::JSAsmOperator::JMP, start);
+  auto end = (uint32_t)module->codes.size();
+  *(uint32_t *)(module->codes.data() + endOffset) = end;
+  popScope(ctx, module);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  auto &chunk = *_labels.rbegin();
+  for (auto &[node, offset] : chunk.second) {
+    if (node->type == JSNodeType::STATEMENT_BREAK) {
+      *(uint32_t *)(module->codes.data() + offset) = end;
+    } else {
+      *(uint32_t *)(module->codes.data() + offset) = start;
+    }
+  }
+  _labels.pop_back();
+}
 
 void JSGenerator::resolveStatementForOf(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
                                         const common::AutoPtr<JSNode> &node,
-                                        const std::wstring &label) {}
+                                        const std::wstring &label) {
+  auto n = node.cast<JSForOfStatement>();
+  _labels.push_back({{label, ctx.scopeChain}, {}});
+  resolveNode(ctx, module, n->expression);
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // gen
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // res
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // done
+  auto start = (uint32_t)module->codes.size();
+  generate(module, vm::JSAsmOperator::POP, 1U); // remove done
+  generate(module, vm::JSAsmOperator::POP, 1U); // remove res
+  generate(module, vm::JSAsmOperator::NEXT);
+  pushScope(ctx, module, n->scope);
+  auto endOffset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JTRUE, 0U);
+  generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+  resolveVariableIdentifier(ctx, module, n->declaration);
+  resolveNode(ctx, module, n->body);
+  popScope(ctx, module);
+  generate(module, vm::JSAsmOperator::JMP, start);
+  auto end = (uint32_t)module->codes.size();
+  *(uint32_t *)(module->codes.data() + endOffset) = end;
+  popScope(ctx, module);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  auto &chunk = *_labels.rbegin();
+  for (auto &[node, offset] : chunk.second) {
+    if (node->type == JSNodeType::STATEMENT_BREAK) {
+      *(uint32_t *)(module->codes.data() + offset) = end;
+    } else {
+      *(uint32_t *)(module->codes.data() + offset) = start;
+    }
+  }
+  _labels.pop_back();
+}
 
 void JSGenerator::resolveStatementForAwaitOf(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
@@ -657,8 +736,10 @@ void JSGenerator::resolveVariableIdentifier(
       if (item == nullptr) {
         generate(module, vm::JSAsmOperator::NEXT);
         generate(module, vm::JSAsmOperator::POP, 1U);
+        generate(module, vm::JSAsmOperator::POP, 1U);
       } else if (item->type == JSNodeType::PATTERN_ARRAY_ITEM) {
         generate(module, vm::JSAsmOperator::NEXT);
+        generate(module, vm::JSAsmOperator::POP, 1U);
         auto aitem = item.cast<JSArrayPatternItem>();
         if (aitem->value != nullptr) {
           auto offset = module->codes.size() + sizeof(uint16_t);
@@ -1130,6 +1211,7 @@ void JSGenerator::resolveDeclarationFunction(
       if (arg->type == JSNodeType::DECLARATION_PARAMETER) {
         auto a = arg.cast<JSParameterDeclaration>();
         generate(module, vm::JSAsmOperator::NEXT);
+        generate(module, vm::JSAsmOperator::POP, 1U);
         resolveDeclarationParameter(ctx, module, arg);
       } else {
         auto a = arg.cast<JSRestPatternItem>();
@@ -1209,6 +1291,7 @@ void JSGenerator::resolveDeclarationParameter(
   if (a->value != nullptr) {
     auto pin = module->codes.size() + sizeof(uint16_t);
     generate(module, vm::JSAsmOperator::JNOT_NULL, 0U);
+    generate(module, vm::JSAsmOperator::POP, 1U);
     resolveNode(ctx, module, a->value);
     *(uint32_t *)(module->codes.data() + pin) = (uint32_t)module->codes.size();
   }
@@ -1237,7 +1320,9 @@ void JSGenerator::resolveDeclarationArray(JSGeneratorContext &ctx,
   auto n = node.cast<JSArrayDeclaration>();
   generate(module, vm::JSAsmOperator::PUSH_ARRAY);
   for (size_t index = 0; index < n->items.size(); index++) {
-    if (n->items[index]->type == JSNodeType::EXPRESSION_REST) {
+    if (!n->items[index]) {
+      continue;
+    } else if (n->items[index]->type == JSNodeType::EXPRESSION_REST) {
       auto aitem = n->items[index].cast<JSBinaryExpression>();
       resolveNode(ctx, module, aitem->right);
       generate(module, vm::JSAsmOperator::MERGE);

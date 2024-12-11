@@ -53,6 +53,7 @@ private:
   JS_OPT(setClosure);
   JS_OPT(setField);
   JS_OPT(getField);
+  JS_OPT(getKeys);
   JS_OPT(setAccessor);
   JS_OPT(merge);
   JS_OPT(setRegexHasIndices);

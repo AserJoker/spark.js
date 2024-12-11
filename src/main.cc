@@ -156,6 +156,9 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::GET_FIELD:
       out << L"get_field";
       break;
+    case vm::JSAsmOperator::GET_KEYS:
+      out << L"get_keys";
+      break;
     case vm::JSAsmOperator::SET_ACCESSOR:
       out << L"set_accessor " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);

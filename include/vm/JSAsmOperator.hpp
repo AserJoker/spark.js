@@ -25,6 +25,7 @@ enum class JSAsmOperator {
   SET_CLOSURE,
   SET_FIELD,
   GET_FIELD,
+  GET_KEYS,
   SET_ACCESSOR,
   MERGE,
   SET_REGEX_HAS_INDICES,

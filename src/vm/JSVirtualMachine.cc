@@ -167,6 +167,12 @@ JS_OPT(JSVirtualMachine::getField) {
   _ctx->stack.push_back(obj->getProperty(ctx, name));
 }
 
+JS_OPT(JSVirtualMachine::getKeys) {
+  auto obj = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(obj->getKeys(ctx));
+}
+
 JS_OPT(JSVirtualMachine::setAccessor) {
   auto type = argi(module);
   auto name = *_ctx->stack.rbegin();
@@ -423,7 +429,9 @@ JS_OPT(JSVirtualMachine::next) {
                     res->toString(ctx)->getString().value()));
   }
   auto val = res->getProperty(ctx, L"value");
+  auto done = res->getProperty(ctx, L"done");
   _ctx->stack.push_back(val);
+  _ctx->stack.push_back(done);
   _pc = pc;
 }
 
@@ -550,6 +558,7 @@ JS_OPT(JSVirtualMachine::call) {
     _pc = pc;
   }
 }
+
 JS_OPT(JSVirtualMachine::memberCall) {
   auto offset = _pc - sizeof(uint16_t);
   auto size = argi(module);
@@ -802,8 +811,6 @@ JS_OPT(JSVirtualMachine::jfalse) {
   auto value = *_ctx->stack.rbegin();
   if (!value->toBoolean(ctx)->getBoolean().value()) {
     _pc = offset;
-  } else {
-    _ctx->stack.pop_back();
   }
 }
 
@@ -812,8 +819,6 @@ JS_OPT(JSVirtualMachine::jtrue) {
   auto value = *_ctx->stack.rbegin();
   if (value->toBoolean(ctx)->getBoolean().value()) {
     _pc = offset;
-  } else {
-    _ctx->stack.pop_back();
   }
 }
 
@@ -822,8 +827,6 @@ JS_OPT(JSVirtualMachine::jnotNull) {
   auto value = *_ctx->stack.rbegin();
   if (!value->isNull() && !value->isUndefined()) {
     _pc = offset;
-  } else {
-    _ctx->stack.pop_back();
   }
 }
 
@@ -936,6 +939,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::GET_FIELD:
         getField(ctx, module);
+        break;
+      case vm::JSAsmOperator::GET_KEYS:
+        getKeys(ctx, module);
         break;
       case vm::JSAsmOperator::SET_ACCESSOR:
         setAccessor(ctx, module);

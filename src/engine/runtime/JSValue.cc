@@ -219,6 +219,9 @@ common::AutoPtr<JSValue> JSValue::pack(common::AutoPtr<JSContext> ctx) {
     val->setProperty(ctx, ctx->symbolPack(), ctx->Symbol());
     return val;
   } break;
+  case JSValueType::JS_NULL:
+  case JSValueType::JS_UNDEFINED:
+    throw error::JSTypeError(L"Cannot convert undefined or null to object");
   default:
     break;
   }
@@ -773,6 +776,9 @@ common::AutoPtr<JSValue> JSValue::getIndex(common::AutoPtr<JSContext> ctx,
     auto &items = entity->getItems();
     if (index < items.size()) {
       auto item = items[index];
+      if (!item) {
+        return ctx->undefined();
+      }
       if (item->getEntity()->getType() == JSValueType::JS_UNINITIALIZED) {
         return ctx->undefined();
       }
@@ -800,8 +806,7 @@ JSValue::setIndex(common::AutoPtr<JSContext> ctx, const uint32_t &index,
       ctx->getScope()->getRoot()->appendChild(items[index]);
     }
     while (items.size() < index) {
-      items.push_back(ctx->null()->getStore());
-      store->appendChild(ctx->null()->getStore());
+      items.resize(index);
     }
     if (items.size() == index) {
       items.push_back((JSStore *)field->getStore());
@@ -812,6 +817,33 @@ JSValue::setIndex(common::AutoPtr<JSContext> ctx, const uint32_t &index,
     return ctx->truly();
   }
   return setProperty(ctx, fmt::format(L"{}", index), field);
+}
+
+common::AutoPtr<JSValue> JSValue::getKeys(common::AutoPtr<JSContext> ctx) {
+  auto result = ctx->createArray();
+  auto self = pack(ctx);
+  auto entity = self->getEntity<JSObjectEntity>();
+  uint32_t index = 0;
+  while (entity != nullptr) {
+    if (self->getType() == JSValueType::JS_ARRAY) {
+      auto &items = entity.cast<JSArrayEntity>()->getItems();
+      for (size_t offset = 0; offset < items.size(); offset++) {
+        if (items[offset] != nullptr) {
+          result->setIndex(ctx, index++,
+                           ctx->createString(fmt::format(L"{}", offset)));
+        }
+      }
+    }
+    auto &props = entity->getProperties();
+    for (auto &[key, field] : props) {
+      if (field.enumable) {
+        result->setIndex(ctx, index++, ctx->createString(key));
+      }
+    }
+    self = self->getPrototype(ctx);
+    entity = self->getEntity<JSObjectEntity>();
+  }
+  return result;
 }
 
 JSObjectEntity::JSField *

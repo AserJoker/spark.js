@@ -4686,16 +4686,12 @@ JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
         if (identifier->type != JSNodeType::EXPRESSION_MEMBER &&
             identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER &&
             identifier->type != JSNodeType::LITERAL_IDENTITY) {
-          throw error::JSSyntaxError(
-              formatException(L"Invalid destructuring assignment target",
-                              filename, source, identifier->location.start));
+          return nullptr;
         }
       }
     }
     if (!identifier) {
-      throw error::JSSyntaxError(
-          formatException(L"Invalid destructuring assignment target", filename,
-                          source, identifier->location.start));
+      return nullptr;
     }
     common::AutoPtr node = new JSRestPatternItem;
     node->identifier = identifier;
@@ -4754,9 +4750,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
       if (match->type != JSNodeType::EXPRESSION_MEMBER &&
           match->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER &&
           match->type != JSNodeType::LITERAL_IDENTITY) {
-        throw error::JSSyntaxError(
-            formatException(L"Invalid destructuring assignment target",
-                            filename, source, identifier->location.start));
+        return nullptr;
       }
     }
   }
@@ -4765,9 +4759,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
   }
   if (!node->identifier) {
     if (match->type != JSNodeType::LITERAL_IDENTITY) {
-      throw error::JSSyntaxError(
-          formatException(L"Invalid destructuring assignment target", filename,
-                          source, identifier->location.start));
+      return nullptr;
     } else {
       node->identifier = match;
       match->addParent(node);
@@ -4871,9 +4863,7 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
       if (identifier->type != JSNodeType::EXPRESSION_MEMBER &&
           identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER &&
           identifier->type != JSNodeType::LITERAL_IDENTITY) {
-        throw error::JSSyntaxError(
-            formatException(L"Invalid destructuring assignment target",
-                            filename, source, identifier->location.start));
+        return nullptr;
       }
     }
   }

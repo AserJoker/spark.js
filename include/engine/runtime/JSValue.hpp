@@ -9,6 +9,7 @@
 #include "engine/entity/JSObjectEntity.hpp"
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace spark::engine {
 class JSContext;
@@ -136,6 +137,8 @@ public:
   common::AutoPtr<JSValue> setIndex(common::AutoPtr<JSContext> ctx,
                                     const uint32_t &name,
                                     const common::AutoPtr<JSValue> &field);
+
+  common::AutoPtr<JSValue> getKeys(common::AutoPtr<JSContext> ctx);
 
   common::AutoPtr<JSValue> removeProperty(common::AutoPtr<JSContext> ctx,
                                           const std::wstring &name);
