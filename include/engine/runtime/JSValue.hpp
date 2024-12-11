@@ -140,6 +140,10 @@ public:
 
   common::AutoPtr<JSValue> getKeys(common::AutoPtr<JSContext> ctx);
 
+  common::AutoPtr<JSValue> getBind(common::AutoPtr<JSContext> ctx);
+
+  void setBind(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> bind);
+
   common::AutoPtr<JSValue> removeProperty(common::AutoPtr<JSContext> ctx,
                                           const std::wstring &name);
 

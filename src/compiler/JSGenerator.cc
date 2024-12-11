@@ -1197,36 +1197,103 @@ void JSGenerator::resolveExportAll(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveDeclarationArrowFunction(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSArrowFunctionDeclaration>();
+  ctx.currentScope->functionDeclarations.push_back(
+      (JSNode *)node.getRawPointer());
+  generate(module, vm::JSAsmOperator::PUSH_ARROW);
+  ctx.currentScope->functionAddr[node->id] =
+      module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
+  if (n->async) {
+    generate(module, vm::JSAsmOperator::SET_FUNC_ASYNC, 1U);
+  }
+  generate(
+      module, vm::JSAsmOperator::SET_FUNC_SOURCE,
+      resolveConstant(ctx, module, node->location.getSource(module->source)));
+  std::vector<JSSourceScope *> workflow = {n->scope.getRawPointer()};
+  while (!workflow.empty()) {
+    auto item = *workflow.begin();
+    workflow.erase(workflow.begin());
+    for (auto &binding : item->bindings) {
+      auto it = item->declarations.begin();
+      for (; it != item->declarations.end(); it++) {
+        if (&*it == binding.declaration) {
+          break;
+        }
+      }
+      if (it == item->declarations.end()) {
+        auto iname = resolveConstant(ctx, module, binding.declaration->name);
+        generate(module, vm::JSAsmOperator::SET_CLOSURE, iname);
+      }
+    }
+    for (auto &child : item->children) {
+      workflow.push_back(child);
+    }
+  }
+}
 
 void JSGenerator::resolveDeclarationFunction(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
-  auto n = node.cast<JSFunctionDeclaration>();
-  auto offset = ctx.currentScope->functionAddr.at(n->id);
-  *(uint32_t *)(module->codes.data() + offset) = (uint32_t)module->codes.size();
-  pushLexScope(ctx, module, node->scope);
-  if (n->arguments.size()) {
-    generate(module, vm::JSAsmOperator::LOAD,
-             resolveConstant(ctx, module, L"arguments"));
-    generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
-    for (auto &arg : n->arguments) {
-      if (arg->type == JSNodeType::DECLARATION_PARAMETER) {
-        auto a = arg.cast<JSParameterDeclaration>();
-        generate(module, vm::JSAsmOperator::NEXT);
-        generate(module, vm::JSAsmOperator::POP, 1U);
-        resolveDeclarationParameter(ctx, module, arg);
-      } else {
-        auto a = arg.cast<JSRestPatternItem>();
-        generate(module, vm::JSAsmOperator::REST_ARRAY);
-        resolveVariableIdentifier(ctx, module, a->identifier);
+  if (node->type == JSNodeType::DECLARATION_ARROW_FUNCTION) {
+    auto n = node.cast<JSArrowFunctionDeclaration>();
+    auto offset = ctx.currentScope->functionAddr.at(n->id);
+    *(uint32_t *)(module->codes.data() + offset) =
+        (uint32_t)module->codes.size();
+    pushLexScope(ctx, module, node->scope);
+    if (n->arguments.size()) {
+      generate(module, vm::JSAsmOperator::LOAD,
+               resolveConstant(ctx, module, L"arguments"));
+      generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+      for (auto &arg : n->arguments) {
+        if (arg->type == JSNodeType::DECLARATION_PARAMETER) {
+          auto a = arg.cast<JSParameterDeclaration>();
+          generate(module, vm::JSAsmOperator::NEXT);
+          generate(module, vm::JSAsmOperator::POP, 1U);
+          resolveDeclarationParameter(ctx, module, arg);
+        } else {
+          auto a = arg.cast<JSRestPatternItem>();
+          generate(module, vm::JSAsmOperator::REST_ARRAY);
+          resolveVariableIdentifier(ctx, module, a->identifier);
+        }
       }
+      generate(module, vm::JSAsmOperator::POP, 1U);
+      generate(module, vm::JSAsmOperator::POP, 1U);
     }
-    generate(module, vm::JSAsmOperator::POP, 1U);
-    generate(module, vm::JSAsmOperator::POP, 1U);
+    resolveNode(ctx, module, n->body);
+    if (n->body->type != JSNodeType::DECLARATION_FUNCTION_BODY) {
+      generate(module, vm::JSAsmOperator::RET);
+    }
+    popLexScope(ctx, module);
+  } else {
+    auto n = node.cast<JSFunctionDeclaration>();
+    auto offset = ctx.currentScope->functionAddr.at(n->id);
+    *(uint32_t *)(module->codes.data() + offset) =
+        (uint32_t)module->codes.size();
+    pushLexScope(ctx, module, node->scope);
+    if (n->arguments.size()) {
+      generate(module, vm::JSAsmOperator::LOAD,
+               resolveConstant(ctx, module, L"arguments"));
+      generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+      for (auto &arg : n->arguments) {
+        if (arg->type == JSNodeType::DECLARATION_PARAMETER) {
+          auto a = arg.cast<JSParameterDeclaration>();
+          generate(module, vm::JSAsmOperator::NEXT);
+          generate(module, vm::JSAsmOperator::POP, 1U);
+          resolveDeclarationParameter(ctx, module, arg);
+        } else {
+          auto a = arg.cast<JSRestPatternItem>();
+          generate(module, vm::JSAsmOperator::REST_ARRAY);
+          resolveVariableIdentifier(ctx, module, a->identifier);
+        }
+      }
+      generate(module, vm::JSAsmOperator::POP, 1U);
+      generate(module, vm::JSAsmOperator::POP, 1U);
+    }
+    resolveNode(ctx, module, n->body);
+    popLexScope(ctx, module);
   }
-  resolveNode(ctx, module, n->body);
-  popLexScope(ctx, module);
 }
 
 void JSGenerator::resolveFunction(JSGeneratorContext &ctx,

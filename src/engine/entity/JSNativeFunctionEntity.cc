@@ -1,7 +1,6 @@
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
-#include "engine/runtime/JSContext.hpp"
 #include <fmt/xchar.h>
 #include <string>
 
@@ -28,14 +27,9 @@ JSNativeFunctionEntity::getClosure() const {
   return _closure;
 }
 
-const JSStore *
-JSNativeFunctionEntity::getBind(common::AutoPtr<JSContext> ctx) const {
-  return _bind;
-}
+const JSStore *JSNativeFunctionEntity::getBind() const { return _bind; }
 
-JSStore *JSNativeFunctionEntity::getBind(common::AutoPtr<JSContext> ctx) {
-  return _bind;
-}
+JSStore *JSNativeFunctionEntity::getBind() { return _bind; }
 
 const std::wstring &JSNativeFunctionEntity::getFunctionName() const {
   static std::wstring anonymous = L"anonymous";
@@ -44,12 +38,3 @@ const std::wstring &JSNativeFunctionEntity::getFunctionName() const {
   }
   return _name;
 }
-
-std::wstring
-JSNativeFunctionEntity::toString(common::AutoPtr<JSContext> ctx) const {
-  return fmt::format(L"function {}(){{[native code]}}", getFunctionName());
-};
-
-bool JSNativeFunctionEntity::toBoolean(common::AutoPtr<JSContext> ctx) const {
-  return true;
-};

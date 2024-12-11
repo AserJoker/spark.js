@@ -7,8 +7,10 @@
 #include "engine/entity/JSBooleanEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSExceptionEntity.hpp"
+#include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSInfinityEntity.hpp"
 #include "engine/entity/JSNaNEntity.hpp"
+#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
@@ -136,7 +138,7 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
                const JSLocation &location) {
   common::AutoPtr<JSValue> func = this;
   if (getType() == JSValueType::JS_OBJECT) {
-    func = self->toPrimitive(ctx);
+    func = toPrimitive(ctx);
   }
   if (func->getType() != JSValueType::JS_NATIVE_FUNCTION &&
       func->getType() != JSValueType::JS_FUNCTION) {
@@ -844,6 +846,46 @@ common::AutoPtr<JSValue> JSValue::getKeys(common::AutoPtr<JSContext> ctx) {
     entity = self->getEntity<JSObjectEntity>();
   }
   return result;
+}
+
+common::AutoPtr<JSValue> JSValue::getBind(common::AutoPtr<JSContext> ctx) {
+  if (!isFunction()) {
+    throw error::JSTypeError(
+        fmt::format(L"cannot convert '{}' to function", getTypeName()));
+  }
+  if (getType() == JSValueType::JS_FUNCTION) {
+    auto bind = getEntity<JSFunctionEntity>()->getBind();
+    if (bind != nullptr) {
+      return ctx->createValue(bind);
+    }
+  }
+  if (getType() == JSValueType::JS_NATIVE_FUNCTION) {
+    auto bind = getEntity<JSNativeFunctionEntity>()->getBind();
+    if (bind != nullptr) {
+      return ctx->createValue(bind);
+    }
+  }
+  return nullptr;
+}
+
+void JSValue::setBind(common::AutoPtr<JSContext> ctx,
+                      common::AutoPtr<JSValue> bind) {
+  if (isFunction()) {
+    _store->appendChild(bind->getStore());
+    if (getType() == JSValueType::JS_FUNCTION) {
+      auto bind = getEntity<JSFunctionEntity>()->getBind();
+      if (bind) {
+        _store->removeChild(bind);
+      }
+      getEntity<JSFunctionEntity>()->bind(bind);
+    } else {
+      auto bind = getEntity<JSNativeFunctionEntity>()->getBind();
+      if (bind) {
+        _store->removeChild(bind);
+      }
+      getEntity<JSNativeFunctionEntity>()->bind(bind);
+    }
+  }
 }
 
 JSObjectEntity::JSField *

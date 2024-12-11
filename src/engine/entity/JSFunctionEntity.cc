@@ -8,12 +8,19 @@ using namespace spark::engine;
 JSFunctionEntity::JSFunctionEntity(
     JSStore *prototype, const common::AutoPtr<compiler::JSModule> &module)
     : JSObjectEntity(prototype), _async(false), _generator(false), _address(0),
-      _length(0) {
+      _length(0), _bind(nullptr) {
   _type = JSValueType::JS_FUNCTION;
   _module = module;
 }
 void JSFunctionEntity::setAsync(bool async) { _async = async; }
+
 void JSFunctionEntity::setGenerator(bool generator) { _generator = generator; }
+
+void JSFunctionEntity::bind(JSStore *self) { _bind = self; }
+
+const JSStore *JSFunctionEntity::getBind() const { return _bind; }
+
+JSStore *JSFunctionEntity::getBind() { return _bind; }
 
 void JSFunctionEntity::setAddress(uint32_t address) { _address = address; }
 

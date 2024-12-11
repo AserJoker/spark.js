@@ -33,7 +33,6 @@
 #include "error/JSTypeError.hpp"
 #include <string>
 
-
 using namespace spark;
 using namespace spark::engine;
 
@@ -317,6 +316,22 @@ JSContext::createGenerator(const common::AutoPtr<compiler::JSModule> &module,
   auto store = new JSStore(new JSFunctionEntity(prop, module));
   auto res = _scope->createValue(store, name);
   res->getEntity<JSFunctionEntity>()->setGenerator(true);
+  res->getStore()->appendChild(prop);
+  return res;
+}
+
+common::AutoPtr<JSValue>
+JSContext::createArrow(const common::AutoPtr<compiler::JSModule> &module,
+                       const std::wstring &name) {
+  auto prop = _GeneratorFunction->getProperty(this, L"prototype")->getStore();
+  auto store = new JSStore(new JSFunctionEntity(prop, module));
+  auto res = _scope->createValue(store, name);
+  auto self = getScope()->getValue(L"this");
+  if (self == nullptr) {
+    res->setBind(this, undefined());
+  } else {
+    res->setBind(this, self);
+  }
   res->getStore()->appendChild(prop);
   return res;
 }

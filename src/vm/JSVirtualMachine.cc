@@ -87,7 +87,9 @@ JS_OPT(JSVirtualMachine::pushGenerator) {
   _ctx->stack.push_back(ctx->createGenerator(module));
 }
 
-JS_OPT(JSVirtualMachine::pushArrow) {}
+JS_OPT(JSVirtualMachine::pushArrow) {
+  _ctx->stack.push_back(ctx->createArrow(module));
+}
 
 JS_OPT(JSVirtualMachine::pushThis) {
   _ctx->stack.push_back(ctx->load(L"this"));
@@ -1197,8 +1199,11 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
                                    ctx->Array()
                                        ->getProperty(ctx, L"prototype")
                                        ->getProperty(ctx, L"values"));
-
-  ctx->createValue(self, L"this");
+  auto bind = func->getBind(ctx);
+  if (bind == nullptr) {
+    bind = self;
+  }
+  ctx->createValue(bind, L"this");
   common::AutoPtr<engine::JSValue> result;
   if (func->getType() == engine::JSValueType::JS_NATIVE_FUNCTION) {
     auto entity = func->getEntity<engine::JSNativeFunctionEntity>();
@@ -1213,7 +1218,7 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
       for (auto &[name, value] : closure) {
         scope->createValue(value, name);
       }
-      scope->createValue(self->getStore(), L"this");
+      scope->createValue(bind->getStore(), L"this");
       scope->createValue(arguments->getStore(), L"arguments");
       result->setOpaque(JSCoroutineContext{
           .eval = new JSEvalContext,

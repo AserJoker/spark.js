@@ -2225,7 +2225,13 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
                     JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
-  auto node = readGroupExpression(filename, source, current);
+  common::AutoPtr<JSNode> node = nullptr;
+  if (!node) {
+    node = readArrowFunctionDeclaration(filename, source, current);
+  }
+  if (!node) {
+    readGroupExpression(filename, source, current);
+  }
   if (!node) {
     node = readBooleanLiteral(filename, source, current);
   }
@@ -2255,9 +2261,6 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
   }
   if (!node) {
     node = readFunctionDeclaration(filename, source, current);
-  }
-  if (!node) {
-    node = readArrowFunctionDeclaration(filename, source, current);
   }
   if (!node) {
     node = readClassDeclaration(filename, source, current);

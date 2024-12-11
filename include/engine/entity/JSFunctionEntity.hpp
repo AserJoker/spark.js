@@ -1,6 +1,7 @@
 #pragma once
 #include "compiler/base/JSModule.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include <string>
 #include <unordered_map>
 namespace spark::engine {
@@ -14,6 +15,7 @@ private:
   common::AutoPtr<compiler::JSModule> _module;
   std::wstring _name;
   std::wstring _source;
+  JSStore *_bind;
 
 public:
   JSFunctionEntity(JSStore *prototype,
@@ -25,6 +27,10 @@ public:
   void setClosure(const std::wstring &name, JSStore *entity);
   void setFuncName(const std::wstring &name);
   void setSource(const std::wstring &name);
+  
+  void bind(JSStore *self);
+  const JSStore *getBind() const;
+  JSStore *getBind();
 
   bool getAsync() const;
   bool isGenerator() const;

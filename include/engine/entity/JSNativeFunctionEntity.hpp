@@ -1,8 +1,6 @@
 #pragma once
-#include "common/AutoPtr.hpp"
 #include "common/Map.hpp"
 #include "engine/base/JSValueType.hpp"
-#include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
 #include <functional>
 #include <string>
@@ -22,18 +20,14 @@ public:
 
   void bind(JSStore *self);
 
-  const JSStore *getBind(common::AutoPtr<JSContext> ctx) const;
+  const JSStore *getBind() const;
 
-  JSStore *getBind(common::AutoPtr<JSContext> ctx);
+  JSStore *getBind();
 
   const std::function<JSFunction> &getCallee() const;
 
   const common::Map<std::wstring, JSStore *> &getClosure() const;
 
   const std::wstring &getFunctionName() const;
-
-  std::wstring toString(common::AutoPtr<JSContext> ctx) const override;
-
-  bool toBoolean(common::AutoPtr<JSContext> ctx) const override;
 };
 }; // namespace spark::engine

@@ -146,6 +146,10 @@ public:
   createGenerator(const common::AutoPtr<compiler::JSModule> &module,
                   const std::wstring &name = L"");
 
+  common::AutoPtr<JSValue>
+  createArrow(const common::AutoPtr<compiler::JSModule> &module,
+              const std::wstring &name = L"");
+
   common::AutoPtr<JSValue> createException(const std::wstring &type,
                                            const std::wstring &message,
                                            const JSLocation &location = {});
