@@ -1,6 +1,7 @@
 #include "vm/JSVirtualMachine.hpp"
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/entity/JSArrayEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
@@ -10,6 +11,7 @@
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
+#include "error/JSSyntaxError.hpp"
 #include "error/JSTypeError.hpp"
 #include "vm/JSAsmOperator.hpp"
 #include "vm/JSCoroutineContext.hpp"
@@ -218,8 +220,38 @@ JS_OPT(JSVirtualMachine::merge) {
       obj1 = obj1->getPrototype(ctx);
       entity = obj1->getEntity<engine::JSObjectEntity>();
     }
+  } else if (obj->getType() == engine::JSValueType::JS_ARRAY) {
+    auto size = obj->getEntity<engine::JSArrayEntity>()->getItems().size();
+    auto iterator =
+        obj1->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
+    if (!iterator->isFunction()) {
+      throw error::JSTypeError(L"array pattern rest require iterator");
+    }
+    auto gen = iterator->apply(ctx, obj1);
+    if (gen->getType() != engine::JSValueType::JS_OBJECT) {
+      throw error::JSTypeError(
+          L"Result of the Symbol.iterator method is not an object");
+    }
+    auto next = gen->getProperty(ctx, L"next");
+    if (!next->isFunction()) {
+      throw error::JSTypeError(L"array pattern require iterator");
+    }
+    for (;;) {
+      auto res = next->apply(ctx, gen);
+      if (res->getType() != engine::JSValueType::JS_OBJECT) {
+        throw error::JSTypeError(
+            fmt::format(L"Iterator result '{}' is not an object",
+                        res->toString(ctx)->getString().value()));
+      }
+      auto val = res->getProperty(ctx, L"value");
+      auto done = res->getProperty(ctx, L"done");
+      if (done->toBoolean(ctx)->getBoolean().value()) {
+        break;
+      }
+      obj->setIndex(ctx, size++, val);
+    }
   } else {
-    throw error::JSError(L"not implement");
+    throw error::JSSyntaxError(L"Invalid operator");
   }
 }
 

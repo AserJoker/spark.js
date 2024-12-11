@@ -2255,6 +2255,9 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
     node = readFunctionDeclaration(filename, source, current);
   }
   if (!node) {
+    node = readArrowFunctionDeclaration(filename, source, current);
+  }
+  if (!node) {
     node = readClassDeclaration(filename, source, current);
   }
   if (!node) {
@@ -2267,18 +2270,22 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
     node = readObjectDeclaration(filename, source, current);
   }
   if (node != nullptr) {
-    for (;;) {
-      auto expr = readMemberExpression(filename, source, current);
-      if (!expr) {
-        expr = readCallExpression(filename, source, current);
-      }
-      if (expr != nullptr) {
-        expr.cast<JSBinaryExpression>()->left = node;
-        node->addParent(expr);
-        node = expr;
-        node->location = getLocation(source, position, current);
-      } else {
-        break;
+    if (node->type != JSNodeType::DECLARATION_FUNCTION &&
+        node->type != JSNodeType::DECLARATION_ARROW_FUNCTION &&
+        node->type != JSNodeType::DECLARATION_CLASS) {
+      for (;;) {
+        auto expr = readMemberExpression(filename, source, current);
+        if (!expr) {
+          expr = readCallExpression(filename, source, current);
+        }
+        if (expr != nullptr) {
+          expr.cast<JSBinaryExpression>()->left = node;
+          node->addParent(expr);
+          node = expr;
+          node->location = getLocation(source, position, current);
+        } else {
+          break;
+        }
       }
     }
     node->location = getLocation(source, position, current);
@@ -2316,38 +2323,42 @@ JSParser::readRValue(uint32_t filename, const std::wstring &source,
     node = readValue(filename, source, current);
   }
   if (node != nullptr) {
-    for (;;) {
-      if (level < 3) {
-        break;
-      }
-      auto expr = readUpdateExpression(filename, source, current);
-      if (level >= 17 && expr == nullptr) {
-        expr = readAssigmentExpression(filename, source, current);
-      }
-      if (level >= 9 && expr == nullptr) {
-        expr = readInstanceOfExpression(filename, source, current);
-      }
-      if (level >= 9 && expr == nullptr) {
-        expr = readInExpression(filename, source, current);
-      }
-      if (level >= 4 && expr == nullptr) {
-        auto tmp = current;
-        expr = readBinaryExpression(filename, source, current);
-        if (expr != nullptr && expr->level > level) {
-          current = tmp;
-          expr = nullptr;
+    if (node->type != JSNodeType::DECLARATION_FUNCTION &&
+        node->type != JSNodeType::DECLARATION_ARROW_FUNCTION &&
+        node->type != JSNodeType::DECLARATION_CLASS) {
+      for (;;) {
+        if (level < 3) {
+          break;
         }
-      }
-      if (level >= 16 && expr == nullptr) {
-        expr = readConditionExpression(filename, source, current);
-      }
-      if (expr != nullptr) {
-        expr.cast<JSBinaryExpression>()->left = node;
-        node->addParent(expr);
-        node = expr;
-        node->location = getLocation(source, position, current);
-      } else {
-        break;
+        auto expr = readUpdateExpression(filename, source, current);
+        if (level >= 17 && expr == nullptr) {
+          expr = readAssigmentExpression(filename, source, current);
+        }
+        if (level >= 9 && expr == nullptr) {
+          expr = readInstanceOfExpression(filename, source, current);
+        }
+        if (level >= 9 && expr == nullptr) {
+          expr = readInExpression(filename, source, current);
+        }
+        if (level >= 4 && expr == nullptr) {
+          auto tmp = current;
+          expr = readBinaryExpression(filename, source, current);
+          if (expr != nullptr && expr->level > level) {
+            current = tmp;
+            expr = nullptr;
+          }
+        }
+        if (level >= 16 && expr == nullptr) {
+          expr = readConditionExpression(filename, source, current);
+        }
+        if (expr != nullptr) {
+          expr.cast<JSBinaryExpression>()->left = node;
+          node->addParent(expr);
+          node = expr;
+          node->location = getLocation(source, position, current);
+        } else {
+          break;
+        }
       }
     }
     node->location = getLocation(source, position, current);
@@ -4665,10 +4676,24 @@ JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
       identifier = readArrayPattern(filename, source, current);
     }
     if (!identifier) {
-      identifier = readIdentifierLiteral(filename, source, current);
+      identifier = readValue(filename, source, current);
+      if (identifier != nullptr) {
+        while (identifier->type == JSNodeType::EXPRESSION_GROUP) {
+          identifier = identifier.cast<JSGroupExpression>()->expression;
+        }
+        if (identifier->type != JSNodeType::EXPRESSION_MEMBER &&
+            identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER &&
+            identifier->type != JSNodeType::LITERAL_IDENTITY) {
+          throw error::JSSyntaxError(
+              formatException(L"Invalid destructuring assignment target",
+                              filename, source, identifier->location.start));
+        }
+      }
     }
     if (!identifier) {
-      return nullptr;
+      throw error::JSSyntaxError(
+          formatException(L"Invalid destructuring assignment target", filename,
+                          source, identifier->location.start));
     }
     common::AutoPtr node = new JSRestPatternItem;
     node->identifier = identifier;
@@ -4689,49 +4714,70 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
   }
   auto current = position;
   skipInvisible(filename, source, current);
-  auto next = current;
-  auto identifier = readIdentifierLiteral(filename, source, current);
+  auto backup = current;
   common::AutoPtr node = new JSObjectPatternItem;
-  if (!identifier) {
+  auto identifier = readIdentifierLiteral(filename, source, current);
+  if (identifier == nullptr) {
     identifier = readStringLiteral(filename, source, current);
   }
-  if (!identifier) {
+  if (identifier == nullptr) {
     identifier = readMemberExpression(filename, source, current);
-    if (!identifier ||
-        identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+    if (identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
       identifier = nullptr;
-      current = next;
+      current = backup;
     } else {
       identifier = identifier.cast<JSComputedMemberExpression>()->right;
     }
   }
-  if (!identifier) {
-    return nullptr;
-  }
-  node->identifier = identifier;
-  identifier->addParent(node);
-  next = current;
-  skipInvisible(filename, source, current);
-  auto token = readSymbolToken(filename, source, current);
-  if (token != nullptr) {
-    if (token->location.isEqual(source, L":")) {
-      auto match = readIdentifierLiteral(filename, source, current);
-      if (!match) {
-        match = readObjectPattern(filename, source, current);
-      }
-      if (!match) {
-        match = readArrayPattern(filename, source, current);
-      }
-      if (!match) {
-        return nullptr;
-      }
-      node->match = match;
-      match->addParent(node);
-      next = current;
-      skipInvisible(filename, source, current);
-      token = readSymbolToken(filename, source, current);
+  if (identifier != nullptr) {
+    auto token = readSymbolToken(filename, source, current);
+    if (token != nullptr && token->location.isEqual(source, L":")) {
+      node->identifier = identifier;
+      identifier->addParent(node);
+      backup = current;
+    } else {
+      current = backup;
     }
   }
+  auto match = readObjectPattern(filename, source, current);
+  if (!match) {
+    match = readArrayPattern(filename, source, current);
+  }
+  if (!match) {
+    match = readValue(filename, source, current);
+    if (match != nullptr) {
+      while (match->type == JSNodeType::EXPRESSION_GROUP) {
+        match = match.cast<JSGroupExpression>()->expression;
+      }
+      if (match->type != JSNodeType::EXPRESSION_MEMBER &&
+          match->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER &&
+          match->type != JSNodeType::LITERAL_IDENTITY) {
+        throw error::JSSyntaxError(
+            formatException(L"Invalid destructuring assignment target",
+                            filename, source, identifier->location.start));
+      }
+    }
+  }
+  if (!match && !node->identifier) {
+    return nullptr;
+  }
+  if (!node->identifier) {
+    if (match->type != JSNodeType::LITERAL_IDENTITY) {
+      throw error::JSSyntaxError(
+          formatException(L"Invalid destructuring assignment target", filename,
+                          source, identifier->location.start));
+    } else {
+      node->identifier = match;
+      match->addParent(node);
+    }
+  }
+  if (match != nullptr) {
+    node->match = match;
+    match->addParent(node);
+  }
+  backup = current;
+  skipInvisible(filename, source, current);
+  auto token = readSymbolToken(filename, source, current);
   if (token != nullptr) {
     if (token->location.isEqual(source, L"=")) {
       auto value = readExpression(filename, source, current);
@@ -4742,7 +4788,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
       }
       node->value = value;
       value->addParent(node);
-      next = current;
+      backup = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);
     }
@@ -4750,12 +4796,11 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
   if (token != nullptr) {
     if (token->location.isEqual(source, L",") ||
         token->location.isEqual(source, L"}")) {
-      current = next;
+      current = backup;
       node->location = getLocation(source, position, current);
       position = current;
       return node;
     }
-    current = next;
   }
   return nullptr;
 }
@@ -4816,10 +4861,19 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
     identifier = readArrayPattern(filename, source, current);
   }
   if (!identifier) {
-    identifier = readIdentifierLiteral(filename, source, current);
-  }
-  if (!identifier) {
-    identifier = readStringLiteral(filename, source, current);
+    identifier = readValue(filename, source, current);
+    if (identifier != nullptr) {
+      while (identifier->type == JSNodeType::EXPRESSION_GROUP) {
+        identifier = identifier.cast<JSGroupExpression>()->expression;
+      }
+      if (identifier->type != JSNodeType::EXPRESSION_MEMBER &&
+          identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER &&
+          identifier->type != JSNodeType::LITERAL_IDENTITY) {
+        throw error::JSSyntaxError(
+            formatException(L"Invalid destructuring assignment target",
+                            filename, source, identifier->location.start));
+      }
+    }
   }
   if (identifier != nullptr) {
     common::AutoPtr node = new JSArrayPatternItem;
@@ -4879,7 +4933,9 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
       if (!token->location.isEqual(source, L",")) {
         return nullptr;
       }
-      item->addParent(node);
+      if (item != nullptr) {
+        item->addParent(node);
+      }
       node->items.push_back(item);
       item = readArrayPatternItem(filename, source, current);
     }
