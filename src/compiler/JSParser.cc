@@ -402,8 +402,7 @@ void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
                                isConst);
       }
     }
-  }
-  if (identifier->type == JSNodeType::PATTERN_ARRAY) {
+  } else if (identifier->type == JSNodeType::PATTERN_ARRAY) {
     auto arr = identifier.cast<JSArrayPattern>();
     for (auto &item : arr->items) {
       if (item->type == JSNodeType::PATTERN_ARRAY_ITEM) {
@@ -416,6 +415,9 @@ void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
                                isConst);
       }
     }
+  } else if (identifier->type != JSNodeType::LITERAL_IDENTITY) {
+    throw error::JSSyntaxError(formatException(
+        L"Unexcepted token", filename, source, identifier->location.start));
   }
   JSSourceDeclaration declar;
   declar.isConst = isConst;
