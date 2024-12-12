@@ -1,4 +1,5 @@
 #include "engine/lib/JSFunctionConstructor.hpp"
+#include "common/AutoPtr.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
@@ -38,8 +39,61 @@ JS_FUNC(JSFunctionConstructor::name) {
   throw error::JSTypeError(
       L"Function.prototype.toString called on incompatible object");
 }
+
 JS_FUNC(JSFunctionConstructor::call) {
   return self->apply(ctx, args[0], std::vector(args.begin() + 1, args.end()));
+}
+
+JS_FUNC(JSFunctionConstructor::apply) {
+  auto arr = ctx->createArray();
+  for (size_t index = 1; index < args.size(); index++) {
+    arr->setIndex(ctx, (uint32_t)(index - 1), args[index]);
+  }
+  return self->apply(ctx, args[0], {arr});
+}
+
+JS_FUNC(JSFunctionConstructor::bind) {
+  auto bind = ctx->undefined();
+  if (args.size()) {
+    bind = args[0];
+  }
+  if (self->isFunction()) {
+    if (self->getType() == JSValueType::JS_NATIVE_FUNCTION) {
+      auto e = self->getEntity<JSNativeFunctionEntity>();
+      auto result = ctx->createNativeFunction(e->getCallee(), e->getClosure(),
+                                              e->getFunctionName());
+      auto e2 = result->getEntity<JSNativeFunctionEntity>();
+      if (e->getBind() != nullptr) {
+        bind = self->getBind(ctx);
+      }
+      result->setBind(ctx, bind);
+      return result;
+    } else if (self->getType() == JSValueType::JS_FUNCTION) {
+      auto e = self->getEntity<JSFunctionEntity>();
+      common::AutoPtr<JSValue> result;
+      if (e->isGenerator()) {
+        result = ctx->createGenerator(e->getModule());
+      } else {
+        result = ctx->createFunction(e->getModule());
+      }
+      auto e2 = result->getEntity<JSFunctionEntity>();
+      e2->setAddress(e->getAddress());
+      e2->setAsync(e->getAsync());
+      e2->setFuncName(e->getFuncName());
+      e2->setLength(e->getLength());
+      e2->setSource(L"function anonymouse(){ [native code] }");
+      for (auto &[k, v] : e->getClosure()) {
+        e2->setClosure(k, v);
+        result->getStore()->appendChild(v);
+      }
+      if (e->getBind() != nullptr) {
+        bind = self->getBind(ctx);
+      }
+      result->setBind(ctx, bind);
+      return result;
+    }
+  }
+  throw error::JSTypeError(L"Bind must be called on a function");
 }
 
 void JSFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx,
@@ -54,4 +108,13 @@ void JSFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx,
 
   prototype->setPropertyDescriptor(ctx, L"name",
                                    ctx->createNativeFunction(name), nullptr);
+
+  prototype->setPropertyDescriptor(ctx, L"call",
+                                   ctx->createNativeFunction(call, L"call"));
+
+  prototype->setPropertyDescriptor(ctx, L"apply",
+                                   ctx->createNativeFunction(apply, L"apply"));
+
+  prototype->setPropertyDescriptor(ctx, L"bind",
+                                   ctx->createNativeFunction(bind, L"bind"));
 }

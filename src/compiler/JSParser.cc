@@ -2227,10 +2227,7 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
   skipInvisible(filename, source, current);
   common::AutoPtr<JSNode> node = nullptr;
   if (!node) {
-    node = readArrowFunctionDeclaration(filename, source, current);
-  }
-  if (!node) {
-    readGroupExpression(filename, source, current);
+    node = readGroupExpression(filename, source, current);
   }
   if (!node) {
     node = readBooleanLiteral(filename, source, current);
@@ -2260,12 +2257,6 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
     node = readNewExpression(filename, source, current);
   }
   if (!node) {
-    node = readFunctionDeclaration(filename, source, current);
-  }
-  if (!node) {
-    node = readClassDeclaration(filename, source, current);
-  }
-  if (!node) {
     node = readIdentifierLiteral(filename, source, current);
   }
   if (!node) {
@@ -2274,19 +2265,26 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
   if (!node) {
     node = readObjectDeclaration(filename, source, current);
   }
+  if (!node) {
+    node = readNewExpression(filename, source, current);
+  }
   if (node != nullptr) {
-    if (node->type != JSNodeType::DECLARATION_FUNCTION &&
-        node->type != JSNodeType::DECLARATION_ARROW_FUNCTION &&
-        node->type != JSNodeType::DECLARATION_CLASS) {
-      for (;;) {
-        auto expr = readMemberExpression(filename, source, current);
-        if (!expr) {
-          expr = readCallExpression(filename, source, current);
-        }
-        if (expr != nullptr) {
-          expr.cast<JSBinaryExpression>()->left = node;
-          node->addParent(expr);
-          node = expr;
+    for (;;) {
+      auto expr = readMemberExpression(filename, source, current);
+      if (!expr) {
+        expr = readCallExpression(filename, source, current);
+      }
+      if (expr != nullptr) {
+        expr.cast<JSBinaryExpression>()->left = node;
+        node->addParent(expr);
+        node = expr;
+        node->location = getLocation(source, position, current);
+      } else {
+        auto temp = readTemplateLiteral(filename, source, current);
+        if (temp != nullptr) {
+          temp.cast<JSTemplateLiteral>()->tag = node;
+          node->addParent(temp);
+          node = temp;
           node->location = getLocation(source, position, current);
         } else {
           break;
@@ -2307,63 +2305,83 @@ JSParser::readRValue(uint32_t filename, const std::wstring &source,
   skipInvisible(filename, source, current);
   common::AutoPtr<JSNode> node = nullptr;
   if (!node) {
+    node = readArrowFunctionDeclaration(filename, source, current);
+    if (node != nullptr) {
+      node->location = getLocation(source, position, current);
+      position = current;
+      return node;
+    }
+  }
+  if (!node) {
+    node = readFunctionDeclaration(filename, source, current);
+    if (node != nullptr) {
+      node->location = getLocation(source, position, current);
+      position = current;
+      return node;
+    }
+  }
+  if (!node) {
+    node = readClassDeclaration(filename, source, current);
+    if (node != nullptr) {
+      node->location = getLocation(source, position, current);
+      position = current;
+      return node;
+    }
+  }
+  if (!node && level >= 4) {
     node = readUnaryExpression(filename, source, current);
   }
-  if (!node) {
+  if (!node && level >= 4) {
     node = readVoidExpression(filename, source, current);
   }
-  if (!node) {
+  if (!node && level >= 4) {
     node = readDeleteExpression(filename, source, current);
   }
-  if (!node) {
+  if (!node && level >= 4) {
     node = readTypeofExpression(filename, source, current);
   }
-  if (!node) {
+  if (!node && level >= 4) {
     node = readAwaitExpression(filename, source, current);
   }
-  if (!node) {
+  if (!node && level >= 4) {
     node = readYieldExpression(filename, source, current);
   }
   if (!node) {
     node = readValue(filename, source, current);
   }
   if (node != nullptr) {
-    if (node->type != JSNodeType::DECLARATION_FUNCTION &&
-        node->type != JSNodeType::DECLARATION_ARROW_FUNCTION &&
-        node->type != JSNodeType::DECLARATION_CLASS) {
-      for (;;) {
-        if (level < 3) {
-          break;
+    for (;;) {
+      if (level < 3) {
+        break;
+      }
+      auto expr = readUpdateExpression(filename, source, current);
+      if (level >= 17 && expr == nullptr) {
+        expr = readAssigmentExpression(filename, source, current);
+      }
+      if (level >= 9 && expr == nullptr) {
+        expr = readInstanceOfExpression(filename, source, current);
+      }
+      if (level >= 9 && expr == nullptr) {
+        expr = readInExpression(filename, source, current);
+      }
+      if (level >= 4 && expr == nullptr) {
+        auto tmp = current;
+        expr = readBinaryExpression(filename, source, current);
+        if (expr != nullptr && expr->level > level) {
+          current = tmp;
+          expr = nullptr;
         }
-        auto expr = readUpdateExpression(filename, source, current);
-        if (level >= 17 && expr == nullptr) {
-          expr = readAssigmentExpression(filename, source, current);
-        }
-        if (level >= 9 && expr == nullptr) {
-          expr = readInstanceOfExpression(filename, source, current);
-        }
-        if (level >= 9 && expr == nullptr) {
-          expr = readInExpression(filename, source, current);
-        }
-        if (level >= 4 && expr == nullptr) {
-          auto tmp = current;
-          expr = readBinaryExpression(filename, source, current);
-          if (expr != nullptr && expr->level > level) {
-            current = tmp;
-            expr = nullptr;
-          }
-        }
-        if (level >= 16 && expr == nullptr) {
-          expr = readConditionExpression(filename, source, current);
-        }
-        if (expr != nullptr) {
-          expr.cast<JSBinaryExpression>()->left = node;
-          node->addParent(expr);
-          node = expr;
-          node->location = getLocation(source, position, current);
-        } else {
-          break;
-        }
+      }
+      if (level >= 16 && expr == nullptr) {
+        expr = readConditionExpression(filename, source, current);
+      }
+      if (expr != nullptr) {
+        expr.cast<JSBinaryExpression>()->left = node;
+        node->addParent(expr);
+        node = expr;
+        node->location = getLocation(source, position, current);
+      } else {
+        break;
       }
     }
     node->location = getLocation(source, position, current);
@@ -2554,14 +2572,8 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
-  auto tag = readIdentifierToken(filename, source, current);
   auto temp = readTemplateToken(filename, source, current);
   common::AutoPtr node = new JSTemplateLiteral;
-  if (tag != nullptr) {
-    node->tag = source.substr(tag->location.start.offset,
-                              tag->location.end.offset -
-                                  tag->location.start.offset + 1);
-  }
   if (temp != nullptr) {
     auto src = source.substr(temp->location.start.offset,
                              temp->location.end.offset -

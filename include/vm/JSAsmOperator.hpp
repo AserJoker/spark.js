@@ -50,6 +50,7 @@ enum class JSAsmOperator {
   VOID,
   TYPE_OF,
   NEW,
+  DELETE,
   PUSH_SCOPE,
   POP_SCOPE,
   CALL,

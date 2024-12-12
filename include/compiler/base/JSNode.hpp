@@ -145,7 +145,7 @@ struct JSIdentifierLiteral : public JSNode {
 };
 
 struct JSTemplateLiteral : public JSNode {
-  std::wstring tag;
+  common::AutoPtr<JSNode> tag;
   std::vector<std::wstring> quasis;
   JSNodeArray expressions;
   JSTemplateLiteral() : JSNode(JSNodeType::LITERAL_TEMPLATE, -2) {}

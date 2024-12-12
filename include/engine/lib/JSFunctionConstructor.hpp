@@ -7,6 +7,8 @@ private:
   static JS_FUNC(toString);
   static JS_FUNC(name);
   static JS_FUNC(call);
+  static JS_FUNC(apply);
+  static JS_FUNC(bind);
 
 public:
   static JS_FUNC(constructor);

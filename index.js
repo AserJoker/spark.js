@@ -1,5 +1,2 @@
-"use strict";
-const arr = [1, , 2];
-for (const a of arr) {
-  console.log(a)
-}
+'use strict'
+delete Array.prototype.join.call([],'')

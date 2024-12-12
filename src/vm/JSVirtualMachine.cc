@@ -1,5 +1,6 @@
 #include "vm/JSVirtualMachine.hpp"
 #include "common/AutoPtr.hpp"
+#include "compiler/base/JSNode.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSArrayEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
@@ -513,6 +514,13 @@ JS_OPT(JSVirtualMachine::void_) {
   _ctx->stack.pop_back();
   _ctx->stack.push_back(ctx->undefined());
 }
+JS_OPT(JSVirtualMachine::delete_) {
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto host = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(host->removeProperty(ctx, field));
+}
 
 JS_OPT(JSVirtualMachine::typeof_) {
   auto value = *_ctx->stack.rbegin();
@@ -542,8 +550,12 @@ JS_OPT(JSVirtualMachine::call) {
   }
   auto func = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
-  auto name = func->getProperty(ctx, L"name")->getString().value();
-  auto loc = module->sourceMap.at(offset);
+  auto name =
+      func->getProperty(ctx, L"name")->toString(ctx)->getString().value();
+  compiler::JSSourceLocation::Position loc = {0, 0, 0};
+  if (module->sourceMap.contains(offset)) {
+    loc = module->sourceMap.at(offset);
+  }
   auto pc = _pc;
   auto res = func->apply(
       ctx, ctx->undefined(), args,
@@ -1013,6 +1025,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::TYPE_OF:
         typeof_(ctx, module);
+        break;
+      case vm::JSAsmOperator::DELETE:
+        delete_(ctx, module);
         break;
       case vm::JSAsmOperator::PUSH_SCOPE:
         pushScope(ctx, module);

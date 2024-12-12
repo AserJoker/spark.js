@@ -146,7 +146,9 @@ void JSGenerator::popScope(JSGeneratorContext &ctx,
 
 void JSGenerator::resolvePrivateName(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
-                                     const common::AutoPtr<JSNode> &node) {}
+                                     const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveLiteralRegex(JSGeneratorContext &ctx,
                                       common::AutoPtr<JSModule> &module,
@@ -212,14 +214,6 @@ void JSGenerator::resolveLiteralNumber(JSGeneratorContext &ctx,
   generate(module, vm::JSAsmOperator::PUSH, n->value);
 }
 
-void JSGenerator::resolveLiteralComment(JSGeneratorContext &ctx,
-                                        common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
-
-void JSGenerator::resolveLiteralMultilineComment(
-    JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
-
 void JSGenerator::resolveLiteralUndefined(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
                                           const common::AutoPtr<JSNode> &node) {
@@ -236,7 +230,76 @@ void JSGenerator::resolveLiteralIdentity(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveLiteralTemplate(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSTemplateLiteral>();
+  if (n->tag != nullptr) {
+    auto opt = vm::JSAsmOperator::CALL;
+    if (n->tag->type == JSNodeType::EXPRESSION_MEMBER) {
+      auto m = n->tag.cast<JSMemberExpression>();
+      resolveNode(ctx, module, m->left);
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               resolveConstant(ctx, module,
+                               m->right.cast<JSIdentifierLiteral>()->value));
+      opt = vm::JSAsmOperator::MEMBER_CALL;
+    } else if (n->tag->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+      auto m = n->tag.cast<JSComputedMemberExpression>();
+      resolveNode(ctx, module, m->left);
+      resolveNode(ctx, module, m->right);
+      opt = vm::JSAsmOperator::MEMBER_CALL;
+    } else {
+      resolveNode(ctx, module, n->tag);
+    }
+    generate(module, vm::JSAsmOperator::PUSH_ARRAY);
+    for (size_t index = 0; index < n->quasis.size(); index++) {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               resolveConstant(ctx, module, n->quasis[index]));
+      generate(module, vm::JSAsmOperator::PUSH, (double)index);
+      generate(module, vm::JSAsmOperator::SET_FIELD);
+      generate(module, vm::JSAsmOperator::POP, 1U);
+    }
+    generate(module, vm::JSAsmOperator::PUSH_ARRAY);
+    for (size_t index = 0; index < n->quasis.size(); index++) {
+      std::wstring raw;
+      for (auto &ch : n->quasis[index]) {
+        if (ch == '\n') {
+          raw += L"\\n";
+        } else if (ch == '\r') {
+          raw += L"\\r";
+        } else if (ch == '\t') {
+          raw += L"\\t";
+        } else {
+          raw += ch;
+        }
+      }
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               resolveConstant(ctx, module, raw));
+      generate(module, vm::JSAsmOperator::PUSH, (double)index);
+      generate(module, vm::JSAsmOperator::SET_FIELD);
+      generate(module, vm::JSAsmOperator::POP, 1U);
+    }
+    generate(module, vm::JSAsmOperator::LOAD_CONST,
+             resolveConstant(ctx, module, L"raw"));
+    generate(module, vm::JSAsmOperator::SET_FIELD);
+    generate(module, vm::JSAsmOperator::POP, 1U);
+    for (auto &exp : n->expressions) {
+      resolveNode(ctx, module, exp);
+    }
+    module->sourceMap[module->codes.size()] = n->tag->location.end;
+    generate(module, opt, (uint32_t)n->expressions.size() + 1);
+  } else {
+    generate(module, vm::JSAsmOperator::LOAD_CONST,
+             resolveConstant(ctx, module, n->quasis[0]));
+    if (n->quasis.size() > 1) {
+      for (size_t i = 0; i < n->expressions.size(); i++) {
+        resolveNode(ctx, module, n->expressions[i]);
+        generate(module, vm::JSAsmOperator::ADD);
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 resolveConstant(ctx, module, n->quasis[i + 1]));
+      }
+      generate(module, vm::JSAsmOperator::ADD);
+    }
+  }
+}
 
 void JSGenerator::resolveLiteralBigint(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
@@ -252,12 +315,14 @@ void JSGenerator::resolveThis(JSGeneratorContext &ctx,
   generate(module, vm::JSAsmOperator::LOAD,
            resolveConstant(ctx, module, L"this"));
 }
+
 void JSGenerator::resolveSuper(JSGeneratorContext &ctx,
                                common::AutoPtr<JSModule> &module,
                                const common::AutoPtr<JSNode> &node) {
   generate(module, vm::JSAsmOperator::LOAD,
            resolveConstant(ctx, module, L"super"));
 }
+
 void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
                                  common::AutoPtr<JSModule> &module,
                                  const common::AutoPtr<JSNode> &node) {
@@ -276,9 +341,6 @@ void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
   }
   popLexScope(ctx, module);
 }
-void JSGenerator::resolveStatementEmpty(JSGeneratorContext &ctx,
-                                        common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
 
 void JSGenerator::resolveStatementBlock(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
@@ -293,7 +355,9 @@ void JSGenerator::resolveStatementBlock(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveStatementDebugger(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveStatementReturn(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
@@ -438,11 +502,9 @@ void JSGenerator::resolveStatementIf(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveStatementSwitch(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
-
-void JSGenerator::resolveStatementSwitchCase(
-    JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveStatementThrow(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
@@ -682,7 +744,9 @@ void JSGenerator::resolveStatementForOf(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveStatementForAwaitOf(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node, const std::wstring &label) {}
+    const common::AutoPtr<JSNode> &node, const std::wstring &label) {
+  // TODO:
+}
 
 void JSGenerator::resolveVariableDeclaration(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
@@ -803,17 +867,11 @@ void JSGenerator::resolveVariableIdentifier(
   }
 }
 
-void JSGenerator::resolveDecorator(JSGeneratorContext &ctx,
-                                   common::AutoPtr<JSModule> &module,
-                                   const common::AutoPtr<JSNode> &node) {}
-
 void JSGenerator::resolveDirective(JSGeneratorContext &ctx,
                                    common::AutoPtr<JSModule> &module,
-                                   const common::AutoPtr<JSNode> &node) {}
-
-void JSGenerator::resolveInterpreterDirective(
-    JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+                                   const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveObjectProperty(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
@@ -1014,11 +1072,15 @@ void JSGenerator::resolveExpressionComputedMember(
 
 void JSGenerator::resolveExpressionOptionalComputedMember(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveExpressionCondition(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
@@ -1051,7 +1113,9 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveExpressionOptionalCall(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveExpressionNew(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
@@ -1075,6 +1139,32 @@ void JSGenerator::resolveExpressionNew(JSGeneratorContext &ctx,
 void JSGenerator::resolveExpressionDelete(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
                                           const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSDeleteExpression>();
+  if (n->right->type == JSNodeType::LITERAL_IDENTITY) {
+    throw error::JSSyntaxError(
+        fmt::format(L"Cannot delete identifier: '{}'",
+                    n->right.cast<JSIdentifierLiteral>()->value));
+  } else if (n->right->type == JSNodeType::EXPRESSION_MEMBER) {
+    auto m = n->right.cast<JSMemberExpression>();
+    resolveNode(ctx, module, m->left);
+    generate(module, vm::JSAsmOperator::LOAD_CONST,
+             resolveConstant(ctx, module,
+                             m->right.cast<JSIdentifierLiteral>()->value));
+    generate(module, vm::JSAsmOperator::DELETE);
+  } else if (n->right->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+    auto m = n->right.cast<JSComputedMemberExpression>();
+    resolveNode(ctx, module, m->left);
+    resolveNode(ctx, module, m->right);
+    generate(module, vm::JSAsmOperator::DELETE);
+  } else if (n->right->type == JSNodeType::EXPRESSION_OPTIONAL_MEMBER) {
+    // TODO:
+  } else if (n->right->type ==
+             JSNodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER) {
+    // TODO:
+  } else {
+    resolveNode(ctx, module, n->right);
+    generate(module, vm::JSAsmOperator::PUSH_TRUE);
+  }
 }
 
 void JSGenerator::resolveExpressionAwait(JSGeneratorContext &ctx,
@@ -1118,82 +1208,83 @@ void JSGenerator::resolveExpressionAssigment(
   resolveVariableIdentifier(ctx, module, host);
 }
 
-void JSGenerator::resolveExpressionRest(JSGeneratorContext &ctx,
-                                        common::AutoPtr<JSModule> &module,
-                                        const common::AutoPtr<JSNode> &node) {}
-
-void JSGenerator::resolvePatternRestItem(JSGeneratorContext &ctx,
-                                         common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
-
-void JSGenerator::resolvePatternObject(JSGeneratorContext &ctx,
-                                       common::AutoPtr<JSModule> &module,
-                                       const common::AutoPtr<JSNode> &node) {}
-
-void JSGenerator::resolvePatternObjectItem(
-    JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
-
-void JSGenerator::resolvePatternArray(JSGeneratorContext &ctx,
-                                      common::AutoPtr<JSModule> &module,
-                                      const common::AutoPtr<JSNode> &node) {}
-
-void JSGenerator::resolvePatternArrayItem(JSGeneratorContext &ctx,
-                                          common::AutoPtr<JSModule> &module,
-                                          const common::AutoPtr<JSNode> &node) {
-}
-
 void JSGenerator::resolveClassMethod(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
-                                     const common::AutoPtr<JSNode> &node) {}
+                                     const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveClassProperty(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
-                                       const common::AutoPtr<JSNode> &node) {}
+                                       const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveClassAccessor(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
-                                       const common::AutoPtr<JSNode> &node) {}
+                                       const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveStaticBlock(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
-                                     const common::AutoPtr<JSNode> &node) {}
+                                     const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveImportDeclaration(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveImportSpecifier(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveImportDefault(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
-                                       const common::AutoPtr<JSNode> &node) {}
+                                       const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveImportNamespace(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveImportAttartube(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveExportDeclaration(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveExportDefault(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
-                                       const common::AutoPtr<JSNode> &node) {}
+                                       const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveExportSpecifier(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
-                                         const common::AutoPtr<JSNode> &node) {}
+                                         const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveExportAll(JSGeneratorContext &ctx,
                                    common::AutoPtr<JSModule> &module,
-                                   const common::AutoPtr<JSNode> &node) {}
+                                   const common::AutoPtr<JSNode> &node) {
+  // TODO:
+}
 
 void JSGenerator::resolveDeclarationArrowFunction(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
@@ -1408,6 +1499,7 @@ void JSGenerator::resolveDeclarationArray(JSGeneratorContext &ctx,
 void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
                                           const common::AutoPtr<JSNode> &node) {
+  // TODO:
 }
 
 void JSGenerator::resolveNode(JSGeneratorContext &ctx,
@@ -1432,12 +1524,6 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
   case JSNodeType::LITERAL_NUMBER:
     resolveLiteralNumber(ctx, module, node);
     break;
-  case JSNodeType::LITERAL_COMMENT:
-    resolveLiteralComment(ctx, module, node);
-    break;
-  case JSNodeType::LITERAL_MULTILINE_COMMENT:
-    resolveLiteralMultilineComment(ctx, module, node);
-    break;
   case JSNodeType::LITERAL_UNDEFINED:
     resolveLiteralUndefined(ctx, module, node);
     break;
@@ -1458,9 +1544,6 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
     break;
   case JSNodeType::PROGRAM:
     resolveProgram(ctx, module, node);
-    break;
-  case JSNodeType::STATEMENT_EMPTY:
-    resolveStatementEmpty(ctx, module, node);
     break;
   case JSNodeType::STATEMENT_BLOCK:
     resolveStatementBlock(ctx, module, node);
@@ -1486,9 +1569,6 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
     break;
   case JSNodeType::STATEMENT_SWITCH:
     resolveStatementSwitch(ctx, module, node);
-    break;
-  case JSNodeType::STATEMENT_SWITCH_CASE:
-    resolveStatementSwitchCase(ctx, module, node);
     break;
   case JSNodeType::STATEMENT_THROW:
     resolveStatementThrow(ctx, module, node);
@@ -1523,14 +1603,8 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
   case JSNodeType::VARIABLE_DECLARATOR:
     resolveVariableDeclarator(ctx, module, node);
     break;
-  case JSNodeType::DECORATOR:
-    resolveDecorator(ctx, module, node);
-    break;
   case JSNodeType::DIRECTIVE:
     resolveDirective(ctx, module, node);
-    break;
-  case JSNodeType::INTERPRETER_DIRECTIVE:
-    resolveInterpreterDirective(ctx, module, node);
     break;
   case JSNodeType::OBJECT_PROPERTY:
     resolveObjectProperty(ctx, module, node);
@@ -1598,24 +1672,6 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
   case JSNodeType::EXPRESSION_ASSIGMENT:
     resolveExpressionAssigment(ctx, module, node);
     break;
-  case JSNodeType::EXPRESSION_REST:
-    resolveExpressionRest(ctx, module, node);
-    break;
-  case JSNodeType::PATTERN_REST_ITEM:
-    resolvePatternRestItem(ctx, module, node);
-    break;
-  case JSNodeType::PATTERN_OBJECT:
-    resolvePatternObject(ctx, module, node);
-    break;
-  case JSNodeType::PATTERN_OBJECT_ITEM:
-    resolvePatternObjectItem(ctx, module, node);
-    break;
-  case JSNodeType::PATTERN_ARRAY:
-    resolvePatternArray(ctx, module, node);
-    break;
-  case JSNodeType::PATTERN_ARRAY_ITEM:
-    resolvePatternArrayItem(ctx, module, node);
-    break;
   case JSNodeType::CLASS_METHOD:
     resolveClassMethod(ctx, module, node);
     break;
@@ -1676,6 +1732,8 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
   case JSNodeType::DECLARATION_CLASS:
     resolveDeclarationClass(ctx, module, node);
     break;
+  default:
+    throw error::JSSyntaxError(L"Unexcepted token");
   }
 }
 

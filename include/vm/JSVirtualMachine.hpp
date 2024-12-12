@@ -77,6 +77,7 @@ private:
   JS_OPT(restObject);
   JS_OPT(await);
   JS_OPT(void_);
+  JS_OPT(delete_);
   JS_OPT(typeof_);
   JS_OPT(pushScope);
   JS_OPT(popScope);

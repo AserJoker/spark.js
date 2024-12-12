@@ -89,14 +89,6 @@ private:
                             common::AutoPtr<JSModule> &module,
                             const common::AutoPtr<JSNode> &node);
 
-  void resolveLiteralComment(JSGeneratorContext &ctx,
-                             common::AutoPtr<JSModule> &module,
-                             const common::AutoPtr<JSNode> &node);
-
-  void resolveLiteralMultilineComment(JSGeneratorContext &ctx,
-                                      common::AutoPtr<JSModule> &module,
-                                      const common::AutoPtr<JSNode> &node);
-
   void resolveLiteralUndefined(JSGeneratorContext &ctx,
                                common::AutoPtr<JSModule> &module,
                                const common::AutoPtr<JSNode> &node);
@@ -122,10 +114,6 @@ private:
   void resolveProgram(JSGeneratorContext &ctx,
                       common::AutoPtr<JSModule> &module,
                       const common::AutoPtr<JSNode> &node);
-
-  void resolveStatementEmpty(JSGeneratorContext &ctx,
-                             common::AutoPtr<JSModule> &module,
-                             const common::AutoPtr<JSNode> &node);
 
   void resolveStatementBlock(JSGeneratorContext &ctx,
                              common::AutoPtr<JSModule> &module,
@@ -166,10 +154,6 @@ private:
   void resolveStatementSwitch(JSGeneratorContext &ctx,
                               common::AutoPtr<JSModule> &module,
                               const common::AutoPtr<JSNode> &node);
-
-  void resolveStatementSwitchCase(JSGeneratorContext &ctx,
-                                  common::AutoPtr<JSModule> &module,
-                                  const common::AutoPtr<JSNode> &node);
 
   void resolveStatementThrow(JSGeneratorContext &ctx,
                              common::AutoPtr<JSModule> &module,
@@ -225,18 +209,9 @@ private:
                                  common::AutoPtr<JSModule> &module,
                                  const common::AutoPtr<JSNode> &node);
 
-  void resolveDecorator(JSGeneratorContext &ctx,
-                        common::AutoPtr<JSModule> &module,
-                        const common::AutoPtr<JSNode> &node);
-
   void resolveDirective(JSGeneratorContext &ctx,
                         common::AutoPtr<JSModule> &module,
                         const common::AutoPtr<JSNode> &node);
-
-  void resolveInterpreterDirective(JSGeneratorContext &ctx,
-                                   common::AutoPtr<JSModule> &module,
-                                   const common::AutoPtr<JSNode> &node);
-
   void resolveObjectProperty(JSGeneratorContext &ctx,
                              common::AutoPtr<JSModule> &module,
                              const common::AutoPtr<JSNode> &node);
@@ -316,30 +291,6 @@ private:
   void resolveExpressionAssigment(JSGeneratorContext &ctx,
                                   common::AutoPtr<JSModule> &module,
                                   const common::AutoPtr<JSNode> &node);
-
-  void resolveExpressionRest(JSGeneratorContext &ctx,
-                             common::AutoPtr<JSModule> &module,
-                             const common::AutoPtr<JSNode> &node);
-
-  void resolvePatternRestItem(JSGeneratorContext &ctx,
-                              common::AutoPtr<JSModule> &module,
-                              const common::AutoPtr<JSNode> &node);
-
-  void resolvePatternObject(JSGeneratorContext &ctx,
-                            common::AutoPtr<JSModule> &module,
-                            const common::AutoPtr<JSNode> &node);
-
-  void resolvePatternObjectItem(JSGeneratorContext &ctx,
-                                common::AutoPtr<JSModule> &module,
-                                const common::AutoPtr<JSNode> &node);
-
-  void resolvePatternArray(JSGeneratorContext &ctx,
-                           common::AutoPtr<JSModule> &module,
-                           const common::AutoPtr<JSNode> &node);
-
-  void resolvePatternArrayItem(JSGeneratorContext &ctx,
-                               common::AutoPtr<JSModule> &module,
-                               const common::AutoPtr<JSNode> &node);
 
   void resolveClassMethod(JSGeneratorContext &ctx,
                           common::AutoPtr<JSModule> &module,

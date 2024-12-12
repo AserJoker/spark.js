@@ -143,8 +143,10 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
   if (func->getType() != JSValueType::JS_NATIVE_FUNCTION &&
       func->getType() != JSValueType::JS_FUNCTION) {
 
-    throw error::JSTypeError(fmt::format(L"{} is not a function", getName()),
-                             location);
+    throw error::JSTypeError(
+        fmt::format(L"'{}' is not a function, value is '{}'", getName(),
+                    toString(ctx)->getString().value()),
+        location);
   }
   ctx->pushCallStack(location);
   auto scope = ctx->getScope();
@@ -875,13 +877,13 @@ void JSValue::setBind(common::AutoPtr<JSContext> ctx,
     if (getType() == JSValueType::JS_FUNCTION) {
       auto current = getEntity<JSFunctionEntity>()->getBind();
       if (current) {
-        _store->removeChild(current);
+        return;
       }
       getEntity<JSFunctionEntity>()->bind(bind->getStore());
     } else {
       auto current = getEntity<JSNativeFunctionEntity>()->getBind();
       if (current) {
-        _store->removeChild(current);
+        return;
       }
       getEntity<JSNativeFunctionEntity>()->bind(bind->getStore());
     }
@@ -1160,6 +1162,19 @@ common::AutoPtr<JSValue>
 JSValue::removeProperty(common::AutoPtr<JSContext> ctx,
                         common::AutoPtr<JSValue> name) {
   auto key = name->toPrimitive(ctx);
+  if (getType() == JSValueType::JS_ARRAY) {
+    auto num = key->toNumber(ctx)->getNumber();
+    if (num.has_value()) {
+      auto &items = getEntity<JSArrayEntity>()->getItems();
+      if (num.value() < items.size()) {
+        if (items[num.value()] != nullptr) {
+          _store->removeChild(items[num.value()]);
+        }
+        items[num.value()] = nullptr;
+      }
+      return ctx->truly();
+    }
+  }
   if (key->getType() != JSValueType::JS_SYMBOL) {
     return removeProperty(ctx, key->toString(ctx)->getString().value());
   }

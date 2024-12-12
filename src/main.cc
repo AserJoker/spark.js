@@ -222,6 +222,9 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::VOID:
       out << L"void";
       break;
+    case vm::JSAsmOperator::DELETE:
+      out << L"delete";
+      break;
     case vm::JSAsmOperator::TYPE_OF:
       out << L"typeof";
       break;
@@ -390,7 +393,7 @@ int main(int argc, char *argv[]) {
     }
   } catch (error::JSError &e) {
     std::cout << e.what();
-    fmt::print(L"  at {} ({}:{}:{})", e.getLocation().funcname,
+    fmt::print(L"\n  at {} ({}:{}:{})", e.getLocation().funcname,
                runtime->getSourceFilename(e.getLocation().filename),
                e.getLocation().line + 1, e.getLocation().column + 1);
   } catch (std::exception &e) {
