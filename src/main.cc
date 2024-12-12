@@ -257,6 +257,10 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"jnotNull " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
+    case vm::JSAsmOperator::JNULL:
+      out << L"jnotNull " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
     case vm::JSAsmOperator::TRY:
       out << L"try " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);

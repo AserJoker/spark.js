@@ -1,2 +1,4 @@
 'use strict'
-delete Array.prototype.join.call([],'')
+const obj = {a:1};
+delete obj?.a
+console.log(obj)

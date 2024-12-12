@@ -844,6 +844,14 @@ JS_OPT(JSVirtualMachine::jnotNull) {
   }
 }
 
+JS_OPT(JSVirtualMachine::jnull) {
+  auto offset = argi(module);
+  auto value = *_ctx->stack.rbegin();
+  if (value->isNull() && value->isUndefined()) {
+    _pc = offset;
+  }
+}
+
 void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
                            const common::AutoPtr<compiler::JSModule> &module,
                            size_t offset) {
@@ -1130,6 +1138,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::JNOT_NULL:
         jnotNull(ctx, module);
+        break;
+      case vm::JSAsmOperator::JNULL:
+        jnull(ctx, module);
         break;
       case vm::JSAsmOperator::TRY:
         tryStart(ctx, module);

@@ -91,6 +91,7 @@ private:
   JS_OPT(jfalse);
   JS_OPT(jtrue);
   JS_OPT(jnotNull);
+  JS_OPT(jnull);
   JS_OPT(pow);
   JS_OPT(mul);
   JS_OPT(div);

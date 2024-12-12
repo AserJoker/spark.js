@@ -59,6 +59,7 @@ enum class JSAsmOperator {
   JFALSE,
   JTRUE,
   JNOT_NULL,
+  JNULL,
   TRY,
   DEFER,
   END_DEFER,

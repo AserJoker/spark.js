@@ -246,6 +246,10 @@ void JSGenerator::resolveLiteralTemplate(JSGeneratorContext &ctx,
       resolveNode(ctx, module, m->left);
       resolveNode(ctx, module, m->right);
       opt = vm::JSAsmOperator::MEMBER_CALL;
+    } else if (n->tag->type == JSNodeType::EXPRESSION_OPTIONAL_MEMBER ||
+               n->tag->type ==
+                   JSNodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER) {
+      throw error::JSSyntaxError(L"Invalid optional chian for template");
     } else {
       resolveNode(ctx, module, n->tag);
     }
@@ -864,6 +868,8 @@ void JSGenerator::resolveVariableIdentifier(
     }
     generate(module, vm::JSAsmOperator::POP, index);
     generate(module, vm::JSAsmOperator::POP, 1U);
+  } else {
+    throw error::JSSyntaxError(L"Invalid left-hand side in assignment");
   }
 }
 
@@ -1059,7 +1065,17 @@ void JSGenerator::resolveExpressionMember(JSGeneratorContext &ctx,
 
 void JSGenerator::resolveExpressionOptionalMember(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-    const common::AutoPtr<JSNode> &node) {}
+    const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSOptionalMemberExpression>();
+  resolveNode(ctx, module, n->left);
+  auto offset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JNULL, 0U);
+  generate(module, vm::JSAsmOperator::LOAD_CONST,
+           resolveConstant(ctx, module,
+                           n->right.cast<JSIdentifierLiteral>()->value));
+  generate(module, vm::JSAsmOperator::GET_FIELD);
+  *(uint32_t *)(module->codes.data() + offset) = module->codes.size();
+}
 
 void JSGenerator::resolveExpressionComputedMember(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
@@ -1073,13 +1089,31 @@ void JSGenerator::resolveExpressionComputedMember(
 void JSGenerator::resolveExpressionOptionalComputedMember(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
-  // TODO:
+
+  auto n = node.cast<JSOptionalComputedMemberExpression>();
+  resolveNode(ctx, module, n->left);
+  auto offset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JNULL, 0U);
+  resolveNode(ctx, module, n->right);
+  generate(module, vm::JSAsmOperator::GET_FIELD);
+  *(uint32_t *)(module->codes.data() + offset) = module->codes.size();
 }
 
 void JSGenerator::resolveExpressionCondition(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSConditionExpression>();
+  auto right = n->right.cast<JSBinaryExpression>();
+  resolveNode(ctx, module, n->left);
+  auto start = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JFALSE, 0U);
+  resolveNode(ctx, module, right->left);
+  auto end = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JMP, 0U);
+  *(uint32_t *)(module->codes.data() + start) = (uint32_t)module->codes.size();
+  resolveNode(ctx, module, right->right);
+  *(uint32_t *)(module->codes.data() + end) = (uint32_t)module->codes.size();
+  generate(module, vm::JSAsmOperator::POP, 1U);
 }
 
 void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
@@ -1101,6 +1135,10 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
                           member->right.cast<JSIdentifierLiteral>()->value));
     }
     opt = vm::JSAsmOperator::MEMBER_CALL;
+  } else if (func->type == JSNodeType::EXPRESSION_OPTIONAL_MEMBER) {
+    // TODO:
+  } else if (func->type == JSNodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER) {
+    // TODO:
   } else {
     resolveNode(ctx, module, n->left);
   }
