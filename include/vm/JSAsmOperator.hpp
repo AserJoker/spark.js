@@ -55,6 +55,8 @@ enum class JSAsmOperator {
   POP_SCOPE,
   CALL,
   MEMBER_CALL,
+  OPTIONAL_CALL,
+  MEMBER_OPTIONAL_CALL,
   JMP,
   JFALSE,
   JTRUE,

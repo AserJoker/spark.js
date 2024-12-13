@@ -4735,11 +4735,13 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
   }
   if (identifier == nullptr) {
     identifier = readMemberExpression(filename, source, current);
-    if (identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
-      identifier = nullptr;
-      current = backup;
-    } else {
-      identifier = identifier.cast<JSComputedMemberExpression>()->right;
+    if (identifier != nullptr) {
+      if (identifier->type != JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+        identifier = nullptr;
+        current = backup;
+      } else {
+        identifier = identifier.cast<JSComputedMemberExpression>()->right;
+      }
     }
   }
   if (identifier != nullptr) {

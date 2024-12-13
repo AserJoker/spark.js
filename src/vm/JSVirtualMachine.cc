@@ -588,6 +588,10 @@ JS_OPT(JSVirtualMachine::memberCall) {
   _ctx->stack.pop_back();
   auto loc = module->sourceMap.at(offset);
   auto func = self->getProperty(ctx, field);
+  if (!func->isFunction()) {
+    throw error::JSTypeError(
+        fmt::format(L"cannot convert {} to function", func->getTypeName()));
+  }
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _pc;
   auto res = func->apply(
@@ -605,6 +609,85 @@ JS_OPT(JSVirtualMachine::memberCall) {
     _pc = pc;
   }
 }
+
+JS_OPT(JSVirtualMachine::optionalCall) {
+  auto offset = _pc - sizeof(uint16_t);
+  auto size = argi(module);
+  std::vector<common::AutoPtr<engine::JSValue>> args;
+  args.resize(size, nullptr);
+  for (auto i = 0; i < size; i++) {
+    args[size - 1 - i] = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
+  }
+  auto func = *_ctx->stack.rbegin();
+  if (func->isNull() || func->isUndefined()) {
+    return;
+  }
+  _ctx->stack.pop_back();
+  auto name =
+      func->getProperty(ctx, L"name")->toString(ctx)->getString().value();
+  compiler::JSSourceLocation::Position loc = {0, 0, 0};
+  if (module->sourceMap.contains(offset)) {
+    loc = module->sourceMap.at(offset);
+  }
+  auto pc = _pc;
+  auto res = func->apply(
+      ctx, ctx->undefined(), args,
+      {
+          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .line = loc.line + 1,
+          .column = loc.column + 1,
+          .funcname = name,
+      });
+  _ctx->stack.push_back(res);
+  if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+    _pc = module->codes.size();
+  } else {
+    _pc = pc;
+  }
+}
+
+JS_OPT(JSVirtualMachine::memberOptionalCall) {
+  auto offset = _pc - sizeof(uint16_t);
+  auto size = argi(module);
+  std::vector<common::AutoPtr<engine::JSValue>> args;
+  args.resize(size, nullptr);
+  for (auto i = 0; i < size; i++) {
+    args[size - 1 - i] = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
+  }
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto self = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto loc = module->sourceMap.at(offset);
+  auto func = self->getProperty(ctx, field);
+  if (func->isNull() || func->isUndefined()) {
+    _ctx->stack.push_back(func);
+    return;
+  }
+  if (!func->isFunction()) {
+    throw error::JSTypeError(
+        fmt::format(L"cannot convert {} to function", func->getTypeName()));
+  }
+  auto name = func->getProperty(ctx, L"name")->getString().value();
+  auto pc = _pc;
+  auto res = func->apply(
+      ctx, self, args,
+      {
+          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .line = loc.line + 1,
+          .column = loc.column + 1,
+          .funcname = name,
+      });
+  _ctx->stack.push_back(res);
+  if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+    _pc = module->codes.size();
+  } else {
+    _pc = pc;
+  }
+}
+
 JS_OPT(JSVirtualMachine::pow) {
   auto arg2 = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
@@ -847,7 +930,7 @@ JS_OPT(JSVirtualMachine::jnotNull) {
 JS_OPT(JSVirtualMachine::jnull) {
   auto offset = argi(module);
   auto value = *_ctx->stack.rbegin();
-  if (value->isNull() && value->isUndefined()) {
+  if (value->isNull() || value->isUndefined()) {
     _pc = offset;
   }
 }
@@ -1048,6 +1131,12 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::MEMBER_CALL:
         memberCall(ctx, module);
+        break;
+      case vm::JSAsmOperator::OPTIONAL_CALL:
+        optionalCall(ctx, module);
+        break;
+      case vm::JSAsmOperator::MEMBER_OPTIONAL_CALL:
+        memberOptionalCall(ctx, module);
         break;
       case vm::JSAsmOperator::POW:
         pow(ctx, module);

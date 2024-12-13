@@ -83,6 +83,8 @@ private:
   JS_OPT(popScope);
   JS_OPT(call);
   JS_OPT(memberCall);
+  JS_OPT(optionalCall);
+  JS_OPT(memberOptionalCall);
   JS_OPT(tryStart);
   JS_OPT(tryEnd);
   JS_OPT(defer);

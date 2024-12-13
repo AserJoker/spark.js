@@ -64,6 +64,11 @@ private:
 
   void popScope(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module);
 
+  void resolveMemberChian(JSGeneratorContext &ctx,
+                          common::AutoPtr<JSModule> &module,
+                          const common::AutoPtr<JSNode> &node,
+                          std::vector<size_t> &offsets);
+
 private:
   void resolvePrivateName(JSGeneratorContext &ctx,
                           common::AutoPtr<JSModule> &module,

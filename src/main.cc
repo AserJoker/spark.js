@@ -245,6 +245,14 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"member_call " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
+    case vm::JSAsmOperator::OPTIONAL_CALL:
+      out << L"optional_call " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::MEMBER_OPTIONAL_CALL:
+      out << L"member_optional_call " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
     case vm::JSAsmOperator::JMP:
       out << L"jmp " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
@@ -258,7 +266,7 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       offset += sizeof(uint32_t);
       break;
     case vm::JSAsmOperator::JNULL:
-      out << L"jnotNull " << *(uint32_t *)(buffer + offset);
+      out << L"jnull " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
     case vm::JSAsmOperator::TRY:
