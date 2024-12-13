@@ -174,6 +174,8 @@ void JSGenerator::resolveMemberChian(JSGeneratorContext &ctx,
     generate(module, vm::JSAsmOperator::JNULL, 0U);
     resolveNode(ctx, module, n->right);
     generate(module, vm::JSAsmOperator::GET_FIELD);
+  } else {
+    resolveNode(ctx, module, node);
   }
 }
 
@@ -547,7 +549,65 @@ void JSGenerator::resolveStatementIf(JSGeneratorContext &ctx,
 void JSGenerator::resolveStatementSwitch(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
                                          const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSSwitchStatement>();
+  _labels.push_back({{L"", ctx.scopeChain}, {}});
+  resolveNode(ctx, module, n->expression);
+  std::vector<size_t> offsets;
+  common::AutoPtr<JSNode> default_;
+  for (auto &ca : n->cases) {
+    auto c = ca.cast<JSSwitchCaseStatement>();
+    if (c->match != nullptr) {
+      generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
+      resolveNode(ctx, module, c->match);
+      generate(module, vm::JSAsmOperator::SEQ);
+      offsets.push_back(module->codes.size() + sizeof(uint16_t));
+      generate(module, vm::JSAsmOperator::JTRUE, 0U);
+      generate(module, vm::JSAsmOperator::POP, 1U);
+    } else {
+      default_ = c;
+    }
+  }
+  if (default_ != nullptr) {
+    generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+    offsets.push_back(module->codes.size() + sizeof(uint16_t));
+    generate(module, vm::JSAsmOperator::JMP, 0U);
+  }
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  auto endOffset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JMP, 0U);
+  size_t index = 0;
+  for (auto &cc : n->cases) {
+    generate(module, vm::JSAsmOperator::POP, 2U);
+    auto c = cc.cast<JSSwitchCaseStatement>();
+    if (c->match != nullptr) {
+      *(uint32_t *)(module->codes.data() + offsets[index]) =
+          module->codes.size();
+      for (auto &sts : c->statements) {
+        resolveNode(ctx, module, sts);
+      }
+      index++;
+    } else {
+      *(uint32_t *)(module->codes.data() + *offsets.rbegin()) =
+          module->codes.size();
+      auto c = default_.cast<JSSwitchCaseStatement>();
+      for (auto &sts : c->statements) {
+        resolveNode(ctx, module, sts);
+      }
+    }
+  }
+
+  auto &chunk = *_labels.rbegin();
+  *(uint32_t *)(module->codes.data() + endOffset) =
+      (uint32_t)module->codes.size();
+  for (auto &[node, offset] : chunk.second) {
+    if (node->type == JSNodeType::STATEMENT_CONTINUE) {
+      throw error::JSSyntaxError(L"invalid continue");
+    } else {
+      *(uint32_t *)(module->codes.data() + offset) =
+          (uint32_t)module->codes.size();
+    }
+  }
+  _labels.pop_back();
 }
 
 void JSGenerator::resolveStatementThrow(JSGeneratorContext &ctx,
