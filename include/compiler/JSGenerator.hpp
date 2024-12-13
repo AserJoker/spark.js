@@ -201,6 +201,10 @@ private:
                                   common::AutoPtr<JSModule> &module,
                                   const common::AutoPtr<JSNode> &node,
                                   const std::wstring &label = L"");
+  
+  void resolveStatementExpression(JSGeneratorContext &ctx,
+                                  common::AutoPtr<JSModule> &module,
+                                  const common::AutoPtr<JSNode> &node);
 
   void resolveVariableDeclaration(JSGeneratorContext &ctx,
                                   common::AutoPtr<JSModule> &module,

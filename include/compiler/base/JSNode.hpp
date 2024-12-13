@@ -178,6 +178,11 @@ struct JSEmptyStatement : public JSNode {
   JSEmptyStatement() : JSNode(JSNodeType::STATEMENT_EMPTY) {}
 };
 
+struct JSExpressionStatement : public JSNode {
+  common::AutoPtr<JSNode> expression;
+  JSExpressionStatement() : JSNode(JSNodeType::STATEMENT_EXPRESSION) {}
+};
+
 struct JSDebuggerStatement : public JSNode {
   JSDebuggerStatement() : JSNode(JSNodeType::STATEMENT_DEBUGGER) {}
 };

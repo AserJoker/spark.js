@@ -282,6 +282,7 @@ void JSParser::bindScope(common::AutoPtr<JSNode> node) {
   case JSNodeType::STATEMENT_WHILE:
   case JSNodeType::STATEMENT_DO_WHILE:
   case JSNodeType::STATEMENT_FOR:
+  case JSNodeType::STATEMENT_EXPRESSION:
   case JSNodeType::VARIABLE_DECLARATION:
   case JSNodeType::DECORATOR:
   case JSNodeType::EXPRESSION_UNARY:
@@ -2217,7 +2218,15 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
 common::AutoPtr<JSNode>
 JSParser::readExpressionStatement(uint32_t filename, const std::wstring &source,
                                   JSSourceLocation::Position &position) {
-  return readExpressions(filename, source, position);
+  common::AutoPtr node = new JSExpressionStatement;
+  auto expr = readExpressions(filename, source, position);
+  if (expr != nullptr) {
+    node->expression = expr;
+    expr->addParent(node);
+    node->location = expr->location;
+    return node;
+  }
+  return nullptr;
 }
 
 common::AutoPtr<JSNode>
@@ -5634,6 +5643,9 @@ std::wstring JSParser::toJSON(const std::wstring &filename,
     break;
   case JSNodeType::STATEMENT_FOR_AWAIT_OF:
     type = L"STATEMENT_FOR_AWAIT_OF";
+    break;
+  case JSNodeType::STATEMENT_EXPRESSION:
+    type = L"STATEMENT_EXPRESSION";
     break;
   case JSNodeType::VARIABLE_DECLARATION:
     type = L"VARIABLE_DECLARATION";

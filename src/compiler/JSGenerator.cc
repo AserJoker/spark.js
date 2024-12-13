@@ -852,6 +852,16 @@ void JSGenerator::resolveStatementForAwaitOf(
   // TODO:
 }
 
+void JSGenerator::resolveStatementExpression(
+    JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
+    const common::AutoPtr<JSNode> &node) {
+  auto n = node.cast<JSExpressionStatement>();
+  resolveNode(ctx, module, n->expression);
+  if (n->expression->type != JSNodeType::EXPRESSION_ASSIGMENT) {
+    generate(module, vm::JSAsmOperator::POP, 1U);
+  }
+}
+
 void JSGenerator::resolveVariableDeclaration(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
@@ -1099,7 +1109,10 @@ void JSGenerator::resolveExpressionBinary(JSGeneratorContext &ctx,
                                           const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSBinaryExpression>();
   resolveNode(ctx, module, n->left);
-  if (n->opt == L"&&" || n->opt == L"||" || n->opt == L"??") {
+  if (n->opt == L",") {
+    generate(module, vm::JSAsmOperator::POP, 1U);
+    resolveNode(ctx, module, n->right);
+  } else if (n->opt == L"&&" || n->opt == L"||" || n->opt == L"??") {
     generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
     auto pin = (module->codes.size() + sizeof(uint16_t));
     if (n->opt == L"&&") {
@@ -1445,7 +1458,73 @@ void JSGenerator::resolveExpressionAssigment(
   auto n = node.cast<JSBinaryExpression>();
   auto host = n->left;
   auto value = n->right;
-  resolveNode(ctx, module, value);
+  if (n->opt == L"+=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::ADD);
+  } else if (n->opt == L"-=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::SUB);
+  } else if (n->opt == L"**=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::POW);
+  } else if (n->opt == L"*=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::MUL);
+  } else if (n->opt == L"/=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::DIV);
+  } else if (n->opt == L"%=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::MOD);
+  } else if (n->opt == L">>>=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::USHR);
+  } else if (n->opt == L"<<=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::SHL);
+  } else if (n->opt == L">>=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::SHR);
+  } else if (n->opt == L"&&=") {
+    resolveNode(ctx, module, host);
+    auto offset = module->codes.size() + sizeof(uint16_t);
+    generate(module, vm::JSAsmOperator::JFALSE, 0U);
+    generate(module, vm::JSAsmOperator::POP, 1U);
+    resolveNode(ctx, module, value);
+    *(uint32_t *)(module->codes.data() + offset) =
+        (uint32_t)module->codes.size();
+  } else if (n->opt == L"||=") {
+    resolveNode(ctx, module, host);
+    auto offset = module->codes.size() + sizeof(uint16_t);
+    generate(module, vm::JSAsmOperator::JTRUE, 0U);
+    generate(module, vm::JSAsmOperator::POP, 1U);
+    resolveNode(ctx, module, value);
+    *(uint32_t *)(module->codes.data() + offset) =
+        (uint32_t)module->codes.size();
+  } else if (n->opt == L"&=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::AND);
+  } else if (n->opt == L"^=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::XOR);
+  } else if (n->opt == L"|=") {
+    resolveNode(ctx, module, host);
+    resolveNode(ctx, module, value);
+    generate(module, vm::JSAsmOperator::OR);
+  } else {
+    resolveNode(ctx, module, value);
+  }
   resolveVariableIdentifier(ctx, module, host);
 }
 
@@ -1837,6 +1916,9 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
     break;
   case JSNodeType::STATEMENT_FOR_AWAIT_OF:
     resolveStatementForAwaitOf(ctx, module, node);
+    break;
+  case JSNodeType::STATEMENT_EXPRESSION:
+    resolveStatementExpression(ctx, module, node);
     break;
   case JSNodeType::VARIABLE_DECLARATION:
     resolveVariableDeclaration(ctx, module, node);
