@@ -961,11 +961,7 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
           if (handle != 0) {
             _ctx->stack.pop_back();
             auto entity = result->getEntity<engine::JSExceptionEntity>();
-            if (entity->getTarget()) {
-              _ctx->stack.push_back(ctx->createValue(entity->getTarget()));
-            } else {
-              _ctx->stack.push_back(ctx->createError(result));
-            }
+            _ctx->stack.push_back(ctx->createError(result));
             _pc = handle;
           }
         }
