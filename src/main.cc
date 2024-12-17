@@ -6,9 +6,11 @@
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
+#include "error/JSTypeError.hpp"
 #include "vm/JSAsmOperator.hpp"
 #include <cstdint>
 #include <exception>
+#include <fmt/chrono.h>
 #include <fmt/xchar.h>
 #include <fstream>
 #include <iostream>
@@ -19,12 +21,29 @@ using namespace spark;
 using namespace spark::engine;
 
 JS_FUNC(print) {
+  using namespace std::chrono;
   if (args.empty()) {
     fmt::print(L"{}", ctx->undefined()->toString(ctx)->getString().value());
   } else {
     fmt::print(L"{}\n", args[0]->toString(ctx)->getString().value());
   }
   return ctx->undefined();
+}
+
+JS_FUNC(setTimeout) {
+  if (args.empty() || !args[0]->isFunction()) {
+    throw error::JSTypeError(
+        L"The 'callback' argument must be of type function.");
+  }
+  int64_t timeout = 0;
+  if (args.size() > 1) {
+    auto num = args[1]->toNumber(ctx)->getNumber();
+    if (num.has_value()) {
+      timeout = (int64_t)num.value();
+    }
+  }
+  auto id = ctx->createMacroTask(args[0], timeout);
+  return ctx->createNumber(id);
 }
 
 std::wstring read(const std::wstring &filename) {
@@ -394,10 +413,13 @@ int main(int argc, char *argv[]) {
   try {
     common::AutoPtr ctx = new engine::JSContext(runtime);
     ctx->createNativeFunction(print, L"print", L"print");
+    ctx->createNativeFunction(setTimeout, L"setTimeout", L"setTimeout");
     auto source = read(L"index.js");
     auto module = ctx->compile(source, L"index.js");
     write(module);
     auto res = ctx->getRuntime()->getVirtualMachine()->eval(ctx, module);
+    while (ctx->nextTick())
+      ;
     if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
       fmt::print(L"Uncaught {}\n", res->toString(ctx)->getString().value());
     } else {

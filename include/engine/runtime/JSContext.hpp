@@ -10,10 +10,13 @@
 #include "engine/entity/JSEntity.hpp"
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSScope.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include "engine/runtime/JSValue.hpp"
+#include <chrono>
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace spark::engine {
 class JSContext : public common::Object {
@@ -30,6 +33,13 @@ public:
     }
   };
 
+  struct Task {
+    uint32_t identifier;
+    common::AutoPtr<JSValue> exec;
+    int64_t timeout;
+    std::chrono::system_clock::time_point start;
+  };
+
 private:
   common::AutoPtr<JSValue> _Object;
   common::AutoPtr<JSValue> _Function;
@@ -38,13 +48,21 @@ private:
   common::AutoPtr<JSValue> _Iterator;
   common::AutoPtr<JSValue> _ArrayIterator;
   common::AutoPtr<JSValue> _Array;
-  common::AutoPtr<JSValue> _Error;
   common::AutoPtr<JSValue> _Symbol;
   common::AutoPtr<JSValue> _Number;
   common::AutoPtr<JSValue> _String;
   common::AutoPtr<JSValue> _Boolean;
   common::AutoPtr<JSValue> _BigInt;
   common::AutoPtr<JSValue> _RegExp;
+  common::AutoPtr<JSValue> _Promise;
+  common::AutoPtr<JSValue> _Error;
+  common::AutoPtr<JSValue> _AggregateError;
+  common::AutoPtr<JSValue> _InternalError;
+  common::AutoPtr<JSValue> _RangeError;
+  common::AutoPtr<JSValue> _ReferenceError;
+  common::AutoPtr<JSValue> _TypeError;
+  common::AutoPtr<JSValue> _SyntaxError;
+  common::AutoPtr<JSValue> _URIError;
 
   // internal
   std::unordered_map<std::wstring, JSStore *> _symbols;
@@ -53,13 +71,17 @@ private:
   common::AutoPtr<JSValue> _symbolPack;
 
 private:
-  void initialize();
-
-private:
   common::AutoPtr<JSScope> _root;
   common::AutoPtr<JSScope> _scope;
   common::AutoPtr<JSRuntime> _runtime;
+
+  std::vector<Task> _microTasks;
+  std::vector<Task> _macroTasks;
+
   JSCallFrame *_callStack;
+
+private:
+  void initialize();
 
 public:
   JSContext(const common::AutoPtr<JSRuntime> &runtime);
@@ -92,6 +114,14 @@ public:
 
   std::vector<JSLocation> trace(const JSLocation &location);
 
+  uint32_t createMicroTask(common::AutoPtr<JSValue> exec);
+
+  uint32_t createMacroTask(common::AutoPtr<JSValue> exec, int64_t timeout = 0);
+
+  bool nextTick();
+
+  void removeMacroTask(uint32_t id);
+
   common::AutoPtr<JSValue> createValue(JSStore *entity,
                                        const std::wstring &name = L"");
 
@@ -120,6 +150,7 @@ public:
                                         const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createObject(const std::wstring &name = L"");
+
   common::AutoPtr<JSValue> createArray(const std::wstring &name = L"");
 
   common::AutoPtr<JSValue>
@@ -127,10 +158,20 @@ public:
                   const std::vector<common::AutoPtr<JSValue>> &args,
                   const JSLocation &loc, const std::wstring &name = L"");
 
+  common::AutoPtr<JSValue> createPromise(const std::wstring &name = L"");
+
+  common::AutoPtr<JSValue> createError(common::AutoPtr<JSValue> exception,
+                                       const std::wstring &name = L"");
+
   common::AutoPtr<JSValue>
   createNativeFunction(const std::function<JSFunction> &value,
                        const std::wstring &funcname = L"",
                        const std::wstring &name = L"");
+
+  common::AutoPtr<JSValue> createNativeFunction(
+      const std::function<JSFunction> &value,
+      const common::Map<std::wstring, common::AutoPtr<JSValue>> closure,
+      const std::wstring &funcname = L"", const std::wstring &name = L"");
 
   common::AutoPtr<JSValue>
   createNativeFunction(const std::function<JSFunction> &value,
@@ -172,8 +213,6 @@ public:
 
   common::AutoPtr<JSValue> Object();
 
-  common::AutoPtr<JSValue> Error();
-
   common::AutoPtr<JSValue> Array();
 
   common::AutoPtr<JSValue> Iterator();
@@ -183,6 +222,24 @@ public:
   common::AutoPtr<JSValue> GeneratorFunction();
 
   common::AutoPtr<JSValue> Generator();
+
+  common::AutoPtr<JSValue> Promise();
+
+  common::AutoPtr<JSValue> Error();
+
+  common::AutoPtr<JSValue> AggregateError();
+
+  common::AutoPtr<JSValue> InternalError();
+
+  common::AutoPtr<JSValue> RangeError();
+
+  common::AutoPtr<JSValue> ReferenceError();
+
+  common::AutoPtr<JSValue> SyntaxError();
+  
+  common::AutoPtr<JSValue> TypeError();
+
+  common::AutoPtr<JSValue> URIErrorError();
 
   common::AutoPtr<JSValue> uninitialized();
 

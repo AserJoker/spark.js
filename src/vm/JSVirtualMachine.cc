@@ -4,6 +4,7 @@
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSArrayEntity.hpp"
 #include "engine/entity/JSEntity.hpp"
+#include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
@@ -958,6 +959,13 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         _ctx->stack.push_back(result);
         if (result->getType() == engine::JSValueType::JS_EXCEPTION) {
           if (handle != 0) {
+            _ctx->stack.pop_back();
+            auto entity = result->getEntity<engine::JSExceptionEntity>();
+            if (entity->getTarget()) {
+              _ctx->stack.push_back(ctx->createValue(entity->getTarget()));
+            } else {
+              _ctx->stack.push_back(ctx->createError(result));
+            }
             _pc = handle;
           }
         }

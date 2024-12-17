@@ -3497,8 +3497,8 @@ JSParser::readArrowFunctionDeclaration(uint32_t filename,
                         JSSourceDeclaration::TYPE::ARGUMENT, false);
       }
     }
-
-    token = readSymbolToken(filename, source, current);
+    auto backup = current;
+    token = readSymbolToken(filename, source, backup);
     if (token != nullptr && token->location.isEqual(source, L"{")) {
       node->body = readFunctionBody(filename, source, current);
     } else {

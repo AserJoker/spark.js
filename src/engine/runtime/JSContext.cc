@@ -14,24 +14,35 @@
 #include "engine/entity/JSNullEntity.hpp"
 #include "engine/entity/JSNumberEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
+#include "engine/entity/JSPromiseEntity.hpp"
 #include "engine/entity/JSStringEntity.hpp"
 #include "engine/entity/JSSymbolEntity.hpp"
 #include "engine/entity/JSUndefinedEntity.hpp"
+#include "engine/lib/JSAggregateErrorConstructor.hpp"
 #include "engine/lib/JSArrayConstructor.hpp"
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/lib/JSFunctionConstructor.hpp"
 #include "engine/lib/JSGeneratorConstructor.hpp"
 #include "engine/lib/JSGeneratorFunctionConstructor.hpp"
+#include "engine/lib/JSInternalErrorConstructor.hpp"
 #include "engine/lib/JSIteratorConstructor.hpp"
 #include "engine/lib/JSObjectConstructor.hpp"
+#include "engine/lib/JSPromiseConstructor.hpp"
+#include "engine/lib/JSRangeErrorConstructor.hpp"
+#include "engine/lib/JSReferenceErrorConstructor.hpp"
 #include "engine/lib/JSSymbolConstructor.hpp"
+#include "engine/lib/JSSyntaxErrorConstructor.hpp"
+#include "engine/lib/JSTypeErrorConstructor.hpp"
+#include "engine/lib/JSURIErrorConstructor.hpp"
 #include "engine/runtime/JSRuntime.hpp"
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSStore.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSSyntaxError.hpp"
 #include "error/JSTypeError.hpp"
+#include <chrono>
 #include <string>
+#include <thread>
 
 using namespace spark;
 using namespace spark::engine;
@@ -90,11 +101,19 @@ void JSContext::initialize() {
   JSSymbolConstructor::initialize(this, _Symbol, symbolPrototype);
   JSObjectConstructor::initialize(this, _Object, objectPrototype);
   JSFunctionConstructor::initialize(this, _Function, functionPrototype);
-  _Error = JSErrorConstructor::initialize(this);
   _Array = JSArrayConstructor::initialize(this);
   _GeneratorFunction = JSGeneratorFunctionConstructor::initialize(this);
   _Iterator = JSIteratorConstructor::initialize(this);
   _Generator = JSGeneratorConstructor::initialize(this);
+  _Promise = JSPromiseConstructor::initialize(this);
+  _Error = JSErrorConstructor::initialize(this);
+  _AggregateError = JSAggregateErrorConstructor::initialize(this);
+  _RangeError = JSRangeErrorConstructor::initialize(this);
+  _ReferenceError = JSReferenceErrorConstructor::initialize(this);
+  _SyntaxError = JSSyntaxErrorConstructor::initialize(this);
+  _TypeError = JSTypeErrorConstructor::initialize(this);
+  _URIError = JSURIErrorConstructor::initialize(this);
+  _InternalError = JSInternalErrorConstructor::initialize(this);
   subRef();
 }
 
@@ -171,6 +190,59 @@ std::vector<JSLocation> JSContext::trace(const JSLocation &location) {
     frame = frame->parent;
   }
   return stack;
+}
+uint32_t JSContext::createMicroTask(common::AutoPtr<JSValue> exec) {
+  static uint32_t index = 0;
+  _microTasks.push_back({
+      .identifier = index++,
+      .exec = getRoot()->createValue(exec->getStore()),
+  });
+  return _microTasks.rbegin()->identifier;
+}
+
+uint32_t JSContext::createMacroTask(common::AutoPtr<JSValue> exec,
+                                    int64_t timeout) {
+  static uint32_t index = 0;
+  _macroTasks.push_back({
+      .identifier = index++,
+      .exec = getRoot()->createValue(exec->getStore()),
+      .timeout = timeout,
+      .start = std::chrono::system_clock::now(),
+  });
+  return _macroTasks.rbegin()->identifier;
+}
+bool JSContext::nextTick() {
+  using namespace std::chrono;
+  if (_microTasks.empty() && _macroTasks.empty()) {
+    return false;
+  }
+  pushScope();
+  while (!_microTasks.empty()) {
+    auto task = *_microTasks.begin();
+    _microTasks.erase(_microTasks.begin());
+    task.exec->apply(this, undefined());
+  }
+  if (!_macroTasks.empty()) {
+    auto task = *_macroTasks.begin();
+    _macroTasks.erase(_macroTasks.begin());
+    if (std::chrono::system_clock::now() - task.start > task.timeout * 1ms) {
+      task.exec->apply(this, undefined());
+    } else {
+      _macroTasks.push_back(task);
+      std::this_thread::sleep_for(10ms);
+    }
+  }
+  popScope();
+  return true;
+}
+
+void JSContext::removeMacroTask(uint32_t id) {
+  for (auto it = _macroTasks.begin(); it != _macroTasks.end(); it++) {
+    if (it->identifier == id) {
+      _macroTasks.erase(it);
+      return;
+    }
+  }
 }
 
 common::AutoPtr<JSValue> JSContext::createValue(JSStore *store,
@@ -267,6 +339,10 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
     result = createValue(
         new JSStore(new JSFunctionEntity(prototype->getStore(), nullptr)));
     result->getStore()->appendChild(prototype->getStore());
+  } else if (constructor == _Promise) {
+    result =
+        createValue(new JSStore(new JSPromiseEntity(prototype->getStore())));
+    result->getStore()->appendChild(prototype->getStore());
   } else if (constructor == _Symbol) {
     throw error::JSTypeError(L"Symbol is not a constructor");
   } else {
@@ -275,6 +351,53 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
   result->getStore()->appendChild(prototype->getStore());
   result->setPropertyDescriptor(this, L"constructor", constructor);
   constructor->apply(this, result, args, loc);
+  return result;
+}
+
+common::AutoPtr<JSValue> JSContext::createPromise(const std::wstring &name) {
+  auto prototype = _Promise->getProperty(this, L"prototype");
+  auto result =
+      createValue(new JSStore(new JSPromiseEntity(prototype->getStore())));
+  result->getStore()->appendChild(prototype->getStore());
+  result->setPropertyDescriptor(this, L"constructor", _Promise);
+  return result;
+}
+common::AutoPtr<JSValue>
+JSContext::createError(common::AutoPtr<JSValue> exception,
+                       const std::wstring &name) {
+  auto e = exception->getEntity<JSExceptionEntity>();
+  if (e->getTarget()) {
+    return createValue(e->getTarget());
+  }
+  common::AutoPtr<JSValue> error;
+  if (e->getExceptionType() == L"AggregateError") {
+    error = _AggregateError;
+  } else if (e->getExceptionType() == L"InternalError") {
+    error = _InternalError;
+  } else if (e->getExceptionType() == L"RangeError") {
+    error = _RangeError;
+  } else if (e->getExceptionType() == L"ReferenceError") {
+    error = _ReferenceError;
+  } else if (e->getExceptionType() == L"SyntaxError") {
+    error = _SyntaxError;
+  } else if (e->getExceptionType() == L"URIError") {
+    error = _URIError;
+  } else {
+    error = _Error;
+  }
+  auto result = constructObject(error, {createString(e->getMessage())}, {});
+  auto stack = e->getStack();
+  std::wstring st;
+  for (auto &[fnindex, line, column, funcname] : e->getStack()) {
+    auto &filename = getRuntime()->getSourceFilename(fnindex);
+    if (fnindex != 0) {
+      st +=
+          fmt::format(L"\n at {}({}:{}:{})", funcname, filename, line, column);
+    } else {
+      st += fmt::format(L"\n at {} ({})", funcname, filename);
+    }
+  }
+  result->setProperty(this, L"stack", createString(st));
   return result;
 }
 
@@ -291,15 +414,36 @@ JSContext::createNativeFunction(const std::function<JSFunction> &value,
 
 common::AutoPtr<JSValue> JSContext::createNativeFunction(
     const std::function<JSFunction> &value,
+    const common::Map<std::wstring, common::AutoPtr<JSValue>> closure,
+    const std::wstring &funcname, const std::wstring &name) {
+  auto prop = _Function->getProperty(this, L"prototype")->getStore();
+  common::Map<std::wstring, JSStore *> clo;
+  for (auto &[k, v] : closure) {
+    clo[k] = (JSStore *)v->getStore();
+  }
+  auto res = _scope->createValue(
+      new JSStore(new JSNativeFunctionEntity(prop, funcname, value, clo)),
+      name);
+  for (auto &[_, v] : clo) {
+    res->getStore()->appendChild(v);
+  }
+  res->getStore()->appendChild(prop);
+  return res;
+}
+
+common::AutoPtr<JSValue> JSContext::createNativeFunction(
+    const std::function<JSFunction> &value,
     const common::Map<std::wstring, JSStore *> closure,
     const std::wstring &funcname, const std::wstring &name) {
   auto prop = _Function->getProperty(this, L"prototype")->getStore();
+
   auto res = _scope->createValue(
       new JSStore(new JSNativeFunctionEntity(prop, funcname, value, closure)),
       name);
   res->getStore()->appendChild(prop);
   return res;
 }
+
 common::AutoPtr<JSValue>
 JSContext::createFunction(const common::AutoPtr<compiler::JSModule> &module,
                           const std::wstring &name) {
@@ -375,6 +519,20 @@ common::AutoPtr<JSValue> JSContext::Object() { return _Object; }
 
 common::AutoPtr<JSValue> JSContext::Error() { return _Error; }
 
+common::AutoPtr<JSValue> JSContext::AggregateError() { return _AggregateError; }
+
+common::AutoPtr<JSValue> JSContext::InternalError() { return _InternalError; }
+
+common::AutoPtr<JSValue> JSContext::RangeError() { return _RangeError; }
+
+common::AutoPtr<JSValue> JSContext::ReferenceError() { return _ReferenceError; }
+
+common::AutoPtr<JSValue> JSContext::SyntaxError() { return _SyntaxError; }
+
+common::AutoPtr<JSValue> JSContext::TypeError() { return _TypeError; }
+
+common::AutoPtr<JSValue> JSContext::URIErrorError() { return _URIError; }
+
 common::AutoPtr<JSValue> JSContext::Array() { return _Array; }
 
 common::AutoPtr<JSValue> JSContext::Iterator() { return _Iterator; }
@@ -386,6 +544,8 @@ common::AutoPtr<JSValue> JSContext::GeneratorFunction() {
 }
 
 common::AutoPtr<JSValue> JSContext::Generator() { return _Generator; }
+
+common::AutoPtr<JSValue> JSContext::Promise() { return _Promise; }
 
 common::AutoPtr<JSValue> JSContext::symbolValue() { return _symbolValue; }
 

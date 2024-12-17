@@ -1634,7 +1634,7 @@ void JSGenerator::resolveDeclarationArrowFunction(
         }
       }
       if (it == item->declarations.end()) {
-        auto iname = resolveConstant(ctx, module, binding.declaration->name);
+        auto iname = resolveConstant(ctx, module, binding.name);
         generate(module, vm::JSAsmOperator::SET_CLOSURE, iname);
       }
     }
@@ -1740,7 +1740,7 @@ void JSGenerator::resolveFunction(JSGeneratorContext &ctx,
           }
         }
         if (it == item->declarations.end()) {
-          auto iname = resolveConstant(ctx, module, binding.declaration->name);
+          auto iname = resolveConstant(ctx, module, binding.name);
           generate(module, vm::JSAsmOperator::SET_CLOSURE, iname);
         }
       }
