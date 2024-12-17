@@ -1,7 +1,6 @@
 #include "engine/lib/JSPromiseConstructor.hpp"
 #include "common/AutoPtr.hpp"
 #include "engine/base/JSValueType.hpp"
-#include "engine/entity/JSExceptionEntity.hpp"
 #include "engine/entity/JSPromiseEntity.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSTypeError.hpp"
@@ -11,25 +10,54 @@ using namespace spark::engine;
 
 static JS_FUNC(resolve) { return ctx->undefined(); }
 static JS_FUNC(reject) { return ctx->undefined(); }
+
 static JS_FUNC(onSettled) {
   auto next = ctx->load(L"next");
   auto onFulfilled = ctx->load(L"onFulfilled");
   auto entity = self->getEntity<JSPromiseEntity>();
   auto value = ctx->createValue(entity->getValue());
   auto res = onFulfilled->apply(ctx, ctx->undefined(), {value});
+  auto nextEntity = next->getEntity<JSPromiseEntity>();
+  for (auto &callback : nextEntity->getFinallyCallbacks()) {
+    auto func = ctx->createValue(callback);
+    auto res = func->apply(ctx, ctx->undefined(), {});
+    if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
+      return ctx->Promise()
+          ->getProperty(ctx, L"reject")
+          ->apply(ctx, ctx->Promise(), {ctx->createError(res)});
+    }
+  }
   if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
-    auto e = res->getEntity<JSExceptionEntity>();
-    if (e->getTarget() != nullptr) {
-      auto error = ctx->createValue(e->getTarget());
-    } else {
+    auto error = ctx->createError(res);
+    for (auto &callback : nextEntity->getRejectedCallbacks()) {
+      auto func = ctx->createValue(callback);
+      auto res = func->apply(ctx, ctx->undefined(), {error});
+      if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
+        return ctx->Promise()
+            ->getProperty(ctx, L"reject")
+            ->apply(ctx, ctx->Promise(), {ctx->createError(res)});
+      }
+    }
+  } else {
+    for (auto &callback : nextEntity->getFulfilledCallbacks()) {
+      auto func = ctx->createValue(callback);
+      auto err = func->apply(ctx, ctx->undefined(), {res});
+      if (err->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
+        return ctx->Promise()
+            ->getProperty(ctx, L"reject")
+            ->apply(ctx, ctx->Promise(), {ctx->createError(err)});
+      }
     }
   }
   return ctx->undefined();
 }
+
 static JS_FUNC(onError) { return ctx->undefined(); }
+
 static JS_FUNC(onDefer) { return ctx->undefined(); }
 
 JS_FUNC(JSPromiseConstructor::resolve) { return ctx->undefined(); }
+
 JS_FUNC(JSPromiseConstructor::reject) { return ctx->undefined(); }
 
 JS_FUNC(JSPromiseConstructor::constructor) {

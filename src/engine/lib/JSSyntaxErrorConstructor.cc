@@ -5,6 +5,10 @@
 using namespace spark;
 using namespace spark::engine;
 JS_FUNC(JSSyntaxErrorConstructor::constructor) {
+  if (self->getType() != JSValueType::JS_OBJECT) {
+    auto prop = ctx->SyntaxError()->getProperty(ctx, L"prototype");
+    self = ctx->createObject(prop);
+  }
   return ctx->Error()->apply(ctx, self, args);
 }
 

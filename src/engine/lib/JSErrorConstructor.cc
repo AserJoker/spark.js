@@ -1,12 +1,14 @@
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/base/JSValueType.hpp"
-#include "engine/entity/JSFunctionEntity.hpp"
-#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include <fmt/xchar.h>
 #include <string>
 using namespace spark;
 using namespace spark::engine;
 JS_FUNC(JSErrorConstructor::constructor) {
+  if (self->getType() != JSValueType::JS_OBJECT) {
+    auto prop = ctx->Error()->getProperty(ctx, L"prototype");
+    self = ctx->createObject(prop);
+  }
   if (args.empty()) {
     self->setProperty(ctx, L"message", ctx->createString(L""));
   } else {
@@ -15,12 +17,8 @@ JS_FUNC(JSErrorConstructor::constructor) {
         ctx->createString(args[0]->toString(ctx)->getString().value()));
   }
   auto constructor = self->getProperty(ctx, L"constructor");
-  std::wstring type;
-  if (constructor->getType() == JSValueType::JS_NATIVE_FUNCTION) {
-    type = constructor->getEntity<JSNativeFunctionEntity>()->getFunctionName();
-  } else {
-    type = constructor->getEntity<JSFunctionEntity>()->getFuncName();
-  }
+  std::wstring type =
+      constructor->getProperty(ctx, L"name")->getString().value();
   auto trace =
       ctx->trace({.filename = 0, .line = 0, .column = 0, .funcname = type});
   std::wstring stack;
@@ -41,12 +39,8 @@ JS_FUNC(JSErrorConstructor::toString) {
   auto message = self->getProperty(ctx, L"message");
   std::wstring result;
   auto constructor = self->getProperty(ctx, L"constructor");
-  std::wstring type;
-  if (constructor->getType() == JSValueType::JS_NATIVE_FUNCTION) {
-    type = constructor->getEntity<JSNativeFunctionEntity>()->getFunctionName();
-  } else {
-    type = constructor->getEntity<JSFunctionEntity>()->getFuncName();
-  }
+  std::wstring type =
+      constructor->getProperty(ctx, L"name")->getString().value();
   auto msg = message->toString(ctx)->getString().value();
   if (!message->isUndefined() && !msg.empty()) {
     result = fmt::format(L"{}: {}", type, msg);
