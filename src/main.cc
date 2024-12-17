@@ -46,6 +46,15 @@ JS_FUNC(setTimeout) {
   return ctx->createNumber(id);
 }
 
+JS_FUNC(nextTick) {
+  if (args.empty() || !args[0]->isFunction()) {
+    throw error::JSTypeError(
+        L"The 'callback' argument must be of type function.");
+  }
+  ctx->createMicroTask(args[0]);
+  return ctx->undefined();
+}
+
 std::wstring read(const std::wstring &filename) {
   std::wifstream in("index.js", std::ios::binary);
   if (in.is_open()) {
@@ -414,6 +423,7 @@ int main(int argc, char *argv[]) {
     common::AutoPtr ctx = new engine::JSContext(runtime);
     ctx->createNativeFunction(print, L"print", L"print");
     ctx->createNativeFunction(setTimeout, L"setTimeout", L"setTimeout");
+    ctx->createNativeFunction(nextTick, L"nextTick", L"nextTick");
     auto source = read(L"index.js");
     auto module = ctx->compile(source, L"index.js");
     write(module);

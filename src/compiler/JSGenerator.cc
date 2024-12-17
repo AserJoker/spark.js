@@ -71,8 +71,20 @@ void JSGenerator::resolveClosure(JSGeneratorContext &ctx,
                                  common::AutoPtr<JSModule> &module,
                                  const JSSourceDeclaration &declaration) {
   uint32_t name = resolveConstant(ctx, module, declaration.name);
-  std::vector<JSSourceScope *> workflow = {
-      declaration.node->scope.getRawPointer()};
+  auto closure = resolveClosure(ctx, module, declaration.node);
+  if (!closure.empty()) {
+    generate(module, vm::JSAsmOperator::LOAD, name);
+    for (auto &item : closure) {
+      generate(module, vm::JSAsmOperator::SET_CLOSURE, item);
+    }
+    generate(module, vm::JSAsmOperator::POP, 1U);
+  }
+}
+std::vector<uint32_t>
+JSGenerator::resolveClosure(JSGeneratorContext &ctx,
+                            common::AutoPtr<JSModule> &module,
+                            common::AutoPtr<JSNode> node) {
+  std::vector workflow = {node->scope};
   std::vector<uint32_t> closure;
   while (!workflow.empty()) {
     auto item = *workflow.begin();
@@ -82,27 +94,32 @@ void JSGenerator::resolveClosure(JSGeneratorContext &ctx,
           binding.name == L"super") {
         continue;
       }
-      auto it = item->declarations.begin();
-      for (; it != item->declarations.end(); it++) {
-        if (&*it == binding.declaration) {
+      auto iname = resolveConstant(ctx, module, binding.name);
+      if (std::find(closure.begin(), closure.end(), iname) != closure.end()) {
+        continue;
+      }
+      auto scope = item;
+      while (scope != node->scope->parent) {
+        auto it = scope->declarations.begin();
+        for (; it != scope->declarations.end(); it++) {
+          if (&*it == binding.declaration) {
+            break;
+          }
+        }
+        if (it != scope->declarations.end()) {
           break;
         }
+        scope = scope->parent;
       }
-      if (it == item->declarations.end()) {
-        closure.push_back(resolveConstant(ctx, module, binding.name));
+      if (scope == node->scope->parent) {
+        closure.push_back(iname);
       }
     }
     for (auto &child : item->children) {
       workflow.push_back(child);
     }
   }
-  if (!closure.empty()) {
-    generate(module, vm::JSAsmOperator::LOAD, name);
-    for (auto &item : closure) {
-      generate(module, vm::JSAsmOperator::SET_CLOSURE, item);
-    }
-    generate(module, vm::JSAsmOperator::POP, 1U);
-  }
+  return closure;
 }
 
 void JSGenerator::pushLexScope(JSGeneratorContext &ctx,
@@ -857,7 +874,9 @@ void JSGenerator::resolveStatementExpression(
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSExpressionStatement>();
   resolveNode(ctx, module, n->expression);
-  if (n->expression->type != JSNodeType::EXPRESSION_ASSIGMENT) {
+  if (n->expression->type != JSNodeType::EXPRESSION_ASSIGMENT &&
+      n->expression->type != JSNodeType::DECLARATION_FUNCTION &&
+      n->expression->type != JSNodeType::DECLARATION_CLASS) {
     generate(module, vm::JSAsmOperator::POP, 1U);
   }
 }
@@ -1622,25 +1641,9 @@ void JSGenerator::resolveDeclarationArrowFunction(
   generate(
       module, vm::JSAsmOperator::SET_FUNC_SOURCE,
       resolveConstant(ctx, module, node->location.getSource(module->source)));
-  std::vector<JSSourceScope *> workflow = {n->scope.getRawPointer()};
-  while (!workflow.empty()) {
-    auto item = *workflow.begin();
-    workflow.erase(workflow.begin());
-    for (auto &binding : item->bindings) {
-      auto it = item->declarations.begin();
-      for (; it != item->declarations.end(); it++) {
-        if (&*it == binding.declaration) {
-          break;
-        }
-      }
-      if (it == item->declarations.end()) {
-        auto iname = resolveConstant(ctx, module, binding.name);
-        generate(module, vm::JSAsmOperator::SET_CLOSURE, iname);
-      }
-    }
-    for (auto &child : item->children) {
-      workflow.push_back(child);
-    }
+  auto closures = resolveClosure(ctx, module, node);
+  for (auto &closure : closures) {
+    generate(module, vm::JSAsmOperator::SET_CLOSURE, closure);
   }
 }
 
@@ -1728,25 +1731,9 @@ void JSGenerator::resolveFunction(JSGeneratorContext &ctx,
     generate(
         module, vm::JSAsmOperator::SET_FUNC_SOURCE,
         resolveConstant(ctx, module, node->location.getSource(module->source)));
-    std::vector<JSSourceScope *> workflow = {n->scope.getRawPointer()};
-    while (!workflow.empty()) {
-      auto item = *workflow.begin();
-      workflow.erase(workflow.begin());
-      for (auto &binding : item->bindings) {
-        auto it = item->declarations.begin();
-        for (; it != item->declarations.end(); it++) {
-          if (&*it == binding.declaration) {
-            break;
-          }
-        }
-        if (it == item->declarations.end()) {
-          auto iname = resolveConstant(ctx, module, binding.name);
-          generate(module, vm::JSAsmOperator::SET_CLOSURE, iname);
-        }
-      }
-      for (auto &child : item->children) {
-        workflow.push_back(child);
-      }
+    auto closures = resolveClosure(ctx, module, node);
+    for (auto &closure : closures) {
+      generate(module, vm::JSAsmOperator::SET_CLOSURE, closure);
     }
   }
 }

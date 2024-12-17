@@ -8,7 +8,26 @@
 using namespace spark;
 using namespace spark::engine;
 
-static JS_FUNC(resolve) { return ctx->undefined(); }
+static JS_FUNC(resolve) {
+  auto value = ctx->undefined();
+  if (!args.empty()) {
+    value = args[0];
+  }
+  auto e = self->getEntity<JSPromiseEntity>();
+  if (e->getStatus() == JSPromiseEntity::Status::PENDING) {
+    e->setValue(value->getStore());
+    self->getStore()->appendChild(value->getStore());
+    e->getStatus() = JSPromiseEntity::Status::FULFILLED;
+    for (auto &callback : e->getFinallyCallbacks()) {
+      auto func = ctx->createValue(callback);
+      auto res = func->apply(ctx, ctx->undefined());
+      if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
+        return res;
+      }
+    }
+  }
+  return ctx->undefined();
+}
 static JS_FUNC(reject) { return ctx->undefined(); }
 
 static JS_FUNC(onSettled) {

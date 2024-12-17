@@ -47,6 +47,10 @@ private:
                       common::AutoPtr<JSModule> &module,
                       const JSSourceDeclaration &declaration);
 
+  std::vector<uint32_t> resolveClosure(JSGeneratorContext &ctx,
+                                       common::AutoPtr<JSModule> &module,
+                                       common::AutoPtr<JSNode> node);
+
   uint32_t resolveConstant(JSGeneratorContext &ctx,
                            common::AutoPtr<JSModule> &module,
                            const std::wstring &source);
@@ -201,7 +205,7 @@ private:
                                   common::AutoPtr<JSModule> &module,
                                   const common::AutoPtr<JSNode> &node,
                                   const std::wstring &label = L"");
-  
+
   void resolveStatementExpression(JSGeneratorContext &ctx,
                                   common::AutoPtr<JSModule> &module,
                                   const common::AutoPtr<JSNode> &node);

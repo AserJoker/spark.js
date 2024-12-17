@@ -328,7 +328,7 @@ JS_OPT(JSVirtualMachine::throw_) {
 JS_OPT(JSVirtualMachine::new_) {
   auto offset = _pc - sizeof(uint16_t);
   auto size = argi(module);
-  auto now = _ctx->stack.size();
+  auto now = _pc;
   std::vector<common::AutoPtr<engine::JSValue>> args;
   args.resize(size, nullptr);
   for (auto i = 0; i < size; i++) {
@@ -338,14 +338,20 @@ JS_OPT(JSVirtualMachine::new_) {
   auto func = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto loc = module->sourceMap.at(offset);
-  _ctx->stack.push_back(ctx->constructObject(
+  auto res = ctx->constructObject(
       func, args,
       {
           .filename = ctx->getRuntime()->setSourceFilename(module->filename),
           .line = loc.line + 1,
           .column = loc.column + 1,
           .funcname = func->getName(),
-      }));
+      });
+  _ctx->stack.push_back(res);
+  if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+    _pc = module->codes.size();
+  } else {
+    _pc = now;
+  }
 };
 
 JS_OPT(JSVirtualMachine::yield) {

@@ -3647,17 +3647,9 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
       auto param = readParameter(filename, source, current);
       while (param != nullptr) {
         param->addParent(node);
-
-        if (param->type == JSNodeType::PATTERN_REST_ITEM) {
-          declareVariable(filename, source, node,
-                          param.cast<JSRestPatternItem>()->identifier,
-                          JSSourceDeclaration::TYPE::ARGUMENT, false);
-        } else {
-          declareVariable(filename, source, node,
-                          param.cast<JSParameterDeclaration>()->identifier,
-                          JSSourceDeclaration::TYPE::ARGUMENT, false);
-        }
-
+        declareVariable(filename, source, node,
+                        param.cast<JSParameterDeclaration>()->identifier,
+                        JSSourceDeclaration::TYPE::ARGUMENT, false);
         node->arguments.push_back(param);
         skipInvisible(filename, source, current);
         auto next = current;

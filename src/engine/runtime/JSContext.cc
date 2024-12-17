@@ -105,7 +105,7 @@ void JSContext::initialize() {
   _GeneratorFunction = JSGeneratorFunctionConstructor::initialize(this);
   _Iterator = JSIteratorConstructor::initialize(this);
   _Generator = JSGeneratorConstructor::initialize(this);
-  _Promise = JSPromiseConstructor::initialize(this);
+  // _Promise = JSPromiseConstructor::initialize(this);
   _Error = JSErrorConstructor::initialize(this);
   _AggregateError = JSAggregateErrorConstructor::initialize(this);
   _RangeError = JSRangeErrorConstructor::initialize(this);
@@ -409,7 +409,9 @@ JSContext::createNativeFunction(const std::function<JSFunction> &value,
   auto store =
       new JSStore(new JSNativeFunctionEntity(prop, funcname, value, {}));
   store->appendChild(prop);
-  return _scope->createValue(store, name);
+  auto res = _scope->createValue(store, name);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
+  return res;
 }
 
 common::AutoPtr<JSValue> JSContext::createNativeFunction(
@@ -428,6 +430,7 @@ common::AutoPtr<JSValue> JSContext::createNativeFunction(
     res->getStore()->appendChild(v);
   }
   res->getStore()->appendChild(prop);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
   return res;
 }
 
@@ -441,6 +444,7 @@ common::AutoPtr<JSValue> JSContext::createNativeFunction(
       new JSStore(new JSNativeFunctionEntity(prop, funcname, value, closure)),
       name);
   res->getStore()->appendChild(prop);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
   return res;
 }
 
@@ -451,6 +455,7 @@ JSContext::createFunction(const common::AutoPtr<compiler::JSModule> &module,
   auto res = _scope->createValue(
       new JSStore(new JSFunctionEntity(prop, module)), name);
   res->getStore()->appendChild(prop);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
   return res;
 }
 common::AutoPtr<JSValue>
@@ -461,6 +466,7 @@ JSContext::createGenerator(const common::AutoPtr<compiler::JSModule> &module,
   auto res = _scope->createValue(store, name);
   res->getEntity<JSFunctionEntity>()->setGenerator(true);
   res->getStore()->appendChild(prop);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
   return res;
 }
 
@@ -477,6 +483,7 @@ JSContext::createArrow(const common::AutoPtr<compiler::JSModule> &module,
     res->setBind(this, self);
   }
   res->getStore()->appendChild(prop);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
   return res;
 }
 
