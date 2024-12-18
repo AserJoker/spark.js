@@ -78,6 +78,8 @@ public:
 
   bool isFunction() const;
 
+  bool isException() const;
+
   void setNumber(double value);
 
   void setString(const std::wstring &value);

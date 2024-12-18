@@ -1,19 +1,18 @@
-const { nextTick } = process;
-function onSettled(promise, val) {
-  promise._finallys.forEach((fn) => {
+function onSettled() {
+  this._finallys.forEach((fn) => {
     fn();
   });
-  promise._callbacks.forEach((fn) => {
-    fn(val);
+  this._callbacks.forEach((fn) => {
+    fn(this._value);
   });
 }
 
-function onRejected(promise, err) {
-  promise._finallys.forEach((fn) => {
+function onRejected() {
+  this._finallys.forEach((fn) => {
     fn();
   });
-  promise._errors.forEach((fn) => {
-    fn(err);
+  this._errors.forEach((fn) => {
+    fn(this._value);
   });
 }
 
@@ -27,11 +26,9 @@ function pipeline(resolve, reject, callback, value) {
 
 function onNextResolve(resolve, reject, callback, value) {
   if (typeof callback == "function") {
-    nextTick(() => {
-      pipeline(resolve, reject, callback, value);
-    });
+    pipeline(resolve, reject, callback, value);
   } else {
-    resolve();
+    resolve(value);
   }
 }
 
@@ -49,88 +46,88 @@ function Promise(receiver) {
   this._finallys = [];
   this._value = undefined;
   this._status = "pendding";
-  this._resolve = function (val) {
+  const resolve = (val) => {
     if (this._status == "pendding") {
       this._value = val;
       this._status = "fulfilled";
-      nextTick(() => onSettled(this, val));
+      nextTick(() => onSettled.bind(this));
     }
   };
-  this._reject = function (err) {
+  const reject = (err) => {
     if (this._status == "pendding") {
       this._value = err;
       this._status = "fulfilled";
-      nextTick(() => onRejected(this, err));
+      nextTick(() => onRejected.bind(this));
     }
   };
-  receiver(this._resolve.bind(this), this._reject.bind(this));
-  this.then = function (callback, onError) {
-    if (this._status == "fulfilled") {
-      if (typeof callback == "function") {
-        return new Promise((resolve, reject) => {
-          nextTick(() => pipeline(resolve, reject, callback, this._value));
-        });
-      } else {
-        return Promise.resolve(callback);
-      }
-    } else if (this._status == "rejected") {
-      if (typeof onError == "function") {
-        return new Promise((resolve, reject) => {
-          nextTick(() => pipeline(resolve, reject, onError, this._value));
-        });
-      } else {
-        return Promise.reject(this._value);
-      }
-    } else {
+  receiver(resolve, reject);
+}
+
+Promise.prototype.then = function (callback, onError) {
+  if (this._status == "fulfilled") {
+    if (typeof callback == "function") {
       return new Promise((resolve, reject) => {
-        this._callbacks.push((val) =>
-          onNextResolve(resolve, reject, callback, val)
-        );
-        this._errors.push((err) => onNextReject(resolve, reject, onError, err));
+        nextTick(() => pipeline(resolve, reject, callback, this._value));
       });
+    } else {
+      return Promise.resolve(this._value);
     }
-  };
-  this.catch = function (onError) {
-    if (this._status == "rejected") {
-      if (typeof onError == "function") {
-        return new Promise((resolve, reject) => {
-          nextTick(() => {
-            pipeline(resolve, reject, onError, this._value);
-          });
-        });
-      } else {
-        return Promise.reject(e);
-      }
-    } else if (this._status == "pendding") {
+  } else if (this._status == "rejected") {
+    if (typeof onError == "function") {
       return new Promise((resolve, reject) => {
-        this._errors.push((err) => onNextReject(resolve, reject, onError, err));
-        this._callbacks.push(resolve);
+        nextTick(() => pipeline(resolve, reject, onError, this._value));
       });
     } else {
       return Promise.reject(this._value);
     }
-  };
-  this.finally = function (callback) {
-    if (this._status == "pendding") {
+  } else {
+    return new Promise((resolve, reject) => {
+      this._callbacks.push((val) =>
+        onNextResolve(resolve, reject, callback, val)
+      );
+      this._errors.push((err) => onNextReject(resolve, reject, onError, err));
+    });
+  }
+};
+Promise.prototype.catch = function (onError) {
+  if (this._status == "rejected") {
+    if (typeof onError == "function") {
       return new Promise((resolve, reject) => {
-        this._finallys.push(() =>
-          onNextResolve(resolve, reject, callback, undefined)
-        );
+        nextTick(() => {
+          pipeline(resolve, reject, onError, this._value);
+        });
       });
     } else {
-      if (typeof callback == "function") {
-        return new Promise((resolve, reject) => {
-          nextTick(() => {
-            pipeline(resolve, reject, callback, undefined);
-          });
-        });
-      } else {
-        return Promise.resolve();
-      }
+      return Promise.reject(this._value);
     }
-  };
-}
-
+  } else if (this._status == "pendding") {
+    return new Promise((resolve, reject) => {
+      this._errors.push((err) => onNextReject(resolve, reject, onError, err));
+      this._callbacks.push(resolve);
+    });
+  } else {
+    return Promise.resolve(this._value);
+  }
+};
+Promise.prototype.finally = function (callback) {
+  if (this._status == "pendding") {
+    return new Promise((resolve, reject) => {
+      this._finallys.push(() =>
+        onNextResolve(resolve, reject, callback, undefined)
+      );
+    });
+  } else {
+    if (typeof callback == "function") {
+      return new Promise((resolve, reject) => {
+        nextTick(() => {
+          pipeline(resolve, reject, callback, undefined);
+        });
+      });
+    } else {
+      return Promise.resolve();
+    }
+  }
+};
 Promise.resolve = function (val) {
   return new Promise((resolve) => resolve(val));
 };
@@ -158,7 +155,7 @@ pro
       return err;
     }
   )
-  .catch((e) => console.log(e))
+  .catch((e) => print(e))
   .then((res) => {
-    console.log(typeof res);
+    print(typeof res);
   });

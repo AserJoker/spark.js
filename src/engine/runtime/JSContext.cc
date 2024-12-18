@@ -27,6 +27,7 @@
 #include "engine/lib/JSInternalErrorConstructor.hpp"
 #include "engine/lib/JSIteratorConstructor.hpp"
 #include "engine/lib/JSObjectConstructor.hpp"
+#include "engine/lib/JSPromiseConstructor.hpp"
 #include "engine/lib/JSRangeErrorConstructor.hpp"
 #include "engine/lib/JSReferenceErrorConstructor.hpp"
 #include "engine/lib/JSSymbolConstructor.hpp"
@@ -104,7 +105,7 @@ void JSContext::initialize() {
   _GeneratorFunction = JSGeneratorFunctionConstructor::initialize(this);
   _Iterator = JSIteratorConstructor::initialize(this);
   _Generator = JSGeneratorConstructor::initialize(this);
-  // _Promise = JSPromiseConstructor::initialize(this);
+  _Promise = JSPromiseConstructor::initialize(this);
   _Error = JSErrorConstructor::initialize(this);
   _AggregateError = JSAggregateErrorConstructor::initialize(this);
   _RangeError = JSRangeErrorConstructor::initialize(this);
@@ -349,7 +350,10 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
   }
   result->getStore()->appendChild(prototype->getStore());
   result->setPropertyDescriptor(this, L"constructor", constructor);
-  constructor->apply(this, result, args, loc);
+  auto err = constructor->apply(this, result, args, loc);
+  if (err->isException()) {
+    return err;
+  }
   return result;
 }
 

@@ -1344,7 +1344,7 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
   if (func->getType() == engine::JSValueType::JS_NATIVE_FUNCTION) {
     auto entity = func->getEntity<engine::JSNativeFunctionEntity>();
     auto callee = entity->getCallee();
-    result = callee(ctx, self, args);
+    result = callee(ctx, bind, args);
   } else if (func->getType() == engine::JSValueType::JS_FUNCTION) {
     auto entity = func->getEntity<engine::JSFunctionEntity>();
     auto closure = entity->getClosure();

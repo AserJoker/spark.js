@@ -122,6 +122,10 @@ bool JSValue::isFunction() const {
          getType() == JSValueType::JS_NATIVE_FUNCTION;
 }
 
+bool JSValue::isException() const {
+  return getType() == JSValueType::JS_EXCEPTION;
+}
+
 void JSValue::setNumber(double value) {
   if (getType() != JSValueType::JS_NUMBER) {
     _store->setEntity(new JSNumberEntity(value));

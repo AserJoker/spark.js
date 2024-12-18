@@ -111,9 +111,13 @@ JS_FUNC(JSArrayConstructor::push) {
   return len;
 }
 JS_FUNC(JSArrayConstructor::forEach) {
-  auto iterator =
-      self->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
-  
+  auto len = self->getProperty(ctx, L"length");
+  auto index = ctx->createNumber();
+  while (index->lt(ctx, len)->getBoolean().value()) {
+    args[0]->apply(ctx, ctx->undefined(),
+                   {self->getProperty(ctx, index), index, self});
+    index->increment(ctx);
+  }
   return ctx->undefined();
 }
 JS_FUNC(JSArrayConstructor::map) {
