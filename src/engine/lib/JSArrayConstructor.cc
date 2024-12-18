@@ -102,6 +102,33 @@ JS_FUNC(JSArrayConstructor::values) {
   return obj;
 }
 
+JS_FUNC(JSArrayConstructor::push) {
+  auto len = self->getProperty(ctx, L"length");
+  for (auto &arg : args) {
+    self->setProperty(ctx, len, arg);
+    len->increment(ctx);
+  }
+  return len;
+}
+JS_FUNC(JSArrayConstructor::forEach) {
+  auto iterator =
+      self->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
+  
+  return ctx->undefined();
+}
+JS_FUNC(JSArrayConstructor::map) {
+  auto result = ctx->createArray();
+  auto len = self->getProperty(ctx, L"length");
+  auto index = ctx->createNumber();
+  while (index->lt(ctx, len)->getBoolean().value()) {
+    auto res = args[0]->apply(ctx, ctx->undefined(),
+                              {self->getProperty(ctx, index), index, self});
+    result->setProperty(ctx, index, res);
+    index->increment(ctx);
+  }
+  return result;
+}
+
 JS_FUNC(JSArrayConstructor::iterator_next) {
   if (!self->hasOpaque<JSArrayIteratorContext>()) {
     throw error::JSTypeError(
@@ -163,6 +190,16 @@ JSArrayConstructor::initialize(common::AutoPtr<JSContext> ctx) {
 
   prototype->setPropertyDescriptor(
       ctx, L"join", ctx->createNativeFunction(join, L"join"), true, false);
+
+  prototype->setPropertyDescriptor(
+      ctx, L"push", ctx->createNativeFunction(push, L"push"), true, false);
+
+  prototype->setPropertyDescriptor(
+      ctx, L"forEach", ctx->createNativeFunction(forEach, L"forEach"), true,
+      false);
+  
+  prototype->setPropertyDescriptor(
+      ctx, L"map", ctx->createNativeFunction(map, L"map"), true, false);
 
   auto values =
       ctx->createNativeFunction(JSArrayConstructor::values, L"values");

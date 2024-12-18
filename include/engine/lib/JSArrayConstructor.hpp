@@ -20,6 +20,9 @@ private:
   static JS_FUNC(toStringTag);
   static JS_FUNC(join);
   static JS_FUNC(values);
+  static JS_FUNC(push);
+  static JS_FUNC(forEach);
+  static JS_FUNC(map);
   static JS_FUNC(iterator_next);
 
 public:

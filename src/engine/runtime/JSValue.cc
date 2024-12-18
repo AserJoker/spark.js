@@ -62,6 +62,20 @@ common::AutoPtr<JSScope> JSValue::getScope() { return _scope; }
 void JSValue::setEntity(const common::AutoPtr<JSEntity> &entity) {
   _store->setEntity(entity);
 }
+void JSValue::setStore(JSStore *store) {
+  if (_store != store) {
+    _store->setEntity(store->getEntity());
+    for (auto &child : _store->getChildren()) {
+      _store->removeChild(child);
+    }
+    for (auto &parent : store->getParent()) {
+      parent->appendChild(_store);
+    }
+    for (auto &child : store->getChildren()) {
+      _store->appendChild(child);
+    }
+  }
+}
 
 std::optional<double> JSValue::getNumber() const {
   if (getType() == JSValueType::JS_NUMBER) {
@@ -856,13 +870,15 @@ common::AutoPtr<JSValue> JSValue::getBind(common::AutoPtr<JSContext> ctx) {
         fmt::format(L"cannot convert '{}' to function", getTypeName()));
   }
   if (getType() == JSValueType::JS_FUNCTION) {
-    auto bind = getEntity<JSFunctionEntity>()->getBind();
+    auto entity = getEntity<JSFunctionEntity>();
+    auto bind = entity->getBind();
     if (bind != nullptr) {
       return ctx->createValue(bind);
     }
   }
   if (getType() == JSValueType::JS_NATIVE_FUNCTION) {
-    auto bind = getEntity<JSNativeFunctionEntity>()->getBind();
+    auto entity = getEntity<JSNativeFunctionEntity>();
+    auto bind = entity->getBind();
     if (bind != nullptr) {
       return ctx->createValue(bind);
     }

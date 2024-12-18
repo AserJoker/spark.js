@@ -621,8 +621,6 @@ JSParser::readCommentToken(uint32_t filename, const std::wstring &source,
               {filename, current.line, current.column});
         }
         if (chr == '/' && source[current.offset - 1] == '*') {
-          current.column++;
-          current.offset++;
           break;
         }
         if (std::find(LTC.begin(), LTC.end(), chr) != LTC.end()) {

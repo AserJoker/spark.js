@@ -49,7 +49,10 @@ JSScope::~JSScope() {
       cache[store] = isAlived;
       for (auto &child : store->getChildren()) {
         if (!cache.contains(child)) {
-          workflow.push_back(child);
+          auto it = std::find(workflow.begin(), workflow.end(), child);
+          if (it == workflow.end()) {
+            workflow.push_back(child);
+          }
         }
       }
     }

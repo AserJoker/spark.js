@@ -8,6 +8,7 @@
 #include "engine/entity/JSFunctionEntity.hpp"
 #include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSObjectEntity.hpp"
+#include "engine/entity/JSSymbolEntity.hpp"
 #include "engine/entity/JSTasKEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "engine/runtime/JSScope.hpp"
@@ -287,7 +288,7 @@ JS_OPT(JSVirtualMachine::storeConst) {
   if (!val || val->getType() == engine::JSValueType::JS_UNINITIALIZED) {
     ctx->createValue(value, name);
   } else {
-    val->setEntity(value->getEntity());
+    val->setStore(value->getStore());
   }
 }
 
@@ -299,7 +300,7 @@ JS_OPT(JSVirtualMachine::store) {
   if (val == nullptr) {
     ctx->createValue(value, name);
   } else {
-    val->setEntity(value->getEntity());
+    val->setStore(value->getStore());
   }
 }
 
@@ -596,8 +597,16 @@ JS_OPT(JSVirtualMachine::memberCall) {
   auto loc = module->sourceMap.at(offset);
   auto func = self->getProperty(ctx, field);
   if (!func->isFunction()) {
-    throw error::JSTypeError(
-        fmt::format(L"cannot convert {} to function", func->getTypeName()));
+    if (field->getType() == engine::JSValueType::JS_SYMBOL) {
+      auto e = field->getEntity<engine::JSSymbolEntity>();
+      throw error::JSTypeError(fmt::format(L"{}[Symbol({})] is not a function",
+                                           self->getName(),
+                                           e->getDescription()));
+    } else {
+      throw error::JSTypeError(
+          fmt::format(L"{}['{}'] is not a function", self->getName(),
+                      field->toString(ctx)->getString().value()));
+    }
   }
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _pc;
@@ -1271,7 +1280,9 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
                        const common::AutoPtr<compiler::JSModule> &module,
                        size_t offset) {
   auto scope = ctx->getScope();
+  auto pc = _pc;
   run(ctx, module, offset);
+  _pc = pc;
   auto value = ctx->undefined();
   if (!_ctx->stack.empty()) {
     value = *_ctx->stack.rbegin();

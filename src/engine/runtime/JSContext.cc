@@ -27,7 +27,6 @@
 #include "engine/lib/JSInternalErrorConstructor.hpp"
 #include "engine/lib/JSIteratorConstructor.hpp"
 #include "engine/lib/JSObjectConstructor.hpp"
-#include "engine/lib/JSPromiseConstructor.hpp"
 #include "engine/lib/JSRangeErrorConstructor.hpp"
 #include "engine/lib/JSReferenceErrorConstructor.hpp"
 #include "engine/lib/JSSymbolConstructor.hpp"

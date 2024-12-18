@@ -46,6 +46,8 @@ public:
 
   void setEntity(const common::AutoPtr<JSEntity> &entity);
 
+  void setStore(JSStore *store);
+
   std::optional<double> getNumber() const;
 
   std::optional<std::wstring> getString() const;

@@ -11,6 +11,7 @@ JSStore::~JSStore() {
       child->_parents.erase(it);
     }
   }
+  _children.clear();
   for (auto &parent : _parents) {
     auto it =
         std::find(parent->_children.begin(), parent->_children.end(), this);
@@ -18,6 +19,7 @@ JSStore::~JSStore() {
       parent->_children.erase(it);
     }
   }
+  _parents.clear();
 }
 void JSStore::appendChild(JSStore *store) {
   store->_parents.push_back(this);

@@ -8,6 +8,7 @@
 #include "error/JSError.hpp"
 #include "error/JSTypeError.hpp"
 #include "vm/JSAsmOperator.hpp"
+#include <chrono>
 #include <cstdint>
 #include <exception>
 #include <fmt/chrono.h>
@@ -424,12 +425,15 @@ int main(int argc, char *argv[]) {
     ctx->createNativeFunction(print, L"print", L"print");
     ctx->createNativeFunction(setTimeout, L"setTimeout", L"setTimeout");
     ctx->createNativeFunction(nextTick, L"nextTick", L"nextTick");
+    fmt::print(L"{}:start compile\n", std::chrono::system_clock::now());
     auto source = read(L"index.js");
     auto module = ctx->compile(source, L"index.js");
     write(module);
+    fmt::print(L"{}:end compile\n", std::chrono::system_clock::now());
     auto res = ctx->getRuntime()->getVirtualMachine()->eval(ctx, module);
     while (ctx->nextTick())
       ;
+    fmt::print(L"{}:finish\n", std::chrono::system_clock::now());
     if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
       fmt::print(L"Uncaught {}\n", res->toString(ctx)->getString().value());
     } else {
