@@ -29,12 +29,11 @@ void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
                                      const JSSourceDeclaration &declaration) {
   uint32_t name = resolveConstant(ctx, module, declaration.name);
   switch (declaration.type) {
-  case JSSourceDeclaration::TYPE::ARGUMENT:
   case JSSourceDeclaration::TYPE::CATCH:
-    return;
   case JSSourceDeclaration::TYPE::UNDEFINED:
     generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
     break;
+  case JSSourceDeclaration::TYPE::ARGUMENT:
   case JSSourceDeclaration::TYPE::UNINITIALIZED:
     generate(module, vm::JSAsmOperator::PUSH_UNINITIALIZED);
     break;

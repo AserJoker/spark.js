@@ -391,31 +391,33 @@ void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
       if (item->type == JSNodeType::PATTERN_OBJECT_ITEM) {
         auto objitem = item.cast<JSObjectPatternItem>();
         if (!objitem->match) {
-          return declareVariable(filename, source, declarator,
-                                 objitem->identifier, type, isConst);
+          declareVariable(filename, source, declarator, objitem->identifier,
+                          type, isConst);
         } else {
-          return declareVariable(filename, source, declarator, objitem->match,
-                                 type, isConst);
+          declareVariable(filename, source, declarator, objitem->match, type,
+                          isConst);
         }
       } else if (item->type == JSNodeType::PATTERN_REST_ITEM) {
-        return declareVariable(filename, source, declarator,
-                               item.cast<JSRestPatternItem>()->identifier, type,
-                               isConst);
+        declareVariable(filename, source, declarator,
+                        item.cast<JSRestPatternItem>()->identifier, type,
+                        isConst);
       }
     }
+    return;
   } else if (identifier->type == JSNodeType::PATTERN_ARRAY) {
     auto arr = identifier.cast<JSArrayPattern>();
     for (auto &item : arr->items) {
       if (item->type == JSNodeType::PATTERN_ARRAY_ITEM) {
         auto arritem = item.cast<JSArrayPatternItem>();
-        return declareVariable(filename, source, declarator,
-                               arritem->identifier, type, isConst);
+        declareVariable(filename, source, declarator, arritem->identifier, type,
+                        isConst);
       } else if (item->type == JSNodeType::PATTERN_REST_ITEM) {
-        return declareVariable(filename, source, declarator,
-                               item.cast<JSRestPatternItem>()->identifier, type,
-                               isConst);
+        declareVariable(filename, source, declarator,
+                        item.cast<JSRestPatternItem>()->identifier, type,
+                        isConst);
       }
     }
+    return;
   } else if (identifier->type != JSNodeType::LITERAL_IDENTITY) {
     throw error::JSSyntaxError(formatException(
         L"Unexcepted token", filename, source, identifier->location.start));

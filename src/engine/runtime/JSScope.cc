@@ -18,6 +18,9 @@ JSScope::JSScope(const common::AutoPtr<JSScope> &parent) {
 }
 
 JSScope::~JSScope() {
+  for (auto &child : _children) {
+    child->_parent = nullptr;
+  }
   _children.clear();
   _values.clear();
   _anonymousValues.clear();
