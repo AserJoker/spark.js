@@ -2261,9 +2261,6 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
     node = readTemplateLiteral(filename, source, current);
   }
   if (!node) {
-    node = readNewExpression(filename, source, current);
-  }
-  if (!node) {
     node = readIdentifierLiteral(filename, source, current);
   }
   if (!node) {
@@ -2272,30 +2269,16 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
   if (!node) {
     node = readObjectDeclaration(filename, source, current);
   }
-  if (!node) {
-    node = readNewExpression(filename, source, current);
-  }
   if (node != nullptr) {
     for (;;) {
-      auto expr = readMemberExpression(filename, source, current);
-      if (!expr) {
-        expr = readCallExpression(filename, source, current);
-      }
-      if (expr != nullptr) {
-        expr.cast<JSBinaryExpression>()->left = node;
-        node->addParent(expr);
-        node = expr;
+      auto temp = readTemplateLiteral(filename, source, current);
+      if (temp != nullptr) {
+        temp.cast<JSTemplateLiteral>()->tag = node;
+        node->addParent(temp);
+        node = temp;
         node->location = getLocation(source, position, current);
       } else {
-        auto temp = readTemplateLiteral(filename, source, current);
-        if (temp != nullptr) {
-          temp.cast<JSTemplateLiteral>()->tag = node;
-          node->addParent(temp);
-          node = temp;
-          node->location = getLocation(source, position, current);
-        } else {
-          break;
-        }
+        break;
       }
     }
     node->location = getLocation(source, position, current);
@@ -2353,14 +2336,14 @@ JSParser::readRValue(uint32_t filename, const std::wstring &source,
   if (!node && level >= 4) {
     node = readYieldExpression(filename, source, current);
   }
+  if (!node && level >= 2) {
+    node = readNewExpression(filename, source, current);
+  }
   if (!node) {
     node = readValue(filename, source, current);
   }
   if (node != nullptr) {
     for (;;) {
-      if (level < 3) {
-        break;
-      }
       auto expr = readUpdateExpression(filename, source, current);
       if (level >= 17 && expr == nullptr) {
         expr = readAssigmentExpression(filename, source, current);
@@ -2370,6 +2353,12 @@ JSParser::readRValue(uint32_t filename, const std::wstring &source,
       }
       if (level >= 9 && expr == nullptr) {
         expr = readInExpression(filename, source, current);
+      }
+      if (level >= 2 && expr == nullptr) {
+        expr = readCallExpression(filename, source, current);
+      }
+      if (level >= 1 && expr == nullptr) {
+        expr = readMemberExpression(filename, source, current);
       }
       if (level >= 4 && expr == nullptr) {
         auto tmp = current;
@@ -3286,14 +3275,31 @@ JSParser::readNewExpression(uint32_t filename, const std::wstring &source,
   auto token = readKeywordToken(filename, source, current);
   if (token != nullptr && token->location.isEqual(source, L"new")) {
     common::AutoPtr node = new JSNewExpression;
-    node->location = getLocation(source, position, current);
-    node->right = readRValue(filename, source, current, 2);
-    if (!node->right) {
+    auto expr = readValue(filename, source, current);
+    if (!expr) {
       throw error::JSSyntaxError(
           formatException(L"Unexcepted token", filename, source, current),
           {filename, current.line, current.column});
     }
-    node->right->addParent(node);
+    auto backup = current;
+    auto token = readSymbolToken(filename, source, current);
+    if (token != nullptr && token->location.isEqual(source, L"(")) {
+      current = backup;
+      auto call = readCallExpression(filename, source, current);
+      if (call == nullptr) {
+        throw error::JSSyntaxError(
+            formatException(L"Unexcepted token", filename, source, current),
+            {filename, current.line, current.column});
+      }
+      call.cast<JSCallExpression>()->left = expr;
+      expr->addParent(call);
+      expr = call;
+    } else {
+      current = backup;
+    }
+    expr->addParent(node);
+    node->right = expr;
+    node->location = getLocation(source, position, current);
     position = current;
     return node;
   }
@@ -3524,13 +3530,15 @@ JSParser::readArrowFunctionDeclaration(uint32_t filename,
       node->scope = new JSSourceScope(parentScope);
       node->scope->node = node.getRawPointer();
       _currentScope = node->scope.getRawPointer();
-
-      declareVariable(filename, source, node,
-                      param.cast<JSParameterDeclaration>()->identifier,
+      common::AutoPtr arg = new JSParameterDeclaration;
+      arg->identifier = param;
+      param->addParent(arg);
+      arg->location = param->location;
+      declareVariable(filename, source, node, param,
                       JSSourceDeclaration::TYPE::ARGUMENT, false);
 
-      param->addParent(node);
-      node->arguments.push_back(param);
+      arg->addParent(node);
+      node->arguments.push_back(arg);
       auto next = current;
       skipInvisible(filename, source, current);
       token = readSymbolToken(filename, source, current);

@@ -77,6 +77,8 @@ public:
   bool isNaN() const;
 
   bool isFunction() const;
+  
+  bool isObject() const;
 
   bool isException() const;
 

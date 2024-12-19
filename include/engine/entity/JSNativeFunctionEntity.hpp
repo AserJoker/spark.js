@@ -28,6 +28,8 @@ public:
 
   const common::Map<std::wstring, JSStore *> &getClosure() const;
 
+  common::Map<std::wstring, JSStore *> &getClosure();
+
   const std::wstring &getFunctionName() const;
 };
 }; // namespace spark::engine

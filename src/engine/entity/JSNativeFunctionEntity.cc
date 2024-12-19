@@ -27,6 +27,10 @@ JSNativeFunctionEntity::getClosure() const {
   return _closure;
 }
 
+common::Map<std::wstring, JSStore *> &JSNativeFunctionEntity::getClosure() {
+  return _closure;
+}
+
 const JSStore *JSNativeFunctionEntity::getBind() const { return _bind; }
 
 JSStore *JSNativeFunctionEntity::getBind() { return _bind; }

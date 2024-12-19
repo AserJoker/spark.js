@@ -2,6 +2,7 @@
 #include "common/AutoPtr.hpp"
 #include "common/Map.hpp"
 #include "engine/base/JSValueType.hpp"
+#include "engine/entity/JSNativeFunctionEntity.hpp"
 #include "engine/entity/JSPromiseEntity.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSTypeError.hpp"
@@ -56,6 +57,14 @@ static JS_FUNC(resolve) {
     if (!args.empty()) {
       value = args[0];
     }
+    if (value->isFunction() || value->isObject()) {
+      auto then = value->getProperty(ctx, L"then");
+      if (then->isFunction()) {
+        auto rejectFunc = ctx->load(L"#reject");
+        auto resolveFunc = ctx->load(L"#resolve");
+        return then->apply(ctx, value, {resolveFunc, rejectFunc});
+      }
+    }
     entity->setValue(value->getStore());
     self->getStore()->appendChild(value->getStore());
     entity->getStatus() = JSPromiseEntity::Status::FULFILLED;
@@ -84,10 +93,10 @@ static JS_FUNC(reject) {
 }
 
 static JS_FUNC(pipeline) {
-  auto resolve = ctx->load(L"resolve");
-  auto reject = ctx->load(L"reject");
-  auto callback = ctx->load(L"callback");
-  auto value = ctx->load(L"value");
+  auto resolve = ctx->load(L"#resolve");
+  auto reject = ctx->load(L"#reject");
+  auto callback = ctx->load(L"#callback");
+  auto value = ctx->load(L"#value");
   auto res = callback->apply(ctx, ctx->undefined(), {value});
   if (res->isException()) {
     reject->apply(ctx, ctx->undefined(), {ctx->createError(res)});
@@ -100,26 +109,26 @@ static JS_FUNC(pipeline) {
 static JS_FUNC(nextCallback) {
   auto resolve = args[0];
   auto reject = args[1];
-  auto callback = ctx->load(L"callback");
-  auto value = ctx->load(L"value");
+  auto callback = ctx->load(L"#callback");
+  auto value = ctx->load(L"#value");
   common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-  closure[L"resolve"] = resolve;
-  closure[L"reject"] = reject;
-  closure[L"callback"] = callback;
-  closure[L"value"] = value;
+  closure[L"#resolve"] = resolve;
+  closure[L"#reject"] = reject;
+  closure[L"#callback"] = callback;
+  closure[L"#value"] = value;
   auto pipelineFunc = ctx->createNativeFunction(pipeline, closure);
   ctx->createMicroTask(pipelineFunc);
   return ctx->undefined();
 }
 
 static JS_FUNC(onCreateFulfilled) {
-  auto value = ctx->load(L"value");
+  auto value = ctx->load(L"#value");
   args[0]->apply(ctx, ctx->undefined(), {value});
   return ctx->undefined();
 }
 
 static JS_FUNC(onCreateRejected) {
-  auto value = ctx->load(L"value");
+  auto value = ctx->load(L"#value");
   args[1]->apply(ctx, ctx->undefined(), {value});
   return ctx->undefined();
 }
@@ -129,15 +138,10 @@ static JS_FUNC(onNextResolve) {
   if (!args.empty()) {
     value = args[0];
   }
-  auto callback = ctx->load(L"callback");
-  auto resolve = ctx->load(L"resolve");
-  auto reject = ctx->load(L"reject");
+  auto callback = ctx->load(L"#callback");
+  auto resolve = ctx->load(L"#resolve");
+  auto reject = ctx->load(L"#reject");
   if (callback->isFunction()) {
-    common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-    closure[L"resolve"] = resolve;
-    closure[L"reject"] = reject;
-    closure[L"callback"] = callback;
-    closure[L"value"] = value;
     auto res = callback->apply(ctx, ctx->undefined(), {value});
     if (res->isException()) {
       reject->apply(ctx, ctx->undefined(), {ctx->createError(res)});
@@ -155,15 +159,10 @@ static JS_FUNC(onNextReject) {
   if (!args.empty()) {
     value = args[0];
   }
-  auto callback = ctx->load(L"onError");
-  auto resolve = ctx->load(L"resolve");
-  auto reject = ctx->load(L"reject");
+  auto callback = ctx->load(L"#onError");
+  auto resolve = ctx->load(L"#resolve");
+  auto reject = ctx->load(L"#reject");
   if (callback->isFunction()) {
-    common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-    closure[L"resolve"] = resolve;
-    closure[L"reject"] = reject;
-    closure[L"callback"] = callback;
-    closure[L"value"] = value;
     auto res = callback->apply(ctx, ctx->undefined(), {value});
     if (res->isException()) {
       reject->apply(ctx, ctx->undefined(), {ctx->createError(res)});
@@ -176,17 +175,34 @@ static JS_FUNC(onNextReject) {
   return ctx->undefined();
 }
 
+static JS_FUNC(onNextFinally) {
+  auto callback = ctx->load(L"#callback");
+  auto resolve = ctx->load(L"#resolve");
+  auto reject = ctx->load(L"#reject");
+  if (callback->isFunction()) {
+    auto res = callback->apply(ctx, ctx->undefined(), {});
+    if (res->isException()) {
+      reject->apply(ctx, ctx->undefined(), {ctx->createError(res)});
+    } else {
+      resolve->apply(ctx, ctx->undefined(), {res});
+    }
+  } else {
+    reject->apply(ctx, ctx->undefined(), {});
+  }
+  return ctx->undefined();
+}
+
 static JS_FUNC(nextPendding) {
   auto entity = self->getEntity<JSPromiseEntity>();
-  auto callback = ctx->load(L"callback");
-  auto onError = ctx->load(L"onError");
+  auto callback = ctx->load(L"#callback");
+  auto onError = ctx->load(L"#onError");
   auto resolve = args[0];
   auto reject = args[1];
   common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-  closure[L"resolve"] = resolve;
-  closure[L"reject"] = reject;
-  closure[L"callback"] = callback;
-  closure[L"onError"] = onError;
+  closure[L"#resolve"] = resolve;
+  closure[L"#reject"] = reject;
+  closure[L"#callback"] = callback;
+  closure[L"#onError"] = onError;
   auto onNextResolveFunc = ctx->createNativeFunction(onNextResolve, closure);
   auto onNextRejectFunc = ctx->createNativeFunction(onNextReject, closure);
   entity->getFulfilledCallbacks().push_back(onNextResolveFunc->getStore());
@@ -196,13 +212,28 @@ static JS_FUNC(nextPendding) {
   return ctx->undefined();
 }
 
+static JS_FUNC(nextFinally) {
+  auto entity = self->getEntity<JSPromiseEntity>();
+  auto callback = ctx->load(L"#callback");
+  auto resolve = args[0];
+  auto reject = args[1];
+  common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
+  closure[L"#resolve"] = resolve;
+  closure[L"#reject"] = reject;
+  closure[L"#callback"] = callback;
+  auto onNextFinallyFunc = ctx->createNativeFunction(onNextFinally, closure);
+  entity->getFinallyCallbacks().push_back(onNextFinallyFunc->getStore());
+  self->getStore()->appendChild(onNextFinallyFunc->getStore());
+  return ctx->undefined();
+}
+
 JS_FUNC(JSPromiseConstructor::resolve) {
   auto value = ctx->undefined();
   if (!args.empty()) {
     value = args[0];
   }
   common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-  closure[L"value"] = value;
+  closure[L"#value"] = value;
   auto onCreateFulfilledFunc =
       ctx->createNativeFunction(onCreateFulfilled, closure);
   return ctx->constructObject(ctx->Promise(), {onCreateFulfilledFunc}, {});
@@ -214,7 +245,7 @@ JS_FUNC(JSPromiseConstructor::reject) {
     value = args[0];
   }
   common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-  closure[L"value"] = value;
+  closure[L"#value"] = value;
   auto onCreateRejectedFunc =
       ctx->createNativeFunction(onCreateRejected, closure);
   return ctx->constructObject(ctx->Promise(), {onCreateRejectedFunc}, {});
@@ -232,12 +263,18 @@ JS_FUNC(JSPromiseConstructor::constructor) {
         fmt::format(L"Promise resolver '{}' is not a function",
                     resolver->toString(ctx)->getString().value()));
   }
+  auto entity = self->getEntity<JSPromiseEntity>();
   if (self->getEntity<JSPromiseEntity>() == nullptr) {
     throw error::JSTypeError(
         L"Promise constructor cannot be invoked without 'new'");
   }
-  auto resolveFunc = ctx->createNativeFunction(::resolve);
   auto rejectFunc = ctx->createNativeFunction(::reject);
+  common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
+  closure[L"#reject"] = rejectFunc;
+  auto resolveFunc = ctx->createNativeFunction(::resolve, closure);
+  resolveFunc->getEntity<JSNativeFunctionEntity>()->getClosure()[L"#resolve"] =
+      resolveFunc->getStore();
+  resolveFunc->getStore()->appendChild(resolveFunc->getStore());
   resolveFunc->setBind(ctx, self);
   rejectFunc->setBind(ctx, self);
   auto err = resolver->apply(ctx, ctx->undefined(), {resolveFunc, rejectFunc});
@@ -261,8 +298,8 @@ JS_FUNC(JSPromiseConstructor::then) {
     auto value = ctx->createValue(entity->getValue());
     if (callback->isFunction()) {
       common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-      closure[L"callback"] = callback;
-      closure[L"value"] = value;
+      closure[L"#callback"] = callback;
+      closure[L"#value"] = value;
       auto nextCallbackFunc = ctx->createNativeFunction(nextCallback, closure);
       return ctx->constructObject(ctx->Promise(), {nextCallbackFunc}, {});
     } else {
@@ -274,8 +311,8 @@ JS_FUNC(JSPromiseConstructor::then) {
     auto value = ctx->createValue(entity->getValue());
     if (callback->isFunction()) {
       common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-      closure[L"callback"] = onError;
-      closure[L"value"] = value;
+      closure[L"#callback"] = onError;
+      closure[L"#value"] = value;
       auto nextCallbackFunc = ctx->createNativeFunction(nextCallback, closure);
       return ctx->constructObject(ctx->Promise(), {nextCallbackFunc}, {});
     } else {
@@ -285,8 +322,8 @@ JS_FUNC(JSPromiseConstructor::then) {
     }
   } else {
     common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-    closure[L"callback"] = callback;
-    closure[L"onError"] = onError;
+    closure[L"#callback"] = callback;
+    closure[L"#onError"] = onError;
     auto nextPenddingFunc = ctx->createNativeFunction(nextPendding, closure);
     nextPenddingFunc->setBind(ctx, self);
     return ctx->constructObject(ctx->Promise(), {nextPenddingFunc}, {});
@@ -302,8 +339,8 @@ JS_FUNC(JSPromiseConstructor::catch_) {
     auto value = ctx->createValue(entity->getValue());
     if (callback->isFunction()) {
       common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-      closure[L"callback"] = callback;
-      closure[L"value"] = value;
+      closure[L"#callback"] = callback;
+      closure[L"#value"] = value;
       auto nextCallbackFunc = ctx->createNativeFunction(nextCallback, closure);
       return ctx->constructObject(ctx->Promise(), {nextCallbackFunc}, {});
     } else {
@@ -313,8 +350,8 @@ JS_FUNC(JSPromiseConstructor::catch_) {
     }
   } else if (entity->getStatus() == JSPromiseEntity::Status::PENDING) {
     common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
-    closure[L"onError"] = callback;
-    closure[L"callback"] = ctx->undefined();
+    closure[L"#onError"] = callback;
+    closure[L"#callback"] = ctx->undefined();
     auto nextPenddingFunc = ctx->createNativeFunction(nextPendding, closure);
     nextPenddingFunc->setBind(ctx, self);
     return ctx->constructObject(ctx->Promise(), {nextPenddingFunc}, {});
@@ -326,7 +363,41 @@ JS_FUNC(JSPromiseConstructor::catch_) {
   }
   return ctx->undefined();
 }
-JS_FUNC(JSPromiseConstructor::finally) { return ctx->undefined(); }
+JS_FUNC(JSPromiseConstructor::finally) {
+  auto entity = self->getEntity<JSPromiseEntity>();
+  auto callback = ctx->undefined();
+  if (!args.empty()) {
+    callback = args[0];
+  }
+  if (entity->getStatus() == JSPromiseEntity::Status::PENDING) {
+    common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
+    closure[L"#callback"] = callback;
+    auto nextFinallyFunc = ctx->createNativeFunction(nextFinally, closure);
+    nextFinallyFunc->setBind(ctx, self);
+    return ctx->constructObject(ctx->Promise(), {nextFinallyFunc}, {});
+  } else {
+    if (callback->isFunction()) {
+      common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
+      closure[L"#callback"] = callback;
+      closure[L"#value"] = ctx->undefined();
+      auto nextCallbackFunc = ctx->createNativeFunction(nextCallback, closure);
+      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc}, {});
+    } else {
+      if (entity->getStatus() == JSPromiseEntity::Status::REJECTED) {
+        return ctx->Promise()
+            ->getProperty(ctx, L"reject")
+            ->apply(ctx, ctx->undefined(),
+                    {ctx->createValue(entity->getValue())});
+      } else {
+        return ctx->Promise()
+            ->getProperty(ctx, L"resolve")
+            ->apply(ctx, ctx->undefined(),
+                    {ctx->createValue(entity->getValue())});
+      }
+    }
+  }
+  return ctx->undefined();
+}
 
 common::AutoPtr<JSValue>
 JSPromiseConstructor::initialize(common::AutoPtr<JSContext> ctx) {

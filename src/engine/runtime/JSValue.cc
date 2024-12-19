@@ -121,6 +121,7 @@ bool JSValue::isFunction() const {
   return getType() == JSValueType::JS_FUNCTION ||
          getType() == JSValueType::JS_NATIVE_FUNCTION;
 }
+bool JSValue::isObject() const { return getType() == JSValueType::JS_OBJECT; }
 
 bool JSValue::isException() const {
   return getType() == JSValueType::JS_EXCEPTION;

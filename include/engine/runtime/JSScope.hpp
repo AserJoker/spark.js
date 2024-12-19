@@ -20,7 +20,7 @@ private:
   std::vector<common::AutoPtr<JSValue>> _anonymousValues;
 
 private:
-  bool isEntityAlived(JSStore *entity, common::Map<JSStore *, bool> &cache);
+  bool isEntityAlived(JSStore *store, common::Map<JSStore *, bool> &cache);
 
 public:
   JSScope(const common::AutoPtr<JSScope> &parent);
@@ -35,7 +35,7 @@ public:
 
   void removeChild(const common::AutoPtr<JSScope> &child);
 
-  common::AutoPtr<JSValue> createValue(JSStore *entity,
+  common::AutoPtr<JSValue> createValue(JSStore *store,
                                        const std::wstring &name = L"");
 
   const common::Map<std::wstring, common::AutoPtr<JSValue>> &getValues() const;

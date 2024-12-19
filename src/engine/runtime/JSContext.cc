@@ -332,18 +332,16 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
   }
   auto prototype = constructor->getProperty(this, L"prototype");
   common::AutoPtr<JSValue> result;
-  if (constructor == _Array) {
+  if (constructor->getStore() == _Array->getStore()) {
     result = createValue(new JSStore(new JSArrayEntity(prototype->getStore())));
-    result->getStore()->appendChild(prototype->getStore());
-  } else if (constructor == _Function) {
+  } else if (constructor->getStore() == _Function->getStore()) {
     result = createValue(
         new JSStore(new JSFunctionEntity(prototype->getStore(), nullptr)));
-    result->getStore()->appendChild(prototype->getStore());
-  } else if (constructor == _Promise) {
-    result =
-        createValue(new JSStore(new JSPromiseEntity(prototype->getStore())));
-    result->getStore()->appendChild(prototype->getStore());
-  } else if (constructor == _Symbol) {
+  } else if (constructor->getStore() == _Promise->getStore()) {
+    auto entity = new JSPromiseEntity(prototype->getStore());
+    auto store = new JSStore(entity);
+    result = createValue(store);
+  } else if (constructor->getStore() == _Symbol->getStore()) {
     throw error::JSTypeError(L"Symbol is not a constructor");
   } else {
     result = createObject(prototype, name);

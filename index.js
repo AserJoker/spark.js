@@ -1,7 +1,14 @@
-function* create() {
-    yield 1;
-    yield 2;
-    yield 3;
-}
-const gen = create();
-Array.prototype.forEach.call(gen,(val)=>console.log(val))
+const pro = Promise.resolve(123);
+const print = console.log;
+pro
+  .then((val) => {
+    print(val);
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(234), 1000);
+    });
+  })
+  .then((res) => {
+    print(res);
+  }).finally(() => {
+    print('finally')
+  });
