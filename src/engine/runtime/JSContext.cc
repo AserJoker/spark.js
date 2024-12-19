@@ -40,9 +40,11 @@
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSSyntaxError.hpp"
 #include "error/JSTypeError.hpp"
+#include "vm/JSCoroutineContext.hpp"
 #include <chrono>
 #include <string>
 #include <thread>
+#include <vector>
 
 using namespace spark;
 using namespace spark::engine;
@@ -245,6 +247,101 @@ void JSContext::removeMacroTask(uint32_t id) {
   }
 }
 
+common::AutoPtr<JSValue>
+JSContext::applyGenerator(common::AutoPtr<JSValue> func,
+                          common::AutoPtr<JSValue> arguments,
+                          common::AutoPtr<JSValue> self) {
+  auto entity = func->getEntity<JSFunctionEntity>();
+  auto closure = entity->getClosure();
+  auto result = constructObject(Generator(), {}, {});
+  common::AutoPtr scope = new engine::JSScope(getRoot());
+  for (auto &[name, value] : closure) {
+    scope->createValue(value, name);
+  }
+  scope->createValue(self->getStore(), L"this");
+  scope->createValue(arguments->getStore(), L"arguments");
+  result->setOpaque(vm::JSCoroutineContext{
+      .eval = new vm::JSEvalContext,
+      .scope = scope,
+      .module = entity->getModule(),
+      .funcname = func->getName(),
+      .pc = entity->getAddress(),
+  });
+  result->getStore()->appendChild(func->getStore());
+  return result;
+}
+common::AutoPtr<JSValue>
+JSContext::applyAsync(common::AutoPtr<JSValue> func,
+                      common::AutoPtr<JSValue> arguments,
+                      common::AutoPtr<JSValue> self) {
+  auto generator = applyGenerator(func, arguments, self);
+  common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
+  closure[L"#generator"] = generator;
+  std::function callback = [](common::AutoPtr<JSContext> ctx,
+                              common::AutoPtr<JSValue> self,
+                              std::vector<common::AutoPtr<JSValue>> args)
+      -> common::AutoPtr<JSValue> {
+    auto resolve = args[0];
+    auto reject = args[1];
+    auto next = [](common::AutoPtr<JSContext> ctx,
+                   common::AutoPtr<JSValue> self,
+                   std::vector<common::AutoPtr<JSValue>> args)
+        -> common::AutoPtr<JSValue> {
+      auto arg = ctx->undefined();
+      if (!args.empty()) {
+        arg = args[0];
+      }
+      auto resolve = ctx->load(L"#resolve");
+      auto reject = ctx->load(L"#reject");
+      auto next = ctx->load(L"#next");
+      auto generator = ctx->load(L"#generator");
+      auto gnext = generator->getProperty(ctx, L"next");
+      auto res = gnext->apply(ctx, generator, {arg});
+      if (res->isException()) {
+        reject->apply(ctx, ctx->undefined(), {res});
+        return ctx->undefined();
+      }
+      auto value = res->getProperty(ctx, L"value");
+      auto done = res->getProperty(ctx, L"done");
+      if (done->toBoolean(ctx)->getBoolean().value()) {
+        resolve->apply(ctx, ctx->undefined(), {value});
+      } else {
+        auto promiseValue = ctx->Promise()
+                                ->getProperty(ctx, L"resolve")
+                                ->apply(ctx, ctx->Promise(), {value});
+        if (promiseValue->isException()) {
+          return promiseValue;
+        }
+        promiseValue = promiseValue->getProperty(ctx, L"then")
+                           ->apply(ctx, promiseValue, {next});
+        if (promiseValue->isException()) {
+          return promiseValue;
+        }
+        promiseValue = promiseValue->getProperty(ctx, L"catch")
+                           ->apply(ctx, promiseValue, {reject});
+        if (promiseValue->isException()) {
+          return promiseValue;
+        }
+      }
+      return ctx->undefined();
+    };
+    common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
+    closure[L"#resolve"] = resolve;
+    closure[L"#reject"] = resolve;
+    closure[L"#generator"] = ctx->load(L"#generator");
+    auto nextFunc = ctx->createNativeFunction(next, closure);
+    nextFunc->getEntity<JSNativeFunctionEntity>()->getClosure()[L"#next"] =
+        nextFunc->getStore();
+    auto err = nextFunc->apply(ctx, self, {});
+    if (err->isException()) {
+      reject->apply(ctx, ctx->undefined(), {ctx->createError(err)});
+    }
+    return ctx->undefined();
+  };
+  auto callbackFunc = createNativeFunction(callback, closure);
+  return constructObject(_Promise, {callbackFunc}, {});
+}
+
 common::AutoPtr<JSValue> JSContext::createValue(JSStore *store,
                                                 const std::wstring &name) {
   return _scope->createValue(store, name);
@@ -355,14 +452,6 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
   return result;
 }
 
-common::AutoPtr<JSValue> JSContext::createPromise(const std::wstring &name) {
-  auto prototype = _Promise->getProperty(this, L"prototype");
-  auto result =
-      createValue(new JSStore(new JSPromiseEntity(prototype->getStore())));
-  result->getStore()->appendChild(prototype->getStore());
-  result->setPropertyDescriptor(this, L"constructor", _Promise);
-  return result;
-}
 common::AutoPtr<JSValue>
 JSContext::createError(common::AutoPtr<JSValue> exception,
                        const std::wstring &name) {

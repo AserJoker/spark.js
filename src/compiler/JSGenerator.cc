@@ -1677,6 +1677,9 @@ void JSGenerator::resolveDeclarationFunction(
     resolveNode(ctx, module, n->body);
     if (n->body->type != JSNodeType::DECLARATION_FUNCTION_BODY) {
       generate(module, vm::JSAsmOperator::RET);
+      for (auto &item : ctx.currentScope->functionDeclarations) {
+        resolveDeclarationFunction(ctx, module, item);
+      }
     }
     popLexScope(ctx, module);
   } else {

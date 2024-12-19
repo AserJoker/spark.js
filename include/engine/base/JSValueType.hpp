@@ -31,12 +31,9 @@ using JSFunction = common::AutoPtr<JSValue>(
     std::vector<common::AutoPtr<JSValue>>);
 
 #define JS_FUNC(funcname)                                                      \
-  common::AutoPtr<JSValue> funcname(                                           \
-      common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,           \
-      std::vector<common::AutoPtr<JSValue>> args)
-#define JS_LAMBDA_FUNC(funcname)                                               \
-  funcname(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,      \
-           std::vector<common::AutoPtr<JSValue>> args)                         \
-      ->common::AutoPtr<JSValue>
+  common::AutoPtr<engine::JSValue> funcname(                                   \
+      common::AutoPtr<engine::JSContext> ctx,                                  \
+      common::AutoPtr<engine::JSValue> self,                                   \
+      std::vector<common::AutoPtr<engine::JSValue>> args)
 
 } // namespace spark::engine

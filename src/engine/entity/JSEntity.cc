@@ -5,12 +5,7 @@ using namespace spark;
 using namespace spark::engine;
 JSEntity::JSEntity(const JSValueType &type) : _type(type), _opaque(nullptr) {}
 
-JSEntity::~JSEntity() {
-  if (_opaque) {
-    delete _opaque;
-    _opaque = nullptr;
-  }
-}
+JSEntity::~JSEntity() { _opaque = nullptr; }
 
 const JSValueType &JSEntity::getType() const { return _type; }
 

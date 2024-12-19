@@ -27,12 +27,12 @@ public:
   void setClosure(const std::wstring &name, JSStore *entity);
   void setFuncName(const std::wstring &name);
   void setSource(const std::wstring &name);
-  
+
   void bind(JSStore *self);
   const JSStore *getBind() const;
   JSStore *getBind();
 
-  bool getAsync() const;
+  bool isAsync() const;
   bool isGenerator() const;
   uint32_t getAddress() const;
   uint32_t getLength() const;

@@ -1,5 +1,6 @@
 #include "vm/JSVirtualMachine.hpp"
 #include "common/AutoPtr.hpp"
+#include "common/Map.hpp"
 #include "compiler/base/JSNode.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSArrayEntity.hpp"
@@ -17,7 +18,6 @@
 #include "error/JSSyntaxError.hpp"
 #include "error/JSTypeError.hpp"
 #include "vm/JSAsmOperator.hpp"
-#include "vm/JSCoroutineContext.hpp"
 #include "vm/JSErrorFrame.hpp"
 #include "vm/JSEvalContext.hpp"
 #include <algorithm>
@@ -515,7 +515,13 @@ JS_OPT(JSVirtualMachine::restObject) {
   _ctx->stack.push_back(res);
 }
 
-JS_OPT(JSVirtualMachine::await) {}
+JS_OPT(JSVirtualMachine::await) {
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(ctx->createValue(
+      new engine::JSStore(new engine::JSTaskEntity(value->getStore(), _pc))));
+  _pc = module->codes.size();
+}
 
 JS_OPT(JSVirtualMachine::void_) {
   auto value = *_ctx->stack.rbegin();
@@ -1310,7 +1316,7 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
     }
   } else {
     auto entity = func->getEntity<engine::JSFunctionEntity>();
-    if (!entity->isGenerator()) {
+    if (!entity->isGenerator() && !entity->isAsync()) {
       auto closure = entity->getClosure();
       for (auto &[name, value] : closure) {
         ctx->createValue(value, name);
@@ -1321,7 +1327,6 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
   auto arguments = ctx->createValue(
       new engine::JSStore(new engine::JSObjectEntity(ctx->null()->getStore())),
       L"arguments");
-
   for (size_t index = 0; index < args.size(); index++) {
     arguments->setPropertyDescriptor(ctx, fmt::format(L"{}", index),
                                      args[index]);
@@ -1349,30 +1354,21 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
     auto entity = func->getEntity<engine::JSFunctionEntity>();
     auto closure = entity->getClosure();
     if (entity->isGenerator()) {
-      result = ctx->constructObject(ctx->Generator(), {}, {});
-      common::AutoPtr scope = new engine::JSScope(ctx->getRoot());
-      for (auto &[name, value] : closure) {
-        scope->createValue(value, name);
-      }
-      scope->createValue(bind->getStore(), L"this");
-      scope->createValue(arguments->getStore(), L"arguments");
-      result->setOpaque(JSCoroutineContext{
-          .eval = new JSEvalContext,
-          .scope = scope,
-          .module = entity->getModule(),
-          .funcname = func->getName(),
-          .pc = entity->getAddress(),
-      });
-      result->getStore()->appendChild(func->getStore());
+      result = ctx->applyGenerator(func, arguments, bind);
     } else {
-      auto current = _ctx;
-      _ctx = new JSEvalContext;
-      result = eval(ctx, entity->getModule(), entity->getAddress());
-      _ctx = current;
+      if (entity->isAsync()) {
+        result = ctx->applyAsync(func, arguments, bind);
+      } else {
+        auto current = _ctx;
+        _ctx = new JSEvalContext;
+        result = eval(ctx, entity->getModule(), entity->getAddress());
+        _ctx = current;
+      }
     }
   }
   return result;
 }
+
 common::AutoPtr<JSEvalContext> JSVirtualMachine::getContext() { return _ctx; }
 
 void JSVirtualMachine::setContext(common::AutoPtr<JSEvalContext> ctx) {

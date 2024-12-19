@@ -121,6 +121,9 @@ private:
   JS_OPT(or_);
   JS_OPT(xor_);
 
+private:
+  static JS_FUNC(asyncCallback);
+
 public:
   JSVirtualMachine();
 

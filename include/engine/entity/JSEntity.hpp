@@ -2,10 +2,9 @@
 #include "common/AutoPtr.hpp"
 #include "common/Object.hpp"
 #include "engine/base/JSValueType.hpp"
+#include <any>
 #include <optional>
 #include <string>
-#include <type_traits>
-#include <typeinfo>
 
 namespace spark::engine {
 class JSContext;
@@ -20,7 +19,7 @@ private:
     T _value;
   };
 
-  Opaque *_opaque;
+  std::any _opaque;
 
 protected:
   JSValueType _type;
@@ -32,29 +31,12 @@ public:
 
   const JSValueType &getType() const;
 
-  template <class T> void setOpaque(T &&value) {
-    if (_opaque) {
-      delete _opaque;
-    }
-    auto opaque =
-        new OpaqueImpl<std::remove_cv_t<std::remove_reference_t<T>>>();
-    opaque->_value = value;
-    _opaque = opaque;
-  }
-  template <class T> T &getOpaque() {
-    auto impl = dynamic_cast<OpaqueImpl<T> *>(_opaque);
-    if (!impl) {
-      throw std::bad_cast();
-    }
-    return impl->_value;
-  }
+  template <class T> void setOpaque(T &&value) { _opaque = value; }
+
+  template <class T> T &getOpaque() { return std::any_cast<T &>(_opaque); }
 
   template <class T> const bool hasOpaque() const {
-    auto impl = dynamic_cast<OpaqueImpl<T>*>((Opaque *)_opaque);
-    if (!impl) {
-      return false;
-    }
-    return true;
+    return _opaque.type() != typeid(nullptr);
   }
 
   virtual std::wstring toString(common::AutoPtr<JSContext> ctx) const;

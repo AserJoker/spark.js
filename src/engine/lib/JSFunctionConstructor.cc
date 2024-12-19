@@ -78,7 +78,7 @@ JS_FUNC(JSFunctionConstructor::bind) {
       }
       auto e2 = result->getEntity<JSFunctionEntity>();
       e2->setAddress(e->getAddress());
-      e2->setAsync(e->getAsync());
+      e2->setAsync(e->isAsync());
       e2->setFuncName(e->getFuncName());
       e2->setLength(e->getLength());
       e2->setSource(L"function anonymouse(){ [native code] }");
