@@ -34,7 +34,7 @@
 using namespace spark;
 using namespace spark::engine;
 JSValue::JSValue(JSScope *scope, JSStore *store)
-    : _scope(scope), _store(store) {}
+    : _scope(scope), _store(store), _const(false) {}
 
 JSValue::~JSValue() {}
 
@@ -44,14 +44,19 @@ const JSValueType &JSValue::getType() const {
   }
   return getEntity()->getType();
 }
+
 std::wstring JSValue::getName() const {
   for (auto &[name, val] : _scope->getValues()) {
     if (val == this) {
       return name;
     }
   }
-  return L"anonymous";
+  return L"[[anonymous]]";
 }
+
+void JSValue::setConst() { _const = true; }
+
+bool JSValue::isConst() const { return _const; };
 
 JSStore *JSValue::getStore() { return _store; }
 
@@ -64,6 +69,9 @@ void JSValue::setEntity(const common::AutoPtr<JSEntity> &entity) {
 }
 void JSValue::setStore(JSStore *store) {
   if (_store != store) {
+    if (_const && getType() != JSValueType::JS_UNINITIALIZED) {
+      throw error::JSTypeError(L"Assignment to constant variable.");
+    }
     _store->setEntity(store->getEntity());
     for (auto &child : _store->getChildren()) {
       _store->removeChild(child);

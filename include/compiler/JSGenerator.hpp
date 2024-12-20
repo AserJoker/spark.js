@@ -73,6 +73,10 @@ private:
                           const common::AutoPtr<JSNode> &node,
                           std::vector<size_t> &offsets);
 
+  void resolveStatements(JSGeneratorContext &ctx,
+                         common::AutoPtr<JSModule> &module,
+                         const JSNodeArray &nodes);
+
 private:
   void resolvePrivateName(JSGeneratorContext &ctx,
                           common::AutoPtr<JSModule> &module,

@@ -236,6 +236,9 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::RET:
       out << L"ret";
       break;
+    case vm::JSAsmOperator::HLT:
+      out << L"hlt";
+      break;
     case vm::JSAsmOperator::END_DEFER:
       out << L"end_defer";
       break;
@@ -431,14 +434,21 @@ int main(int argc, char *argv[]) {
     write(module);
     fmt::print(L"{}:end compile\n", std::chrono::system_clock::now());
     auto res = ctx->getRuntime()->getVirtualMachine()->eval(ctx, module);
-    while (ctx->nextTick())
-      ;
-    fmt::print(L"{}:finish\n", std::chrono::system_clock::now());
+    if (!res->isException()) {
+      while (!ctx->isTaskComplete()) {
+        auto err = ctx->nextTick();
+        if (err != nullptr) {
+          res = err;
+          break;
+        }
+      }
+    }
     if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
       fmt::print(L"Uncaught {}\n", res->toString(ctx)->getString().value());
     } else {
       fmt::print(L"{}\n", res->toString(ctx)->getString().value());
     }
+    fmt::print(L"{}:finish\n", std::chrono::system_clock::now());
   } catch (error::JSError &e) {
     std::cout << e.what();
     fmt::print(L"\n  at {} ({}:{}:{})", e.getLocation().funcname,

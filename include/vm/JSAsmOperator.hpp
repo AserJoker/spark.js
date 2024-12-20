@@ -40,6 +40,7 @@ enum class JSAsmOperator {
   LOAD,
   LOAD_CONST,
   RET,
+  HLT,
   NEXT,
   REST_ARRAY,
   REST_OBJECT,

@@ -194,6 +194,26 @@ void JSGenerator::resolveMemberChian(JSGeneratorContext &ctx,
     resolveNode(ctx, module, node);
   }
 }
+void JSGenerator::resolveStatements(JSGeneratorContext &ctx,
+                                    common::AutoPtr<JSModule> &module,
+                                    const JSNodeArray &nodes) {
+  bool clean = false;
+  for (auto &item : nodes) {
+    if (clean) {
+      generate(module, vm::JSAsmOperator::POP, 1U);
+      clean = false;
+    }
+    resolveNode(ctx, module, item);
+    if (item->type == JSNodeType::STATEMENT_EXPRESSION) {
+      auto expr = item.cast<JSExpressionStatement>()->expression;
+      if (expr->type != JSNodeType::EXPRESSION_ASSIGMENT &&
+          expr->type != JSNodeType::DECLARATION_CLASS &&
+          expr->type != JSNodeType::DECLARATION_FUNCTION) {
+        clean = true;
+      }
+    }
+  }
+}
 
 void JSGenerator::resolvePrivateName(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
@@ -391,11 +411,8 @@ void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
   for (auto &dec : n->directives) {
     resolveNode(ctx, module, dec);
   }
-  for (auto &item : n->body) {
-    resolveNode(ctx, module, item);
-  }
-  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
-  generate(module, vm::JSAsmOperator::RET);
+  resolveStatements(ctx, module, n->body);
+  generate(module, vm::JSAsmOperator::HLT);
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
   }
@@ -407,9 +424,7 @@ void JSGenerator::resolveStatementBlock(JSGeneratorContext &ctx,
                                         const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSBlockStatement>();
   pushScope(ctx, module, n->scope);
-  for (auto &sts : n->body) {
-    resolveNode(ctx, module, sts);
-  }
+  resolveStatements(ctx, module, n->body);
   popScope(ctx, module);
 }
 
@@ -871,11 +886,6 @@ void JSGenerator::resolveStatementExpression(
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSExpressionStatement>();
   resolveNode(ctx, module, n->expression);
-  if (n->expression->type != JSNodeType::EXPRESSION_ASSIGMENT &&
-      n->expression->type != JSNodeType::DECLARATION_FUNCTION &&
-      n->expression->type != JSNodeType::DECLARATION_CLASS) {
-    generate(module, vm::JSAsmOperator::POP, 1U);
-  }
 }
 
 void JSGenerator::resolveVariableDeclaration(
@@ -1742,9 +1752,7 @@ void JSGenerator::resolveDeclarationFunctionBody(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSFunctionBodyDeclaration>();
-  for (auto &item : n->statements) {
-    resolveNode(ctx, module, item);
-  }
+  resolveStatements(ctx, module, n->statements);
   generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
   generate(module, vm::JSAsmOperator::RET);
   for (auto &item : ctx.currentScope->functionDeclarations) {
@@ -1861,7 +1869,6 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
   case JSNodeType::STATEMENT_RETURN:
     resolveStatementReturn(ctx, module, node);
     break;
-
   case JSNodeType::STATEMENT_LABEL:
     resolveStatementLabel(ctx, module, node);
     break;

@@ -118,7 +118,9 @@ public:
 
   uint32_t createMacroTask(common::AutoPtr<JSValue> exec, int64_t timeout = 0);
 
-  bool nextTick();
+  common::AutoPtr<JSValue> nextTick();
+
+  bool isTaskComplete() const;
 
   void removeMacroTask(uint32_t id);
 

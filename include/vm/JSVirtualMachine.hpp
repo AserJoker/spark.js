@@ -68,6 +68,7 @@ private:
   JS_OPT(load);
   JS_OPT(loadConst);
   JS_OPT(ret);
+  JS_OPT(hlt);
   JS_OPT(throw_);
   JS_OPT(new_);
   JS_OPT(yield);

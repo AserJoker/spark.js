@@ -286,10 +286,11 @@ JS_OPT(JSVirtualMachine::storeConst) {
   _ctx->stack.pop_back();
   auto val = ctx->getScope()->getValue(name);
   if (!val || val->getType() == engine::JSValueType::JS_UNINITIALIZED) {
-    ctx->createValue(value, name);
+    val = ctx->createValue(value, name);
   } else {
     val->setStore(value->getStore());
   }
+  val->setConst();
 }
 
 JS_OPT(JSVirtualMachine::store) {
@@ -316,6 +317,12 @@ JS_OPT(JSVirtualMachine::loadConst) {
 }
 
 JS_OPT(JSVirtualMachine::ret) { _pc = module->codes.size(); }
+JS_OPT(JSVirtualMachine::hlt) {
+  if (_ctx->stack.empty()) {
+    _ctx->stack.push_back(ctx->undefined());
+  }
+  _pc = module->codes.size();
+}
 
 JS_OPT(JSVirtualMachine::throw_) {
   auto value = *_ctx->stack.rbegin();
@@ -1114,6 +1121,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::RET:
         ret(ctx, module);
+        break;
+      case vm::JSAsmOperator::HLT:
+        hlt(ctx, module);
         break;
       case vm::JSAsmOperator::THROW:
         throw_(ctx, module);

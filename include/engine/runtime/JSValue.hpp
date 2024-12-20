@@ -21,6 +21,8 @@ private:
 
   JSScope *_scope;
 
+  bool _const;
+
 public:
   JSValue(JSScope *scope, JSStore *store);
 
@@ -29,6 +31,10 @@ public:
   const JSValueType &getType() const;
 
   std::wstring getName() const;
+
+  void setConst();
+
+  bool isConst() const;
 
   template <class T = JSEntity> common::AutoPtr<T> getEntity() {
     return _store->getEntity().cast<T>();
@@ -77,7 +83,7 @@ public:
   bool isNaN() const;
 
   bool isFunction() const;
-  
+
   bool isObject() const;
 
   bool isException() const;

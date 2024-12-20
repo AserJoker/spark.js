@@ -213,18 +213,15 @@ uint32_t JSContext::createMacroTask(common::AutoPtr<JSValue> exec,
   });
   return _macroTasks.rbegin()->identifier;
 }
-bool JSContext::nextTick() {
+common::AutoPtr<JSValue> JSContext::nextTick() {
   using namespace std::chrono;
-  if (_microTasks.empty() && _macroTasks.empty()) {
-    return false;
-  }
   pushScope();
   while (!_microTasks.empty()) {
     auto task = *_microTasks.begin();
     _microTasks.erase(_microTasks.begin());
     auto err = task.exec->apply(this, undefined());
     if (err->isException()) {
-      fmt::print(L"Uncaught {}\n", err->toString(this)->getString().value());
+      return err;
     }
   }
   if (!_macroTasks.empty()) {
@@ -233,7 +230,7 @@ bool JSContext::nextTick() {
     if (std::chrono::system_clock::now() - task.start > task.timeout * 1ms) {
       auto err = task.exec->apply(this, undefined());
       if (err->isException()) {
-        fmt::print(L"Uncaught {}\n", err->toString(this)->getString().value());
+        return err;
       }
     } else {
       _macroTasks.push_back(task);
@@ -241,7 +238,11 @@ bool JSContext::nextTick() {
     }
   }
   popScope();
-  return true;
+  return nullptr;
+}
+
+bool JSContext::isTaskComplete() const {
+  return _macroTasks.empty() && _microTasks.empty();
 }
 
 void JSContext::removeMacroTask(uint32_t id) {
@@ -276,6 +277,7 @@ JSContext::applyGenerator(common::AutoPtr<JSValue> func,
   result->getStore()->appendChild(func->getStore());
   return result;
 }
+
 common::AutoPtr<JSValue>
 JSContext::applyAsync(common::AutoPtr<JSValue> func,
                       common::AutoPtr<JSValue> arguments,
