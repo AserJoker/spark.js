@@ -167,7 +167,10 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
                     toString(ctx)->getString().value()),
         location);
   }
-  ctx->pushCallStack(location);
+  if (!location.funcname.empty() || location.filename != 0 ||
+      location.column != 0 || location.line != 0) {
+    ctx->pushCallStack(location);
+  }
   auto scope = ctx->getScope();
   ctx->pushScope();
   JSStore *store = nullptr;
@@ -187,7 +190,10 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
   while (ctx->getScope() != scope) {
     ctx->popScope();
   }
-  ctx->popCallStack();
+  if (!location.funcname.empty() || location.filename != 0 ||
+      location.column != 0 || location.line != 0) {
+    ctx->popCallStack();
+  }
   return ctx->createValue(store);
 }
 

@@ -1,8 +1,10 @@
 function Test() {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(2), 1000);
+  throw new Error('test');
+  return new Promise((resolve, reject) => {
+    setTimeout(() => reject(new Error("test")));
   });
 }
+const print = console.log;
 function Test2() {
   function* awaiter() {
     print(1);
@@ -13,12 +15,20 @@ function Test2() {
   return new Promise((resolve, reject) => {
     function next(res) {
       const { value, done } = gen.next(res);
+      print("value");
+      print(value);
+      print("done");
+      print(done);
       if (done) {
         return resolve(value);
       } else {
         return Promise.resolve(value)
           .then(next)
-          .catch((e) => reject(e));
+          .catch((e) => {
+            print("aaa");
+            gen.throw(e);
+            print("bbb");
+          });
       }
     }
     try {
@@ -28,4 +38,6 @@ function Test2() {
     }
   });
 }
-Test2().then(() => print(4));
+Test2()
+  .then(() => print(4))
+  .catch((e) => print(e));

@@ -24,9 +24,14 @@ JS_FUNC(JSErrorConstructor::constructor) {
   std::wstring stack;
   for (auto it = trace.begin() + 1; it != trace.end(); it++) {
     auto &loc = *it;
-    stack += fmt::format(L"  at {} ({}:{}:{})", loc.funcname,
-                         ctx->getRuntime()->getSourceFilename(loc.filename),
-                         loc.line, loc.column);
+    if (loc.filename) {
+      stack += fmt::format(L"  at {} ({}:{}:{})", loc.funcname,
+                           ctx->getRuntime()->getSourceFilename(loc.filename),
+                           loc.line, loc.column);
+    } else {
+      stack += fmt::format(L"  at {} ({})", loc.funcname,
+                           ctx->getRuntime()->getSourceFilename(loc.filename));
+    }
     if (it != trace.end() - 1) {
       stack += L"\n";
     }

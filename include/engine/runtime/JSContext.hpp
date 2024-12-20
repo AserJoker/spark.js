@@ -125,10 +125,10 @@ public:
   common::AutoPtr<JSValue> applyGenerator(common::AutoPtr<JSValue> func,
                                           common::AutoPtr<JSValue> arguments,
                                           common::AutoPtr<JSValue> self);
-  
+
   common::AutoPtr<JSValue> applyAsync(common::AutoPtr<JSValue> func,
-                                          common::AutoPtr<JSValue> arguments,
-                                          common::AutoPtr<JSValue> self);
+                                      common::AutoPtr<JSValue> arguments,
+                                      common::AutoPtr<JSValue> self);
 
   common::AutoPtr<JSValue> createValue(JSStore *entity,
                                        const std::wstring &name = L"");
@@ -163,8 +163,8 @@ public:
 
   common::AutoPtr<JSValue>
   constructObject(common::AutoPtr<JSValue> constructor,
-                  const std::vector<common::AutoPtr<JSValue>> &args,
-                  const JSLocation &loc, const std::wstring &name = L"");
+                  const std::vector<common::AutoPtr<JSValue>> &args = {},
+                  const JSLocation &loc = {}, const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createError(common::AutoPtr<JSValue> exception,
                                        const std::wstring &name = L"");

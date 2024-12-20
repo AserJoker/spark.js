@@ -222,13 +222,19 @@ bool JSContext::nextTick() {
   while (!_microTasks.empty()) {
     auto task = *_microTasks.begin();
     _microTasks.erase(_microTasks.begin());
-    task.exec->apply(this, undefined());
+    auto err = task.exec->apply(this, undefined());
+    if (err->isException()) {
+      fmt::print(L"Uncaught {}\n", err->toString(this)->getString().value());
+    }
   }
   if (!_macroTasks.empty()) {
     auto task = *_macroTasks.begin();
     _macroTasks.erase(_macroTasks.begin());
     if (std::chrono::system_clock::now() - task.start > task.timeout * 1ms) {
-      task.exec->apply(this, undefined());
+      auto err = task.exec->apply(this, undefined());
+      if (err->isException()) {
+        fmt::print(L"Uncaught {}\n", err->toString(this)->getString().value());
+      }
     } else {
       _macroTasks.push_back(task);
       std::this_thread::sleep_for(10ms);
@@ -253,7 +259,7 @@ JSContext::applyGenerator(common::AutoPtr<JSValue> func,
                           common::AutoPtr<JSValue> self) {
   auto entity = func->getEntity<JSFunctionEntity>();
   auto closure = entity->getClosure();
-  auto result = constructObject(Generator(), {}, {});
+  auto result = constructObject(Generator());
   common::AutoPtr scope = new engine::JSScope(getRoot());
   for (auto &[name, value] : closure) {
     scope->createValue(value, name);
@@ -312,8 +318,24 @@ JSContext::applyAsync(common::AutoPtr<JSValue> func,
         if (promiseValue->isException()) {
           return promiseValue;
         }
-        promiseValue = promiseValue->getProperty(ctx, L"then")
-                           ->apply(ctx, promiseValue, {next});
+        auto onerror = [](common::AutoPtr<JSContext> ctx,
+                          common::AutoPtr<JSValue> self,
+                          std::vector<common::AutoPtr<JSValue>> args)
+            -> common::AutoPtr<JSValue> {
+          auto generator = ctx->load(L"#generator");
+          auto err = generator->getProperty(ctx, L"throw")
+                         ->apply(ctx, generator, {args[0]});
+          if (err->isException()) {
+            return err;
+          }
+          return ctx->undefined();
+        };
+        common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
+        closure[L"#generator"] = generator;
+        promiseValue =
+            promiseValue->getProperty(ctx, L"catch")
+                ->apply(ctx, promiseValue,
+                        {ctx->createNativeFunction(onerror, closure)});
         if (promiseValue->isException()) {
           return promiseValue;
         }
@@ -322,12 +344,17 @@ JSContext::applyAsync(common::AutoPtr<JSValue> func,
         if (promiseValue->isException()) {
           return promiseValue;
         }
+        promiseValue = promiseValue->getProperty(ctx, L"then")
+                           ->apply(ctx, promiseValue, {next});
+        if (promiseValue->isException()) {
+          return promiseValue;
+        }
       }
       return ctx->undefined();
     };
     common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
     closure[L"#resolve"] = resolve;
-    closure[L"#reject"] = resolve;
+    closure[L"#reject"] = reject;
     closure[L"#generator"] = ctx->load(L"#generator");
     auto nextFunc = ctx->createNativeFunction(next, closure);
     nextFunc->getEntity<JSNativeFunctionEntity>()->getClosure()[L"#next"] =
@@ -339,7 +366,7 @@ JSContext::applyAsync(common::AutoPtr<JSValue> func,
     return ctx->undefined();
   };
   auto callbackFunc = createNativeFunction(callback, closure);
-  return constructObject(_Promise, {callbackFunc}, {});
+  return constructObject(_Promise, {callbackFunc});
 }
 
 common::AutoPtr<JSValue> JSContext::createValue(JSStore *store,
@@ -414,7 +441,7 @@ common::AutoPtr<JSValue> JSContext::createObject(const std::wstring &name) {
 }
 
 common::AutoPtr<JSValue> JSContext::createArray(const std::wstring &name) {
-  return constructObject(_Array, {}, {});
+  return constructObject(_Array);
 }
 
 common::AutoPtr<JSValue>
@@ -475,7 +502,7 @@ JSContext::createError(common::AutoPtr<JSValue> exception,
   } else {
     error = _Error;
   }
-  auto result = constructObject(error, {createString(e->getMessage())}, {});
+  auto result = constructObject(error, {createString(e->getMessage())});
   auto stack = e->getStack();
   std::wstring st;
   for (auto &[fnindex, line, column, funcname] : e->getStack()) {

@@ -155,7 +155,7 @@ static JS_FUNC(onNextResolve) {
 }
 
 static JS_FUNC(onNextReject) {
-  auto value = ctx->constructObject(ctx->Error(), {}, {});
+  auto value = ctx->constructObject(ctx->Error());
   if (!args.empty()) {
     value = args[0];
   }
@@ -236,11 +236,11 @@ JS_FUNC(JSPromiseConstructor::resolve) {
   closure[L"#value"] = value;
   auto onCreateFulfilledFunc =
       ctx->createNativeFunction(onCreateFulfilled, closure);
-  return ctx->constructObject(ctx->Promise(), {onCreateFulfilledFunc}, {});
+  return ctx->constructObject(ctx->Promise(), {onCreateFulfilledFunc});
 }
 
 JS_FUNC(JSPromiseConstructor::reject) {
-  auto value = ctx->constructObject(ctx->Error(), {}, {});
+  auto value = ctx->constructObject(ctx->Error());
   if (!args.empty()) {
     value = args[0];
   }
@@ -248,7 +248,7 @@ JS_FUNC(JSPromiseConstructor::reject) {
   closure[L"#value"] = value;
   auto onCreateRejectedFunc =
       ctx->createNativeFunction(onCreateRejected, closure);
-  return ctx->constructObject(ctx->Promise(), {onCreateRejectedFunc}, {});
+  return ctx->constructObject(ctx->Promise(), {onCreateRejectedFunc});
 }
 
 JS_FUNC(JSPromiseConstructor::constructor) {
@@ -301,7 +301,7 @@ JS_FUNC(JSPromiseConstructor::then) {
       closure[L"#callback"] = callback;
       closure[L"#value"] = value;
       auto nextCallbackFunc = ctx->createNativeFunction(nextCallback, closure);
-      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc}, {});
+      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc});
     } else {
       return ctx->Promise()
           ->getProperty(ctx, L"resolve")
@@ -314,7 +314,7 @@ JS_FUNC(JSPromiseConstructor::then) {
       closure[L"#callback"] = onError;
       closure[L"#value"] = value;
       auto nextCallbackFunc = ctx->createNativeFunction(nextCallback, closure);
-      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc}, {});
+      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc});
     } else {
       return ctx->Promise()
           ->getProperty(ctx, L"reject")
@@ -326,7 +326,7 @@ JS_FUNC(JSPromiseConstructor::then) {
     closure[L"#onError"] = onError;
     auto nextPenddingFunc = ctx->createNativeFunction(nextPendding, closure);
     nextPenddingFunc->setBind(ctx, self);
-    return ctx->constructObject(ctx->Promise(), {nextPenddingFunc}, {});
+    return ctx->constructObject(ctx->Promise(), {nextPenddingFunc});
   }
 }
 JS_FUNC(JSPromiseConstructor::catch_) {
@@ -342,7 +342,7 @@ JS_FUNC(JSPromiseConstructor::catch_) {
       closure[L"#callback"] = callback;
       closure[L"#value"] = value;
       auto nextCallbackFunc = ctx->createNativeFunction(nextCallback, closure);
-      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc}, {});
+      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc});
     } else {
       return ctx->Promise()
           ->getProperty(ctx, L"reject")
@@ -354,7 +354,7 @@ JS_FUNC(JSPromiseConstructor::catch_) {
     closure[L"#callback"] = ctx->undefined();
     auto nextPenddingFunc = ctx->createNativeFunction(nextPendding, closure);
     nextPenddingFunc->setBind(ctx, self);
-    return ctx->constructObject(ctx->Promise(), {nextPenddingFunc}, {});
+    return ctx->constructObject(ctx->Promise(), {nextPenddingFunc});
   } else {
     auto value = ctx->createValue(entity->getValue());
     return ctx->Promise()
@@ -374,14 +374,14 @@ JS_FUNC(JSPromiseConstructor::finally) {
     closure[L"#callback"] = callback;
     auto nextFinallyFunc = ctx->createNativeFunction(nextFinally, closure);
     nextFinallyFunc->setBind(ctx, self);
-    return ctx->constructObject(ctx->Promise(), {nextFinallyFunc}, {});
+    return ctx->constructObject(ctx->Promise(), {nextFinallyFunc});
   } else {
     if (callback->isFunction()) {
       common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
       closure[L"#callback"] = callback;
       closure[L"#value"] = ctx->undefined();
       auto nextCallbackFunc = ctx->createNativeFunction(nextCallback, closure);
-      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc}, {});
+      return ctx->constructObject(ctx->Promise(), {nextCallbackFunc});
     } else {
       if (entity->getStatus() == JSPromiseEntity::Status::REJECTED) {
         return ctx->Promise()
