@@ -963,6 +963,16 @@ JS_OPT(JSVirtualMachine::jnull) {
     _pc = offset;
   }
 }
+JS_OPT(JSVirtualMachine::import) {
+  auto identifier = args(module);
+  _ctx->stack.push_back(ctx->undefined());
+}
+JS_OPT(JSVirtualMachine::importModule) {
+  auto source = args(module);
+  _ctx->stack.push_back(ctx->undefined());
+}
+JS_OPT(JSVirtualMachine::importAll) { _ctx->stack.push_back(ctx->undefined()); }
+JS_OPT(JSVirtualMachine::export_) {}
 
 void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
                            const common::AutoPtr<compiler::JSModule> &module,
@@ -1280,6 +1290,18 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::NEW:
         new_(ctx, module);
+        break;
+      case vm::JSAsmOperator::IMPORT:
+        import(ctx, module);
+        break;
+      case vm::JSAsmOperator::IMPORT_MODULE:
+        importModule(ctx, module);
+        break;
+      case vm::JSAsmOperator::IMPORT_ALL:
+        importAll(ctx, module);
+        break;
+      case vm::JSAsmOperator::EXPORT:
+        export_(ctx, module);
         break;
       }
     } catch (error::JSError &e) {

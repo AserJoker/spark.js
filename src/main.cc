@@ -410,6 +410,22 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"rest_object " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
+    case vm::JSAsmOperator::IMPORT:
+      out << L"import " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::IMPORT_MODULE:
+      out << L"import_module " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::IMPORT_ALL:
+      out << L"import_all " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::EXPORT:
+      out << L"export " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
     }
     out << std::endl;
   }

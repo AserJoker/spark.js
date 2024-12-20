@@ -51,12 +51,8 @@ private:
                                        common::AutoPtr<JSModule> &module,
                                        common::AutoPtr<JSNode> node);
 
-  uint32_t resolveConstant(JSGeneratorContext &ctx,
-                           common::AutoPtr<JSModule> &module,
+  uint32_t resolveConstant(common::AutoPtr<JSModule> &module,
                            const std::wstring &source);
-
-  void reset(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
-             common::AutoPtr<JSNode> node);
 
   void pushLexScope(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
                     const common::AutoPtr<JSSourceScope> &scope);
@@ -441,6 +437,11 @@ private:
     auto buffer = module->codes.data() + size;
     uint16_t code = (uint16_t)opt;
     *(uint16_t *)buffer = code;
+  }
+
+  void generate(common::AutoPtr<JSModule> &module, const vm::JSAsmOperator &opt,
+                const std::wstring &source) {
+    generate(module, opt, resolveConstant(module, source));
   }
 
 public:

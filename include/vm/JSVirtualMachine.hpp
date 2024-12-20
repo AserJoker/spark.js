@@ -121,6 +121,10 @@ private:
   JS_OPT(and_);
   JS_OPT(or_);
   JS_OPT(xor_);
+  JS_OPT(import);
+  JS_OPT(importModule);
+  JS_OPT(importAll);
+  JS_OPT(export_);
 
 public:
   JSVirtualMachine();
