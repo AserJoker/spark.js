@@ -351,13 +351,11 @@ void JSGenerator::resolveLiteralTemplate(JSGeneratorContext &ctx,
   } else {
     generate(module, vm::JSAsmOperator::LOAD_CONST,
              resolveConstant(ctx, module, n->quasis[0]));
-    if (n->quasis.size() > 1) {
-      for (size_t i = 0; i < n->expressions.size(); i++) {
-        resolveNode(ctx, module, n->expressions[i]);
-        generate(module, vm::JSAsmOperator::ADD);
-        generate(module, vm::JSAsmOperator::LOAD_CONST,
-                 resolveConstant(ctx, module, n->quasis[i + 1]));
-      }
+    for (size_t i = 0; i < n->expressions.size(); i++) {
+      resolveNode(ctx, module, n->expressions[i]);
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               resolveConstant(ctx, module, n->quasis[i + 1]));
+      generate(module, vm::JSAsmOperator::ADD);
       generate(module, vm::JSAsmOperator::ADD);
     }
   }
