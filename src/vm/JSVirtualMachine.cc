@@ -22,6 +22,7 @@
 #include "vm/JSEvalContext.hpp"
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -963,16 +964,56 @@ JS_OPT(JSVirtualMachine::jnull) {
     _pc = offset;
   }
 }
+
 JS_OPT(JSVirtualMachine::import) {
   auto identifier = args(module);
-  _ctx->stack.push_back(ctx->undefined());
+  auto mod = *_ctx->stack.rbegin();
+  auto source = mod->getOpaque<std::wstring>();
+  if (mod->getOwnPropertyDescriptor(ctx, identifier) == nullptr) {
+    throw error::JSSyntaxError(fmt::format(
+        L"The requested module '{}' does not provide an export named '{}'",
+        source, identifier));
+  }
+  _ctx->stack.push_back(mod->getProperty(ctx, identifier));
 }
+
 JS_OPT(JSVirtualMachine::importModule) {
+  using namespace std::filesystem;
   auto source = args(module);
-  _ctx->stack.push_back(ctx->undefined());
+  auto mod = ctx->getModule(source);
+  if (mod != nullptr) {
+    _ctx->stack.push_back(mod);
+  }
+  auto [path, _] = ctx->getCurrentModule();
+  auto next = ctx->getRuntime()->getPathResolver()(path, source);
+  if (exists(next) && !is_directory(next)) {
+    mod = ctx->eval(next, engine::JSContext::EvalType::MODULE);
+  } else if (exists(next + L".js") && !is_directory(next + L".js")) {
+    mod = ctx->eval(next + L".js", engine::JSContext::EvalType::MODULE);
+  } else if (exists(next + L"/index.js") &&
+             !is_directory(next + L"/index.js")) {
+    mod =
+        ctx->eval(next + L"/index.module", engine::JSContext::EvalType::MODULE);
+  } else if (exists(next + L"/index.module") &&
+             !is_directory(next + L"/index.module")) {
+    mod =
+        ctx->eval(next + L"/index.module", engine::JSContext::EvalType::BINARY);
+  } else if (exists(next + L".module") && !is_directory(next + L".module")) {
+    mod = ctx->eval(next + L".module", engine::JSContext::EvalType::BINARY);
+  } else {
+    throw error::JSError(fmt::format(L"Cannot find module '{}'", source));
+  }
+  mod->setOpaque(source);
+  _ctx->stack.push_back(mod);
 }
-JS_OPT(JSVirtualMachine::importAll) { _ctx->stack.push_back(ctx->undefined()); }
-JS_OPT(JSVirtualMachine::export_) {}
+
+JS_OPT(JSVirtualMachine::export_) {
+  auto name = args(module);
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto &[_, mod] = ctx->getCurrentModule();
+  mod->setProperty(ctx, name, value);
+}
 
 void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
                            const common::AutoPtr<compiler::JSModule> &module,
@@ -1296,9 +1337,6 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::IMPORT_MODULE:
         importModule(ctx, module);
-        break;
-      case vm::JSAsmOperator::IMPORT_ALL:
-        importAll(ctx, module);
         break;
       case vm::JSAsmOperator::EXPORT:
         export_(ctx, module);

@@ -38,10 +38,14 @@
 #include "engine/runtime/JSScope.hpp"
 #include "engine/runtime/JSStore.hpp"
 #include "engine/runtime/JSValue.hpp"
+#include "error/JSInternalError.hpp"
 #include "error/JSSyntaxError.hpp"
 #include "error/JSTypeError.hpp"
 #include "vm/JSCoroutineContext.hpp"
 #include <chrono>
+#include <codecvt>
+#include <fstream>
+#include <locale>
 #include <string>
 #include <thread>
 #include <vector>
@@ -51,9 +55,10 @@ using namespace spark::engine;
 
 JSContext::JSContext(const common::AutoPtr<JSRuntime> &runtime)
     : _runtime(runtime) {
-  _scope = new JSScope(_runtime->getRoot());
+  _scope = new JSScope();
   _root = _scope;
   _callStack = new JSCallFrame();
+  _currentModule = {_runtime->getCurrentPath().append(L"/spark.js"), nullptr};
   initialize();
 }
 
@@ -121,10 +126,55 @@ void JSContext::initialize() {
 
 common::AutoPtr<JSRuntime> &JSContext::getRuntime() { return _runtime; }
 
+const std::pair<std::wstring, common::AutoPtr<JSValue>> &
+JSContext::getCurrentModule() const {
+  return _currentModule;
+}
+
+std::pair<std::wstring, common::AutoPtr<JSValue>> &
+JSContext::getCurrentModule() {
+  return _currentModule;
+}
+common::AutoPtr<JSValue> JSContext::eval(const std::wstring &filename,
+                                         const EvalType &type) {
+  std::string fn;
+  std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+  fn = converter.to_bytes(filename);
+  std::wifstream in(fn, std::ios::binary);
+  if (in.is_open()) {
+    in.seekg(0, std::ios::end);
+    size_t len = in.tellg();
+    in.seekg(0, std::ios::beg);
+    wchar_t *buf = new wchar_t[len + 1];
+    buf[len] = 0;
+    in.read(buf, len);
+    in.close();
+    std::wstring source = buf;
+    delete[] buf;
+    return eval(source, filename, type);
+  } else {
+    throw error::JSError(
+        fmt::format(L"Cannot find source file '{}'", filename));
+  }
+}
+
 common::AutoPtr<JSValue> JSContext::eval(const std::wstring &source,
-                                         const std::wstring &filename) {
-  auto module = compile(source, filename);
-  return _runtime->getVirtualMachine()->eval(this, module);
+                                         const std::wstring &filename,
+                                         const EvalType &type) {
+  if (type == EvalType::EXPRESSION) {
+    auto module = compile(source, filename);
+    return _runtime->getVirtualMachine()->eval(this, module);
+  } else if (type == EvalType::MODULE) {
+    auto old = _currentModule;
+    _currentModule = {filename, createObject()};
+    auto module = compile(source, filename);
+    _runtime->getVirtualMachine()->eval(this, module);
+    auto res = _currentModule.second;
+    _currentModule = old;
+    return res;
+  } else {
+    throw error::JSInternalError(L"not implement");
+  }
 }
 
 common::AutoPtr<compiler::JSModule>
@@ -369,6 +419,18 @@ JSContext::applyAsync(common::AutoPtr<JSValue> func,
   };
   auto callbackFunc = createNativeFunction(callback, closure);
   return constructObject(_Promise, {callbackFunc});
+}
+
+void JSContext::setModule(const std::wstring &name,
+                          common::AutoPtr<JSValue> module) {
+  _modules[name] = module;
+}
+
+common::AutoPtr<JSValue> JSContext::getModule(const std::wstring &name) {
+  if (_modules.contains(name)) {
+    return _modules.at(name);
+  }
+  return nullptr;
 }
 
 common::AutoPtr<JSValue> JSContext::createValue(JSStore *store,

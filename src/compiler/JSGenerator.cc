@@ -23,6 +23,51 @@ uint32_t JSGenerator::resolveConstant(common::AutoPtr<JSModule> &module,
     return module->constants.size() - 1;
   }
 }
+
+void JSGenerator::resolveExport(JSGeneratorContext &ctx,
+                                common::AutoPtr<JSModule> &module,
+                                common::AutoPtr<JSNode> node) {
+  if (node->type == JSNodeType::DECLARATION_FUNCTION) {
+    auto n = node.cast<JSFunctionDeclaration>();
+    resolveExport(ctx, module, n->identifier);
+  } else if (node->type == JSNodeType::DECLARATION_CLASS) {
+    auto n = node.cast<JSClassDeclaration>();
+    resolveExport(ctx, module, n->identifier);
+  } else if (node->type == JSNodeType::VARIABLE_DECLARATION) {
+    auto n = node.cast<JSVariableDeclaration>();
+    for (auto &declaration : n->declarations) {
+      resolveExport(ctx, module, declaration);
+    }
+  } else if (node->type == JSNodeType::VARIABLE_DECLARATOR) {
+    auto n = node.cast<JSVariableDeclarator>();
+    resolveExport(ctx, module, n->identifier);
+  } else if (node->type == JSNodeType::PATTERN_ARRAY) {
+    auto n = node.cast<JSArrayPattern>();
+    for (auto &item : n->items) {
+      resolveExport(ctx, module, item);
+    }
+  } else if (node->type == JSNodeType::PATTERN_OBJECT) {
+    auto n = node.cast<JSObjectPattern>();
+    for (auto &item : n->items) {
+      resolveExport(ctx, module, item);
+    }
+  } else if (node->type == JSNodeType::PATTERN_REST_ITEM) {
+    auto n = node.cast<JSRestPatternItem>();
+    resolveExport(ctx, module, n->identifier);
+  } else if (node->type == JSNodeType::PATTERN_ARRAY_ITEM) {
+    auto n = node.cast<JSArrayPatternItem>();
+    resolveExport(ctx, module, n->identifier);
+  } else if (node->type == JSNodeType::PATTERN_OBJECT_ITEM) {
+    auto n = node.cast<JSObjectPatternItem>();
+    resolveExport(ctx, module, n->match);
+  } else if (node->type == JSNodeType::LITERAL_IDENTITY) {
+    generate(module, vm::JSAsmOperator::LOAD,
+             node.cast<JSIdentifierLiteral>()->value);
+    generate(module, vm::JSAsmOperator::EXPORT,
+             node.cast<JSIdentifierLiteral>()->value);
+  }
+}
+
 void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
                                      const JSSourceDeclaration &declaration) {
@@ -1603,7 +1648,7 @@ void JSGenerator::resolveImportNamespace(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
                                          const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSImportNamespaceSpecifier>();
-  generate(module, vm::JSAsmOperator::IMPORT_ALL);
+  generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
   std::wstring name;
   if (n->alias->type == JSNodeType::LITERAL_IDENTITY) {
     name = n->alias.cast<JSIdentifierLiteral>()->value;
@@ -1622,25 +1667,96 @@ void JSGenerator::resolveImportAttartube(JSGeneratorContext &ctx,
 void JSGenerator::resolveExportDeclaration(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSExportDeclaration>();
+  if (n->source != nullptr) {
+    generate(module, vm::JSAsmOperator::IMPORT_MODULE,
+             n->source.cast<JSStringLiteral>()->value);
+    for (auto &item : n->items) {
+      if (item->type == JSNodeType::EXPORT_SPECIFIER) {
+        auto n = item.cast<JSExportSpecifier>();
+        if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+          generate(module, vm::JSAsmOperator::IMPORT,
+                   n->identifier.cast<JSIdentifierLiteral>()->value);
+        } else {
+          generate(module, vm::JSAsmOperator::IMPORT,
+                   n->identifier.cast<JSStringLiteral>()->value);
+        }
+        if (n->alias != nullptr) {
+          if (n->alias->type == JSNodeType::LITERAL_IDENTITY) {
+            generate(module, vm::JSAsmOperator::EXPORT,
+                     n->alias.cast<JSIdentifierLiteral>()->value);
+          } else {
+            generate(module, vm::JSAsmOperator::EXPORT,
+                     n->alias.cast<JSStringLiteral>()->value);
+          }
+        } else {
+          if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+            generate(module, vm::JSAsmOperator::EXPORT,
+                     n->identifier.cast<JSIdentifierLiteral>()->value);
+          } else {
+            generate(module, vm::JSAsmOperator::EXPORT,
+                     n->identifier.cast<JSStringLiteral>()->value);
+          }
+        }
+      } else if (item->type == JSNodeType::EXPORT_ALL) {
+        auto n = item.cast<JSExportAllSpecifier>();
+        generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
+        if (n->alias->type == JSNodeType::LITERAL_IDENTITY) {
+          generate(module, vm::JSAsmOperator::EXPORT,
+                   n->alias.cast<JSIdentifierLiteral>()->value);
+        } else {
+          generate(module, vm::JSAsmOperator::EXPORT,
+                   n->alias.cast<JSStringLiteral>()->value);
+        }
+      } else if (item->type == JSNodeType::EXPORT_DEFAULT) {
+        generate(module, vm::JSAsmOperator::IMPORT, L"default");
+        generate(module, vm::JSAsmOperator::EXPORT, L"default");
+      }
+    }
+    generate(module, vm::JSAsmOperator::POP, 1U);
+  } else {
+    for (auto &item : n->items) {
+      resolveNode(ctx, module, item);
+      resolveExport(ctx, module, item);
+    }
+  }
 }
 
 void JSGenerator::resolveExportDefault(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
                                        const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSExportDefaultSpecifier>();
+  resolveNode(ctx, module, n->value);
+  if (n->value->type == JSNodeType::DECLARATION_FUNCTION) {
+    auto func = n->value.cast<JSFunctionDeclaration>();
+    generate(module, vm::JSAsmOperator::LOAD,
+             func->identifier.cast<JSIdentifierLiteral>()->value);
+  } else if (n->value->type == JSNodeType::DECLARATION_CLASS) {
+    auto clazz = n->value.cast<JSClassDeclaration>();
+    generate(module, vm::JSAsmOperator::LOAD,
+             clazz->identifier.cast<JSIdentifierLiteral>()->value);
+  }
+  generate(module, vm::JSAsmOperator::EXPORT, L"default");
 }
 
 void JSGenerator::resolveExportSpecifier(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
                                          const common::AutoPtr<JSNode> &node) {
-  // TODO:
-}
-
-void JSGenerator::resolveExportAll(JSGeneratorContext &ctx,
-                                   common::AutoPtr<JSModule> &module,
-                                   const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSExportSpecifier>();
+  generate(module, vm::JSAsmOperator::LOAD,
+           n->identifier.cast<JSIdentifierLiteral>()->value);
+  if (n->alias != nullptr) {
+    if (n->alias->type == JSNodeType::LITERAL_IDENTITY) {
+      generate(module, vm::JSAsmOperator::EXPORT,
+               n->alias.cast<JSIdentifierLiteral>()->value);
+    } else {
+      generate(module, vm::JSAsmOperator::EXPORT,
+               n->alias.cast<JSStringLiteral>()->value);
+    }
+  } else {
+    generate(module, vm::JSAsmOperator::EXPORT,
+             n->identifier.cast<JSIdentifierLiteral>()->value);
+  }
 }
 
 void JSGenerator::resolveDeclarationArrowFunction(
@@ -2031,9 +2147,6 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
     break;
   case JSNodeType::EXPORT_SPECIFIER:
     resolveExportSpecifier(ctx, module, node);
-    break;
-  case JSNodeType::EXPORT_ALL:
-    resolveExportAll(ctx, module, node);
     break;
   case JSNodeType::DECLARATION_ARROW_FUNCTION:
     resolveDeclarationArrowFunction(ctx, module, node);

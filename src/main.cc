@@ -418,10 +418,6 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"import_module " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case vm::JSAsmOperator::IMPORT_ALL:
-      out << L"import_all " << *(uint32_t *)(buffer + offset);
-      offset += sizeof(uint32_t);
-      break;
     case vm::JSAsmOperator::EXPORT:
       out << L"export " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
@@ -438,7 +434,8 @@ void write(common::AutoPtr<compiler::JSModule> module) {
 }
 
 int main(int argc, char *argv[]) {
-  common::AutoPtr runtime = new engine::JSRuntime();
+  common::AutoPtr runtime = new engine::JSRuntime(argc, argv);
+  fmt::print(L"{}\n", runtime->getCurrentPath());
   try {
     common::AutoPtr ctx = new engine::JSContext(runtime);
     ctx->createNativeFunction(print, L"print", L"print");
@@ -449,7 +446,7 @@ int main(int argc, char *argv[]) {
     auto module = ctx->compile(source, L"index.js");
     write(module);
     fmt::print(L"{}:end compile\n", std::chrono::system_clock::now());
-    auto res = ctx->getRuntime()->getVirtualMachine()->eval(ctx, module);
+    auto res = ctx->eval(L"index.js", JSContext::EvalType::MODULE);
     if (!res->isException()) {
       while (!ctx->isTaskComplete()) {
         auto err = ctx->nextTick();
@@ -461,8 +458,6 @@ int main(int argc, char *argv[]) {
     }
     if (res->getType() == spark::engine::JSValueType::JS_EXCEPTION) {
       fmt::print(L"Uncaught {}\n", res->toString(ctx)->getString().value());
-    } else {
-      fmt::print(L"{}\n", res->toString(ctx)->getString().value());
     }
     fmt::print(L"{}:finish\n", std::chrono::system_clock::now());
   } catch (error::JSError &e) {
