@@ -54,6 +54,9 @@ private:
   uint32_t resolveConstant(common::AutoPtr<JSModule> &module,
                            const std::wstring &source);
 
+  void resolveExport(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
+                     common::AutoPtr<JSNode> node);
+
   void pushLexScope(JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
                     const common::AutoPtr<JSSourceScope> &scope);
 
@@ -352,10 +355,6 @@ private:
   void resolveExportSpecifier(JSGeneratorContext &ctx,
                               common::AutoPtr<JSModule> &module,
                               const common::AutoPtr<JSNode> &node);
-
-  void resolveExportAll(JSGeneratorContext &ctx,
-                        common::AutoPtr<JSModule> &module,
-                        const common::AutoPtr<JSNode> &node);
 
   void resolveDeclarationArrowFunction(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,

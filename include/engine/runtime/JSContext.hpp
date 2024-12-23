@@ -40,6 +40,8 @@ public:
     std::chrono::system_clock::time_point start;
   };
 
+  enum class EvalType { MODULE, BINARY, FUNCTION, EXPRESSION };
+
 private:
   common::AutoPtr<JSValue> _Object;
   common::AutoPtr<JSValue> _Function;
@@ -78,6 +80,10 @@ private:
   std::vector<Task> _microTasks;
   std::vector<Task> _macroTasks;
 
+  std::unordered_map<std::wstring, common::AutoPtr<JSValue>> _modules;
+
+  std::pair<std::wstring, common::AutoPtr<JSValue>> _currentModule;
+
   JSCallFrame *_callStack;
 
 private:
@@ -90,8 +96,18 @@ public:
 
   common::AutoPtr<JSRuntime> &getRuntime();
 
-  common::AutoPtr<JSValue> eval(const std::wstring &source,
-                                const std::wstring &filename);
+  const std::pair<std::wstring, common::AutoPtr<JSValue>> &
+  getCurrentModule() const;
+
+  std::pair<std::wstring, common::AutoPtr<JSValue>> &getCurrentModule();
+
+  common::AutoPtr<JSValue>
+  eval(const std::wstring &source, const std::wstring &filename,
+       const EvalType &type = JSContext::EvalType::EXPRESSION);
+
+  common::AutoPtr<JSValue>
+  eval(const std::wstring &filename,
+       const EvalType &type = JSContext::EvalType::EXPRESSION);
 
   common::AutoPtr<compiler::JSModule> compile(const std::wstring &source,
                                               const std::wstring &filename);
@@ -131,6 +147,10 @@ public:
   common::AutoPtr<JSValue> applyAsync(common::AutoPtr<JSValue> func,
                                       common::AutoPtr<JSValue> arguments,
                                       common::AutoPtr<JSValue> self);
+
+  void setModule(const std::wstring &name, common::AutoPtr<JSValue> module);
+
+  common::AutoPtr<JSValue> getModule(const std::wstring &name);
 
   common::AutoPtr<JSValue> createValue(JSStore *entity,
                                        const std::wstring &name = L"");

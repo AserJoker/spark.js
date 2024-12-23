@@ -95,7 +95,6 @@ enum class JSAsmOperator {
   XOR,
   IMPORT,
   IMPORT_MODULE,
-  IMPORT_ALL,
   EXPORT,
 };
 }

@@ -23,7 +23,7 @@ private:
   bool isEntityAlived(JSStore *store, common::Map<JSStore *, bool> &cache);
 
 public:
-  JSScope(const common::AutoPtr<JSScope> &parent);
+  JSScope(const common::AutoPtr<JSScope> &parent = nullptr);
 
   virtual ~JSScope();
 
