@@ -8,10 +8,12 @@
 #include <string>
 
 namespace spark::engine {
+class JSContext;
 class JSScope : public common::Object {
 private:
   JSStore *_root;
   JSScope *_parent;
+  JSStore *_gcRoot;
 
   std::vector<common::AutoPtr<JSScope>> _children;
 
@@ -23,7 +25,7 @@ private:
   bool isEntityAlived(JSStore *store, common::Map<JSStore *, bool> &cache);
 
 public:
-  JSScope(const common::AutoPtr<JSScope> &parent = nullptr);
+  JSScope(JSStore *gcRoot, const common::AutoPtr<JSScope> &parent = nullptr);
 
   virtual ~JSScope();
 

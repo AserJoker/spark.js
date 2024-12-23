@@ -8,7 +8,8 @@
 
 using namespace spark;
 using namespace spark::engine;
-JSScope::JSScope(const common::AutoPtr<JSScope> &parent) {
+JSScope::JSScope(JSStore *gcRoot, const common::AutoPtr<JSScope> &parent)
+    : _gcRoot(gcRoot) {
   _parent = (JSScope *)parent.getRawPointer();
   _root = new JSStore(new JSEntity(JSValueType::JS_INTERNAL));
   if (_parent) {
@@ -61,7 +62,7 @@ JSScope::~JSScope() {
     }
   }
   while (!destroyed.empty()) {
-    delete *destroyed.rbegin();
+    _gcRoot->appendChild(*destroyed.rbegin());
     destroyed.pop_back();
   }
   delete _root;
@@ -77,7 +78,8 @@ bool JSScope::isEntityAlived(JSStore *store,
     if (cache.contains(store) && cache.at(store)) {
       return true;
     }
-    if (store->getEntity()->getType() == JSValueType::JS_INTERNAL) {
+    if (store != _gcRoot &&
+        store->getEntity()->getType() == JSValueType::JS_INTERNAL) {
       return true;
     }
     alivedCache.push_back(store);

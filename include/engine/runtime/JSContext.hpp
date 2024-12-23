@@ -77,6 +77,7 @@ private:
   common::AutoPtr<JSScope> _root;
   common::AutoPtr<JSScope> _scope;
   common::AutoPtr<JSRuntime> _runtime;
+  JSStore *_gcRoot;
 
   std::vector<Task> _microTasks;
   std::vector<Task> _macroTasks;
@@ -113,6 +114,8 @@ public:
   common::AutoPtr<compiler::JSModule>
   compile(const std::wstring &source, const std::wstring &filename,
           const JSEvalType &type = JSEvalType::MODULE);
+
+  void gc();
 
   void pushScope();
 

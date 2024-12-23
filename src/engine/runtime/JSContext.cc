@@ -46,8 +46,10 @@
 #include "vm/JSCoroutineContext.hpp"
 #include <chrono>
 #include <codecvt>
+#include <cstdint>
 #include <fstream>
 #include <locale>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -57,7 +59,8 @@ using namespace spark::engine;
 
 JSContext::JSContext(const common::AutoPtr<JSRuntime> &runtime)
     : _runtime(runtime) {
-  _scope = new JSScope();
+  _gcRoot = new JSStore();
+  _scope = new JSScope(_gcRoot);
   _root = _scope;
   _callStack = new JSCallFrame();
   _currentModule = {_runtime->getCurrentPath().append(L"/spark.js"), nullptr};
@@ -68,6 +71,11 @@ JSContext::~JSContext() {
   while (_callStack) {
     popCallStack();
   }
+  _scope = nullptr;
+  _root = nullptr;
+  gc();
+  delete _gcRoot;
+  _gcRoot = nullptr;
 }
 
 void JSContext::initialize() {
@@ -192,12 +200,27 @@ JSContext::compile(const std::wstring &source, const std::wstring &filename,
   return generator->resolve(filename, source, ast, type);
 }
 
-void JSContext::pushScope() { _scope = new JSScope(_scope); }
+void JSContext::gc() {
+  auto &children = _gcRoot->getChildren();
+  std::set<uintptr_t> cache;
+  while (!children.empty()) {
+    auto item = *children.rbegin();
+    children.pop_back();
+    if (!cache.contains((uintptr_t)item)) {
+      delete item;
+    } else {
+      cache.insert((uintptr_t)item);
+    }
+  }
+}
+
+void JSContext::pushScope() { _scope = new JSScope(_gcRoot, _scope); }
 
 void JSContext::popScope() {
   auto parent = _scope->getParent();
   parent->removeChild(_scope);
   _scope = parent;
+  gc();
 }
 
 common::AutoPtr<JSScope> JSContext::setScope(common::AutoPtr<JSScope> scope) {
@@ -317,7 +340,7 @@ JSContext::applyGenerator(common::AutoPtr<JSValue> func,
   auto entity = func->getEntity<JSFunctionEntity>();
   auto closure = entity->getClosure();
   auto result = constructObject(Generator());
-  common::AutoPtr scope = new engine::JSScope(getRoot());
+  common::AutoPtr scope = new engine::JSScope(_gcRoot, getRoot());
   for (auto &[name, value] : closure) {
     scope->createValue(value, name);
   }

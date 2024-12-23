@@ -439,7 +439,7 @@ void write(common::AutoPtr<compiler::JSModule> module) {
   out.close();
 }
 
-int main(int argc, char *argv[]) {
+int spark_main(int argc, char *argv[]) {
   common::AutoPtr runtime = new engine::JSRuntime(argc, argv);
   fmt::print(L"{}\n", runtime->getCurrentPath());
   try {
@@ -475,4 +475,9 @@ int main(int argc, char *argv[]) {
     std::cout << e.what() << std::endl;
   }
   return 0;
+}
+
+int main(int argc, char *argv[]) {
+  auto res = spark_main(argc, argv);
+  return res;
 }
