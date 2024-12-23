@@ -5,6 +5,7 @@
 #include "common/Map.hpp"
 #include "common/Object.hpp"
 #include "compiler/base/JSModule.hpp"
+#include "engine/base/JSEvalType.hpp"
 #include "engine/base/JSLocation.hpp"
 #include "engine/base/JSValueType.hpp"
 #include "engine/entity/JSEntity.hpp"
@@ -40,12 +41,12 @@ public:
     std::chrono::system_clock::time_point start;
   };
 
-  enum class EvalType { MODULE, BINARY, FUNCTION, EXPRESSION };
-
 private:
   common::AutoPtr<JSValue> _Object;
   common::AutoPtr<JSValue> _Function;
   common::AutoPtr<JSValue> _GeneratorFunction;
+  common::AutoPtr<JSValue> _AsyncFunction;
+  common::AutoPtr<JSValue> _AsyncGeneratorFunction;
   common::AutoPtr<JSValue> _Generator;
   common::AutoPtr<JSValue> _Iterator;
   common::AutoPtr<JSValue> _ArrayIterator;
@@ -103,14 +104,15 @@ public:
 
   common::AutoPtr<JSValue>
   eval(const std::wstring &source, const std::wstring &filename,
-       const EvalType &type = JSContext::EvalType::EXPRESSION);
+       const JSEvalType &type = JSEvalType::EXPRESSION);
 
   common::AutoPtr<JSValue>
   eval(const std::wstring &filename,
-       const EvalType &type = JSContext::EvalType::EXPRESSION);
+       const JSEvalType &type = JSEvalType::EXPRESSION);
 
-  common::AutoPtr<compiler::JSModule> compile(const std::wstring &source,
-                                              const std::wstring &filename);
+  common::AutoPtr<compiler::JSModule>
+  compile(const std::wstring &source, const std::wstring &filename,
+          const JSEvalType &type = JSEvalType::MODULE);
 
   void pushScope();
 
@@ -219,6 +221,18 @@ public:
   createArrow(const common::AutoPtr<compiler::JSModule> &module,
               const std::wstring &name = L"");
 
+  common::AutoPtr<JSValue>
+  createAsyncFunction(const common::AutoPtr<compiler::JSModule> &module,
+                      const std::wstring &name = L"");
+
+  common::AutoPtr<JSValue>
+  createAsyncGenerator(const common::AutoPtr<compiler::JSModule> &module,
+                       const std::wstring &name = L"");
+
+  common::AutoPtr<JSValue>
+  createAsyncArrow(const common::AutoPtr<compiler::JSModule> &module,
+                   const std::wstring &name = L"");
+
   common::AutoPtr<JSValue> createException(const std::wstring &type,
                                            const std::wstring &message,
                                            const JSLocation &location = {});
@@ -238,6 +252,10 @@ public:
   common::AutoPtr<JSValue> Symbol();
 
   common::AutoPtr<JSValue> Function();
+
+  common::AutoPtr<JSValue> AsyncFunction();
+
+  common::AutoPtr<JSValue> AsyncGeneratorFunction();
 
   common::AutoPtr<JSValue> Object();
 

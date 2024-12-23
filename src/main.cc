@@ -138,6 +138,15 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::PUSH_ARROW:
       out << L"push_arrow";
       break;
+    case vm::JSAsmOperator::PUSH_ASYNC:
+      out << L"push_async";
+      break;
+    case vm::JSAsmOperator::PUSH_ASYNC_ARROW:
+      out << L"push_async_arrow";
+      break;
+    case vm::JSAsmOperator::PUSH_ASYNC_GENERATOR:
+      out << L"push_async_generator";
+      break;
     case vm::JSAsmOperator::PUSH_THIS:
       out << L"push_this";
       break;
@@ -159,9 +168,6 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::SET_FUNC_ADDRESS:
       out << L"set_address " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
-      break;
-    case vm::JSAsmOperator::SET_FUNC_ASYNC:
-      out << L"set_async";
       break;
     case vm::JSAsmOperator::SET_FUNC_NAME:
       out << L"set_func_name " << *(uint32_t *)(buffer + offset);
@@ -446,7 +452,7 @@ int main(int argc, char *argv[]) {
     auto module = ctx->compile(source, L"index.js");
     write(module);
     fmt::print(L"{}:end compile\n", std::chrono::system_clock::now());
-    auto res = ctx->eval(L"index.js", JSContext::EvalType::MODULE);
+    auto res = ctx->eval(L"index.js", JSEvalType::MODULE);
     if (!res->isException()) {
       while (!ctx->isTaskComplete()) {
         auto err = ctx->nextTick();

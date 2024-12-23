@@ -3,6 +3,7 @@
 #include "base/JSNode.hpp"
 #include "common/AutoPtr.hpp"
 #include "common/Object.hpp"
+#include "engine/base/JSEvalType.hpp"
 #include "vm/JSAsmOperator.hpp"
 #include <string>
 #include <unordered_map>
@@ -18,9 +19,13 @@ private:
     JSLexScope(JSLexScope *parent = nullptr) : parent(parent) {}
   };
 
+  enum class JSLexContextType { MODULE, EXPRESSION, FUNCTION };
+
   struct JSGeneratorContext {
     JSLexScope *currentScope;
     size_t scopeChain;
+    engine::JSEvalType evalType;
+    JSLexContextType lexContextType;
     JSGeneratorContext() {
       currentScope = nullptr;
       scopeChain = 0;
@@ -446,6 +451,7 @@ private:
 public:
   common::AutoPtr<JSModule> resolve(const std::wstring &filename,
                                     const std::wstring &source,
-                                    const common::AutoPtr<JSNode> &root);
+                                    const common::AutoPtr<JSNode> &root,
+                                    const engine::JSEvalType &type);
 };
 } // namespace spark::compiler

@@ -20,6 +20,8 @@
 #include "engine/entity/JSUndefinedEntity.hpp"
 #include "engine/lib/JSAggregateErrorConstructor.hpp"
 #include "engine/lib/JSArrayConstructor.hpp"
+#include "engine/lib/JSAsyncFunctionConstructor.hpp"
+#include "engine/lib/JSAsyncGeneratorFunctionConstructor.hpp"
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/lib/JSFunctionConstructor.hpp"
 #include "engine/lib/JSGeneratorConstructor.hpp"
@@ -108,8 +110,11 @@ void JSContext::initialize() {
   JSSymbolConstructor::initialize(this, _Symbol, symbolPrototype);
   JSObjectConstructor::initialize(this, _Object, objectPrototype);
   JSFunctionConstructor::initialize(this, _Function, functionPrototype);
+  _AsyncFunction = JSAsyncFunctionConstructor::initialize(this);
   _Array = JSArrayConstructor::initialize(this);
   _GeneratorFunction = JSGeneratorFunctionConstructor::initialize(this);
+  _AsyncGeneratorFunction =
+      JSAsyncGeneratorFunctionConstructor::initialize(this);
   _Iterator = JSIteratorConstructor::initialize(this);
   _Generator = JSGeneratorConstructor::initialize(this);
   _Promise = JSPromiseConstructor::initialize(this);
@@ -136,7 +141,7 @@ JSContext::getCurrentModule() {
   return _currentModule;
 }
 common::AutoPtr<JSValue> JSContext::eval(const std::wstring &filename,
-                                         const EvalType &type) {
+                                         const JSEvalType &type) {
   std::string fn;
   std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
   fn = converter.to_bytes(filename);
@@ -160,14 +165,14 @@ common::AutoPtr<JSValue> JSContext::eval(const std::wstring &filename,
 
 common::AutoPtr<JSValue> JSContext::eval(const std::wstring &source,
                                          const std::wstring &filename,
-                                         const EvalType &type) {
-  if (type == EvalType::EXPRESSION) {
-    auto module = compile(source, filename);
+                                         const JSEvalType &type) {
+  if (type == JSEvalType::EXPRESSION || type == JSEvalType::FUNCTION) {
+    auto module = compile(source, filename, type);
     return _runtime->getVirtualMachine()->eval(this, module);
-  } else if (type == EvalType::MODULE) {
+  } else if (type == JSEvalType::MODULE) {
     auto old = _currentModule;
     _currentModule = {filename, createObject()};
-    auto module = compile(source, filename);
+    auto module = compile(source, filename, type);
     _runtime->getVirtualMachine()->eval(this, module);
     auto res = _currentModule.second;
     _currentModule = old;
@@ -178,12 +183,13 @@ common::AutoPtr<JSValue> JSContext::eval(const std::wstring &source,
 }
 
 common::AutoPtr<compiler::JSModule>
-JSContext::compile(const std::wstring &source, const std::wstring &filename) {
+JSContext::compile(const std::wstring &source, const std::wstring &filename,
+                   const JSEvalType &type) {
   auto parser = _runtime->getParser();
   auto generator = _runtime->getGenerator();
   auto index = _runtime->setSourceFilename(filename);
   auto ast = parser->parse(index, source);
-  return generator->resolve(filename, source, ast);
+  return generator->resolve(filename, source, ast, type);
 }
 
 void JSContext::pushScope() { _scope = new JSScope(_scope); }
@@ -525,6 +531,19 @@ JSContext::constructObject(common::AutoPtr<JSValue> constructor,
   } else if (constructor->getStore() == _Function->getStore()) {
     result = createValue(
         new JSStore(new JSFunctionEntity(prototype->getStore(), nullptr)));
+  } else if (constructor->getStore() == _AsyncFunction->getStore()) {
+    auto entity = new JSFunctionEntity(prototype->getStore(), nullptr);
+    entity->setAsync(true);
+    result = createValue(new JSStore(entity));
+  } else if (constructor->getStore() == _GeneratorFunction->getStore()) {
+    auto entity = new JSFunctionEntity(prototype->getStore(), nullptr);
+    entity->setGenerator(true);
+    result = createValue(new JSStore(entity));
+  } else if (constructor->getStore() == _AsyncGeneratorFunction->getStore()) {
+    auto entity = new JSFunctionEntity(prototype->getStore(), nullptr);
+    entity->setGenerator(true);
+    entity->setAsync(true);
+    result = createValue(new JSStore(entity));
   } else if (constructor->getStore() == _Promise->getStore()) {
     auto entity = new JSPromiseEntity(prototype->getStore());
     auto store = new JSStore(entity);
@@ -654,7 +673,7 @@ JSContext::createGenerator(const common::AutoPtr<compiler::JSModule> &module,
 common::AutoPtr<JSValue>
 JSContext::createArrow(const common::AutoPtr<compiler::JSModule> &module,
                        const std::wstring &name) {
-  auto prop = _GeneratorFunction->getProperty(this, L"prototype")->getStore();
+  auto prop = _Function->getProperty(this, L"prototype")->getStore();
   auto store = new JSStore(new JSFunctionEntity(prop, module));
   auto res = _scope->createValue(store, name);
   auto self = getScope()->getValue(L"this");
@@ -663,6 +682,49 @@ JSContext::createArrow(const common::AutoPtr<compiler::JSModule> &module,
   } else {
     res->setBind(this, self);
   }
+  res->getStore()->appendChild(prop);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
+  return res;
+}
+
+common::AutoPtr<JSValue> JSContext::createAsyncFunction(
+    const common::AutoPtr<compiler::JSModule> &module,
+    const std::wstring &name) {
+  auto prop = _Function->getProperty(this, L"prototype")->getStore();
+  auto store = new JSStore(new JSFunctionEntity(prop, module));
+  auto res = _scope->createValue(store, name);
+  res->getEntity<JSFunctionEntity>()->setAsync(true);
+  res->getStore()->appendChild(prop);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
+  return res;
+}
+
+common::AutoPtr<JSValue> JSContext::createAsyncGenerator(
+    const common::AutoPtr<compiler::JSModule> &module,
+    const std::wstring &name) {
+  auto prop = _GeneratorFunction->getProperty(this, L"prototype")->getStore();
+  auto store = new JSStore(new JSFunctionEntity(prop, module));
+  auto res = _scope->createValue(store, name);
+  res->getEntity<JSFunctionEntity>()->setGenerator(true);
+  res->getEntity<JSFunctionEntity>()->setAsync(true);
+  res->getStore()->appendChild(prop);
+  res->setPropertyDescriptor(this, L"prototype", createObject());
+  return res;
+}
+
+common::AutoPtr<JSValue>
+JSContext::createAsyncArrow(const common::AutoPtr<compiler::JSModule> &module,
+                            const std::wstring &name) {
+  auto prop = _AsyncFunction->getProperty(this, L"prototype")->getStore();
+  auto store = new JSStore(new JSFunctionEntity(prop, module));
+  auto res = _scope->createValue(store, name);
+  auto self = getScope()->getValue(L"this");
+  if (self == nullptr) {
+    res->setBind(this, undefined());
+  } else {
+    res->setBind(this, self);
+  }
+  res->getEntity<JSFunctionEntity>()->setAsync(true);
   res->getStore()->appendChild(prop);
   res->setPropertyDescriptor(this, L"prototype", createObject());
   return res;
@@ -702,6 +764,12 @@ common::AutoPtr<JSValue> JSContext::falsely() { return createBoolean(false); }
 common::AutoPtr<JSValue> JSContext::Symbol() { return _Symbol; }
 
 common::AutoPtr<JSValue> JSContext::Function() { return _Function; }
+
+common::AutoPtr<JSValue> JSContext::AsyncFunction() { return _AsyncFunction; }
+
+common::AutoPtr<JSValue> JSContext::AsyncGeneratorFunction() {
+  return _AsyncGeneratorFunction;
+}
 
 common::AutoPtr<JSValue> JSContext::Object() { return _Object; }
 

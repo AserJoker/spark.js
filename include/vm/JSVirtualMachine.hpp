@@ -40,13 +40,15 @@ private:
   JS_OPT(pushFunction);
   JS_OPT(pushGenerator);
   JS_OPT(pushArrow);
+  JS_OPT(pushAsync);
+  JS_OPT(pushAsyncArrow);
+  JS_OPT(pushAsyncGenerator);
   JS_OPT(pushThis);
   JS_OPT(pushSuper);
   JS_OPT(pushBigint);
   JS_OPT(pushRegex);
   JS_OPT(pushValue);
   JS_OPT(setAddress);
-  JS_OPT(setAsync);
   JS_OPT(setFuncName);
   JS_OPT(setFuncLen);
   JS_OPT(setFuncSource);

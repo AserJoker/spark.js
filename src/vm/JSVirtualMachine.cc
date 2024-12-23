@@ -95,6 +95,18 @@ JS_OPT(JSVirtualMachine::pushArrow) {
   _ctx->stack.push_back(ctx->createArrow(module));
 }
 
+JS_OPT(JSVirtualMachine::pushAsync) {
+  _ctx->stack.push_back(ctx->createAsyncFunction(module));
+}
+
+JS_OPT(JSVirtualMachine::pushAsyncArrow) {
+  _ctx->stack.push_back(ctx->createAsyncArrow(module));
+}
+
+JS_OPT(JSVirtualMachine::pushAsyncGenerator) {
+  _ctx->stack.push_back(ctx->createAsyncGenerator(module));
+}
+
 JS_OPT(JSVirtualMachine::pushThis) {
   _ctx->stack.push_back(ctx->load(L"this"));
 }
@@ -122,12 +134,6 @@ JS_OPT(JSVirtualMachine::setAddress) {
   auto addr = argi(module);
   auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
   func->setAddress(addr);
-}
-
-JS_OPT(JSVirtualMachine::setAsync) {
-  auto async = argi(module);
-  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
-  func->setAsync(async);
 }
 
 JS_OPT(JSVirtualMachine::setFuncName) {
@@ -987,19 +993,19 @@ JS_OPT(JSVirtualMachine::importModule) {
   auto [path, _] = ctx->getCurrentModule();
   auto next = ctx->getRuntime()->getPathResolver()(path, source);
   if (exists(next) && !is_directory(next)) {
-    mod = ctx->eval(next, engine::JSContext::EvalType::MODULE);
+    mod = ctx->eval(next, engine::JSEvalType::MODULE);
   } else if (exists(next + L".js") && !is_directory(next + L".js")) {
-    mod = ctx->eval(next + L".js", engine::JSContext::EvalType::MODULE);
+    mod = ctx->eval(next + L".js", engine::JSEvalType::MODULE);
   } else if (exists(next + L"/index.js") &&
              !is_directory(next + L"/index.js")) {
     mod =
-        ctx->eval(next + L"/index.module", engine::JSContext::EvalType::MODULE);
+        ctx->eval(next + L"/index.module", engine::JSEvalType::MODULE);
   } else if (exists(next + L"/index.module") &&
              !is_directory(next + L"/index.module")) {
     mod =
-        ctx->eval(next + L"/index.module", engine::JSContext::EvalType::BINARY);
+        ctx->eval(next + L"/index.module", engine::JSEvalType::BINARY);
   } else if (exists(next + L".module") && !is_directory(next + L".module")) {
-    mod = ctx->eval(next + L".module", engine::JSContext::EvalType::BINARY);
+    mod = ctx->eval(next + L".module", engine::JSEvalType::BINARY);
   } else {
     throw error::JSError(fmt::format(L"Cannot find module '{}'", source));
   }
@@ -1089,6 +1095,15 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case vm::JSAsmOperator::PUSH_ARROW:
         pushArrow(ctx, module);
         break;
+      case vm::JSAsmOperator::PUSH_ASYNC:
+        pushAsync(ctx, module);
+        break;
+      case vm::JSAsmOperator::PUSH_ASYNC_ARROW:
+        pushAsyncArrow(ctx, module);
+        break;
+      case vm::JSAsmOperator::PUSH_ASYNC_GENERATOR:
+        pushAsyncGenerator(ctx, module);
+        break;
       case vm::JSAsmOperator::PUSH_THIS:
         pushThis(ctx, module);
         break;
@@ -1106,9 +1121,6 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::SET_FUNC_ADDRESS:
         setAddress(ctx, module);
-        break;
-      case vm::JSAsmOperator::SET_FUNC_ASYNC:
-        setAsync(ctx, module);
         break;
       case vm::JSAsmOperator::SET_FUNC_NAME:
         setFuncName(ctx, module);
@@ -1424,7 +1436,11 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
     auto entity = func->getEntity<engine::JSFunctionEntity>();
     auto closure = entity->getClosure();
     if (entity->isGenerator()) {
-      result = ctx->applyGenerator(func, arguments, bind);
+      if (entity->isAsync()) {
+        // TODO:
+      } else {
+        result = ctx->applyGenerator(func, arguments, bind);
+      }
     } else {
       if (entity->isAsync()) {
         result = ctx->applyAsync(func, arguments, bind);

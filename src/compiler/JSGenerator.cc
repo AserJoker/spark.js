@@ -2,6 +2,7 @@
 #include "common/AutoPtr.hpp"
 #include "compiler/base/JSNode.hpp"
 #include "compiler/base/JSNodeType.hpp"
+#include "engine/base/JSEvalType.hpp"
 #include "error/JSSyntaxError.hpp"
 #include "vm/JSAsmOperator.hpp"
 #include <cstdint>
@@ -84,9 +85,17 @@ void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
   case JSSourceDeclaration::TYPE::FUNCTION: {
     auto n = (JSFunctionDeclaration *)declaration.node;
     if (n->generator) {
-      generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
+      if (n->async) {
+        generate(module, vm::JSAsmOperator::PUSH_ASYNC_GENERATOR);
+      } else {
+        generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
+      }
     } else {
-      generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+      if (n->async) {
+        generate(module, vm::JSAsmOperator::PUSH_ASYNC);
+      } else {
+        generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+      }
     }
 
     ctx.currentScope->functionAddr[declaration.node->id] =
@@ -94,9 +103,6 @@ void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
 
     generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
     generate(module, vm::JSAsmOperator::SET_FUNC_NAME, name);
-    if (n->async) {
-      generate(module, vm::JSAsmOperator::SET_FUNC_ASYNC, 1U);
-    }
     generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
              n->location.getSource(module->source));
     break;
@@ -450,7 +456,12 @@ void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
     }
   }
   resolveStatements(ctx, module, body);
-  generate(module, vm::JSAsmOperator::HLT);
+  if (ctx.evalType == engine::JSEvalType::FUNCTION) {
+    generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+    generate(module, vm::JSAsmOperator::RET);
+  } else {
+    generate(module, vm::JSAsmOperator::HLT);
+  }
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
   }
@@ -1082,12 +1093,17 @@ void JSGenerator::resolveObjectMethod(JSGeneratorContext &ctx,
   ctx.currentScope->functionDeclarations.push_back(
       (JSNode *)node.getRawPointer());
   if (n->generator) {
-    generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
+    if (n->async) {
+      generate(module, vm::JSAsmOperator::PUSH_ASYNC_GENERATOR);
+    } else {
+      generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
+    }
   } else {
-    generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
-  }
-  if (n->async) {
-    generate(module, vm::JSAsmOperator::SET_FUNC_ASYNC);
+    if (n->async) {
+      generate(module, vm::JSAsmOperator::PUSH_ASYNC);
+    } else {
+      generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+    }
   }
   ctx.currentScope->functionAddr[node->id] =
       module->codes.size() + sizeof(uint16_t);
@@ -1765,13 +1781,14 @@ void JSGenerator::resolveDeclarationArrowFunction(
   auto n = node.cast<JSArrowFunctionDeclaration>();
   ctx.currentScope->functionDeclarations.push_back(
       (JSNode *)node.getRawPointer());
-  generate(module, vm::JSAsmOperator::PUSH_ARROW);
+  if (n->async) {
+    generate(module, vm::JSAsmOperator::PUSH_ASYNC_ARROW);
+  } else {
+    generate(module, vm::JSAsmOperator::PUSH_ARROW);
+  }
   ctx.currentScope->functionAddr[node->id] =
       module->codes.size() + sizeof(uint16_t);
   generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
-  if (n->async) {
-    generate(module, vm::JSAsmOperator::SET_FUNC_ASYNC, 1U);
-  }
   generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
            resolveConstant(module, node->location.getSource(module->source)));
   auto closures = resolveClosure(ctx, module, node);
@@ -1852,16 +1869,21 @@ void JSGenerator::resolveFunction(JSGeneratorContext &ctx,
       (JSNode *)node.getRawPointer());
   if (n->identifier == nullptr) {
     if (n->generator) {
-      generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
+      if (n->async) {
+        generate(module, vm::JSAsmOperator::PUSH_ASYNC_GENERATOR);
+      } else {
+        generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
+      }
     } else {
-      generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+      if (n->async) {
+        generate(module, vm::JSAsmOperator::PUSH_ASYNC);
+      } else {
+        generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+      }
     }
     ctx.currentScope->functionAddr[node->id] =
         module->codes.size() + sizeof(uint16_t);
     generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
-    if (n->async) {
-      generate(module, vm::JSAsmOperator::SET_FUNC_ASYNC, 1U);
-    }
     generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
              node->location.getSource(module->source));
     auto closures = resolveClosure(ctx, module, node);
@@ -1874,6 +1896,8 @@ void JSGenerator::resolveFunction(JSGeneratorContext &ctx,
 void JSGenerator::resolveDeclarationFunctionBody(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
+  auto old = ctx.lexContextType;
+  ctx.lexContextType = JSLexContextType::FUNCTION;
   auto n = node.cast<JSFunctionBodyDeclaration>();
   resolveStatements(ctx, module, n->statements);
   generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
@@ -1881,6 +1905,7 @@ void JSGenerator::resolveDeclarationFunctionBody(
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
   }
+  ctx.lexContextType = old;
 }
 
 void JSGenerator::resolveDeclarationParameter(
@@ -2176,8 +2201,17 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
 
 common::AutoPtr<JSModule>
 JSGenerator::resolve(const std::wstring &filename, const std::wstring &source,
-                     const common::AutoPtr<JSNode> &node) {
+                     const common::AutoPtr<JSNode> &node,
+                     const engine::JSEvalType &type) {
   JSGeneratorContext ctx;
+  ctx.evalType = type;
+  if (type == engine::JSEvalType::FUNCTION) {
+    ctx.lexContextType = JSLexContextType::FUNCTION;
+  } else if (type == engine::JSEvalType::MODULE) {
+    ctx.lexContextType = JSLexContextType::MODULE;
+  } else {
+    ctx.lexContextType = JSLexContextType::EXPRESSION;
+  }
   common::AutoPtr<JSModule> module = new JSModule;
   module->filename = filename;
   module->source = source;
