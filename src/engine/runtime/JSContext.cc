@@ -21,6 +21,7 @@
 #include "engine/lib/JSAggregateErrorConstructor.hpp"
 #include "engine/lib/JSArrayConstructor.hpp"
 #include "engine/lib/JSAsyncFunctionConstructor.hpp"
+#include "engine/lib/JSAsyncGeneratorConstructor.hpp"
 #include "engine/lib/JSAsyncGeneratorFunctionConstructor.hpp"
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/lib/JSFunctionConstructor.hpp"
@@ -125,6 +126,7 @@ void JSContext::initialize() {
       JSAsyncGeneratorFunctionConstructor::initialize(this);
   _Iterator = JSIteratorConstructor::initialize(this);
   _Generator = JSGeneratorConstructor::initialize(this);
+  _AsyncGenerator = JSAsyncGeneratorConstructor::initialize(this);
   _Promise = JSPromiseConstructor::initialize(this);
   _Error = JSErrorConstructor::initialize(this);
   _AggregateError = JSAggregateErrorConstructor::initialize(this);
@@ -181,7 +183,10 @@ common::AutoPtr<JSValue> JSContext::eval(const std::wstring &source,
     auto old = _currentModule;
     _currentModule = {filename, createObject()};
     auto module = compile(source, filename, type);
-    _runtime->getVirtualMachine()->eval(this, module);
+    auto err = _runtime->getVirtualMachine()->eval(this, module);
+    if (err->isException()) {
+      return err;
+    }
     auto res = _currentModule.second;
     _currentModule = old;
     return res;
@@ -340,6 +345,29 @@ JSContext::applyGenerator(common::AutoPtr<JSValue> func,
   auto entity = func->getEntity<JSFunctionEntity>();
   auto closure = entity->getClosure();
   auto result = constructObject(Generator());
+  common::AutoPtr scope = new engine::JSScope(_gcRoot, getRoot());
+  for (auto &[name, value] : closure) {
+    scope->createValue(value, name);
+  }
+  scope->createValue(self->getStore(), L"this");
+  scope->createValue(arguments->getStore(), L"arguments");
+  result->setOpaque(vm::JSCoroutineContext{
+      .eval = new vm::JSEvalContext,
+      .scope = scope,
+      .module = entity->getModule(),
+      .funcname = func->getName(),
+      .pc = entity->getAddress(),
+  });
+  result->getStore()->appendChild(func->getStore());
+  return result;
+}
+common::AutoPtr<JSValue>
+JSContext::applyAsyncGenerator(common::AutoPtr<JSValue> func,
+                               common::AutoPtr<JSValue> arguments,
+                               common::AutoPtr<JSValue> self) {
+  auto entity = func->getEntity<JSFunctionEntity>();
+  auto closure = entity->getClosure();
+  auto result = constructObject(AsyncGenerator());
   common::AutoPtr scope = new engine::JSScope(_gcRoot, getRoot());
   for (auto &[name, value] : closure) {
     scope->createValue(value, name);
@@ -823,6 +851,8 @@ common::AutoPtr<JSValue> JSContext::GeneratorFunction() {
 }
 
 common::AutoPtr<JSValue> JSContext::Generator() { return _Generator; }
+
+common::AutoPtr<JSValue> JSContext::AsyncGenerator() { return _AsyncGenerator; }
 
 common::AutoPtr<JSValue> JSContext::Promise() { return _Promise; }
 

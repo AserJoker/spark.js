@@ -19,13 +19,11 @@ private:
     JSLexScope(JSLexScope *parent = nullptr) : parent(parent) {}
   };
 
-  enum class JSLexContextType { MODULE, EXPRESSION, FUNCTION };
-
   struct JSGeneratorContext {
     JSLexScope *currentScope;
     size_t scopeChain;
     engine::JSEvalType evalType;
-    JSLexContextType lexContextType;
+    engine::JSEvalType lexContextType;
     JSGeneratorContext() {
       currentScope = nullptr;
       scopeChain = 0;

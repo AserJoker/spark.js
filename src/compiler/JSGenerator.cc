@@ -933,7 +933,10 @@ void JSGenerator::resolveStatementExpression(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSExpressionStatement>();
+  auto old = ctx.lexContextType;
+  ctx.lexContextType = engine::JSEvalType::EXPRESSION;
   resolveNode(ctx, module, n->expression);
+  ctx.lexContextType = old;
 }
 
 void JSGenerator::resolveVariableDeclaration(
@@ -1824,7 +1827,14 @@ void JSGenerator::resolveDeclarationFunction(
       generate(module, vm::JSAsmOperator::POP, 1U);
       generate(module, vm::JSAsmOperator::POP, 1U);
     }
+    auto old = ctx.lexContextType;
+    if (n->async) {
+      ctx.lexContextType = engine::JSEvalType::ASYNC_FUNCTION;
+    } else {
+      ctx.lexContextType = engine::JSEvalType::FUNCTION;
+    }
     resolveNode(ctx, module, n->body);
+    ctx.lexContextType = old;
     if (n->body->type != JSNodeType::DECLARATION_FUNCTION_BODY) {
       generate(module, vm::JSAsmOperator::RET);
       for (auto &item : ctx.currentScope->functionDeclarations) {
@@ -1856,7 +1866,22 @@ void JSGenerator::resolveDeclarationFunction(
       generate(module, vm::JSAsmOperator::POP, 1U);
       generate(module, vm::JSAsmOperator::POP, 1U);
     }
+    auto old = ctx.lexContextType;
+    if (n->generator) {
+      if (n->async) {
+        ctx.lexContextType = engine::JSEvalType::ASYNC_GENERATOR;
+      } else {
+        ctx.lexContextType = engine::JSEvalType::GENERATOR;
+      }
+    } else {
+      if (n->async) {
+        ctx.lexContextType = engine::JSEvalType::ASYNC_FUNCTION;
+      } else {
+        ctx.lexContextType = engine::JSEvalType::FUNCTION;
+      }
+    }
     resolveNode(ctx, module, n->body);
+    ctx.lexContextType = old;
     popLexScope(ctx, module);
   }
 }
@@ -1896,8 +1921,6 @@ void JSGenerator::resolveFunction(JSGeneratorContext &ctx,
 void JSGenerator::resolveDeclarationFunctionBody(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
-  auto old = ctx.lexContextType;
-  ctx.lexContextType = JSLexContextType::FUNCTION;
   auto n = node.cast<JSFunctionBodyDeclaration>();
   resolveStatements(ctx, module, n->statements);
   generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
@@ -1905,7 +1928,6 @@ void JSGenerator::resolveDeclarationFunctionBody(
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
   }
-  ctx.lexContextType = old;
 }
 
 void JSGenerator::resolveDeclarationParameter(
@@ -2205,13 +2227,7 @@ JSGenerator::resolve(const std::wstring &filename, const std::wstring &source,
                      const engine::JSEvalType &type) {
   JSGeneratorContext ctx;
   ctx.evalType = type;
-  if (type == engine::JSEvalType::FUNCTION) {
-    ctx.lexContextType = JSLexContextType::FUNCTION;
-  } else if (type == engine::JSEvalType::MODULE) {
-    ctx.lexContextType = JSLexContextType::MODULE;
-  } else {
-    ctx.lexContextType = JSLexContextType::EXPRESSION;
-  }
+  ctx.lexContextType = type;
   common::AutoPtr<JSModule> module = new JSModule;
   module->filename = filename;
   module->source = source;

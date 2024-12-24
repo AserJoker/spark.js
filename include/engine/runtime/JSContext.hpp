@@ -48,6 +48,7 @@ private:
   common::AutoPtr<JSValue> _AsyncFunction;
   common::AutoPtr<JSValue> _AsyncGeneratorFunction;
   common::AutoPtr<JSValue> _Generator;
+  common::AutoPtr<JSValue> _AsyncGenerator;
   common::AutoPtr<JSValue> _Iterator;
   common::AutoPtr<JSValue> _ArrayIterator;
   common::AutoPtr<JSValue> _Array;
@@ -148,6 +149,10 @@ public:
   common::AutoPtr<JSValue> applyGenerator(common::AutoPtr<JSValue> func,
                                           common::AutoPtr<JSValue> arguments,
                                           common::AutoPtr<JSValue> self);
+  common::AutoPtr<JSValue>
+  applyAsyncGenerator(common::AutoPtr<JSValue> func,
+                      common::AutoPtr<JSValue> arguments,
+                      common::AutoPtr<JSValue> self);
 
   common::AutoPtr<JSValue> applyAsync(common::AutoPtr<JSValue> func,
                                       common::AutoPtr<JSValue> arguments,
@@ -157,7 +162,7 @@ public:
 
   common::AutoPtr<JSValue> getModule(const std::wstring &name);
 
-  common::AutoPtr<JSValue> createValue(JSStore *entity,
+  common::AutoPtr<JSValue> createValue(JSStore *store,
                                        const std::wstring &name = L"");
 
   common::AutoPtr<JSValue> createValue(common::AutoPtr<JSValue> value,
@@ -271,6 +276,8 @@ public:
   common::AutoPtr<JSValue> GeneratorFunction();
 
   common::AutoPtr<JSValue> Generator();
+
+  common::AutoPtr<JSValue> AsyncGenerator();
 
   common::AutoPtr<JSValue> Promise();
 

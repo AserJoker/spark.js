@@ -998,12 +998,10 @@ JS_OPT(JSVirtualMachine::importModule) {
     mod = ctx->eval(next + L".js", engine::JSEvalType::MODULE);
   } else if (exists(next + L"/index.js") &&
              !is_directory(next + L"/index.js")) {
-    mod =
-        ctx->eval(next + L"/index.module", engine::JSEvalType::MODULE);
+    mod = ctx->eval(next + L"/index.module", engine::JSEvalType::MODULE);
   } else if (exists(next + L"/index.module") &&
              !is_directory(next + L"/index.module")) {
-    mod =
-        ctx->eval(next + L"/index.module", engine::JSEvalType::BINARY);
+    mod = ctx->eval(next + L"/index.module", engine::JSEvalType::BINARY);
   } else if (exists(next + L".module") && !is_directory(next + L".module")) {
     mod = ctx->eval(next + L".module", engine::JSEvalType::BINARY);
   } else {
@@ -1374,10 +1372,10 @@ JSVirtualMachine::eval(common::AutoPtr<engine::JSContext> ctx,
   auto value = ctx->undefined();
   if (!_ctx->stack.empty()) {
     value = *_ctx->stack.rbegin();
-    if (ctx->getScope() != scope) {
-      auto entity = value->getStore();
-      value = scope->createValue(entity);
-    }
+  }
+  if (ctx->getScope() != scope) {
+    auto entity = value->getStore();
+    value = scope->createValue(entity);
   }
   while (ctx->getScope() != scope) {
     popScope(ctx, module);
@@ -1437,7 +1435,7 @@ JSVirtualMachine::apply(common::AutoPtr<engine::JSContext> ctx,
     auto closure = entity->getClosure();
     if (entity->isGenerator()) {
       if (entity->isAsync()) {
-        // TODO:
+        result = ctx->applyAsyncGenerator(func, arguments, bind);
       } else {
         result = ctx->applyGenerator(func, arguments, bind);
       }
