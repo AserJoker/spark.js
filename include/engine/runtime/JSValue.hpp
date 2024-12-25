@@ -251,6 +251,10 @@ public:
   common::AutoPtr<JSValue> xor_(common::AutoPtr<JSContext> ctx,
                                 common::AutoPtr<JSValue> another); // a^b
 
+  common::AutoPtr<JSValue> instanceof
+      (common::AutoPtr<JSContext> ctx,
+       common::AutoPtr<JSValue> another); // a instanceof b
+
   common::AutoPtr<JSValue> equal(common::AutoPtr<JSContext> ctx,
                                  common::AutoPtr<JSValue> another); // a==b
 

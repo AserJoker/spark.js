@@ -469,7 +469,12 @@ JS_OPT(JSVirtualMachine::awaitNext) {
     auto iterator = value->getProperty(
         ctx, ctx->Symbol()->getProperty(ctx, L"asyncIterator"));
     if (!iterator->isFunction()) {
-      throw error::JSTypeError(L"for await require async iterator");
+      iterator =
+          value->getProperty(ctx, ctx->Symbol()->getProperty(ctx, L"iterator"));
+
+      if (!iterator->isFunction()) {
+        throw error::JSTypeError(L"for await require iterator");
+      }
     }
     gen = iterator->apply(ctx, value);
     if (gen->getType() != engine::JSValueType::JS_OBJECT) {
@@ -488,9 +493,15 @@ JS_OPT(JSVirtualMachine::awaitNext) {
         fmt::format(L"Iterator result '{}' is not an object",
                     res->toString(ctx)->getString().value()));
   }
-  _ctx->stack.push_back(ctx->createValue(
-      new engine::JSStore(new engine::JSTaskEntity(res->getStore(), _pc))));
-  _pc = module->codes.size();
+  if (res->getProperty(ctx, L"constructor")->getStore() ==
+      ctx->Promise()->getStore()) {
+    _ctx->stack.push_back(ctx->createValue(
+        new engine::JSStore(new engine::JSTaskEntity(res->getStore(), _pc))));
+    _pc = module->codes.size();
+  } else {
+    _ctx->stack.push_back(res);
+    _pc = pc;
+  }
 }
 
 JS_OPT(JSVirtualMachine::restArray) {
@@ -941,6 +952,13 @@ JS_OPT(JSVirtualMachine::xor_) {
   _ctx->stack.pop_back();
   _ctx->stack.push_back(arg1->xor_(ctx, arg2));
 }
+JS_OPT(JSVirtualMachine:: instanceof) {
+  auto arg2 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto arg1 = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(arg1->instanceof (ctx, arg2));
+}
 
 JS_OPT(JSVirtualMachine::tryStart) {
   auto handle = argi(module);
@@ -1347,6 +1365,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::XOR:
         xor_(ctx, module);
+        break;
+      case vm::JSAsmOperator::INSTANCE_OF:
+        instanceof (ctx, module);
         break;
       case vm::JSAsmOperator::JMP:
         jmp(ctx, module);

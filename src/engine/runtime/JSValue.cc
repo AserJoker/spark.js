@@ -1965,6 +1965,23 @@ common::AutoPtr<JSValue> JSValue::xor_(common::AutoPtr<JSContext> ctx,
   return ctx->createNumber();
 } // a^b
 
+common::AutoPtr<JSValue> JSValue:: instanceof
+    (common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> another) {
+  if (another->getType() < JSValueType::JS_OBJECT) {
+    throw error::JSTypeError(
+        L"Right-hand side of 'instanceof' is not an object");
+  }
+  auto prototype = another->getProperty(ctx, L"prototype");
+  auto current = pack(ctx)->getPrototype(ctx);
+  while (current->getType() >= JSValueType::JS_OBJECT) {
+    if (current->getStore() == prototype->getStore()) {
+      return ctx->truly();
+    }
+    current = current->getPrototype(ctx);
+  }
+  return ctx->falsely();
+}
+
 common::AutoPtr<JSValue> JSValue::equal(common::AutoPtr<JSContext> ctx,
                                         common::AutoPtr<JSValue> another) {
   if (getType() == another->getType()) {

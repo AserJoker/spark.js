@@ -1284,6 +1284,8 @@ void JSGenerator::resolveExpressionBinary(JSGeneratorContext &ctx,
       generate(module, vm::JSAsmOperator::OR);
     } else if (n->opt == L"^") {
       generate(module, vm::JSAsmOperator::XOR);
+    } else if (n->opt == L"instanceof") {
+      generate(module, vm::JSAsmOperator::INSTANCE_OF);
     }
   }
 }

@@ -96,6 +96,7 @@ enum class JSAsmOperator {
   AND,
   OR,
   XOR,
+  INSTANCE_OF,
   IMPORT,
   IMPORT_MODULE,
   EXPORT,

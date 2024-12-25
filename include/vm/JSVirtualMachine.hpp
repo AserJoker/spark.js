@@ -124,6 +124,7 @@ private:
   JS_OPT(and_);
   JS_OPT(or_);
   JS_OPT(xor_);
+  JS_OPT(instanceof);
   JS_OPT(import);
   JS_OPT(importModule);
   JS_OPT(export_);

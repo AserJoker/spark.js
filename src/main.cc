@@ -406,6 +406,9 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::XOR:
       out << L"xor";
       break;
+    case vm::JSAsmOperator::INSTANCE_OF:
+      out << L"instance_of";
+      break;
     case vm::JSAsmOperator::NEXT:
       out << L"next";
       break;
