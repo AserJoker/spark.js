@@ -44,6 +44,7 @@ enum class JSAsmOperator {
   RET,
   HLT,
   NEXT,
+  AWAIT_NEXT,
   REST_ARRAY,
   REST_OBJECT,
   THROW,

@@ -11,6 +11,7 @@ struct JSCoroutineContext {
   common::AutoPtr<engine::JSScope> scope;
   common::AutoPtr<compiler::JSModule> module;
   common::AutoPtr<engine::JSValue> value;
+  bool done;
   std::wstring funcname;
   size_t pc;
   ~JSCoroutineContext() {

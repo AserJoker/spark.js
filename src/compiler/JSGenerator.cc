@@ -926,7 +926,49 @@ void JSGenerator::resolveStatementForOf(JSGeneratorContext &ctx,
 void JSGenerator::resolveStatementForAwaitOf(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node, const std::wstring &label) {
-  // TODO:
+  auto n = node.cast<JSForOfStatement>();
+  _labels.push_back({{label, ctx.scopeChain}, {}});
+  resolveNode(ctx, module, n->expression);
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // gen
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // res
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // value
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // done
+  auto start = (uint32_t)module->codes.size();
+  generate(module, vm::JSAsmOperator::POP, 1U); // remove res
+  generate(module, vm::JSAsmOperator::POP, 1U); // remove done
+  generate(module, vm::JSAsmOperator::POP, 1U); // remove value
+  generate(module, vm::JSAsmOperator::AWAIT_NEXT);
+  generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
+  generate(module, vm::JSAsmOperator::LOAD_CONST, L"value");
+  generate(module, vm::JSAsmOperator::GET_FIELD);
+  generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+  generate(module, vm::JSAsmOperator::LOAD_CONST, L"done");
+  generate(module, vm::JSAsmOperator::GET_FIELD); // gen,res,done,value
+  pushScope(ctx, module, n->scope);
+  auto endOffset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JTRUE, 0U);
+  generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+  resolveVariableIdentifier(ctx, module, n->declaration);
+  resolveNode(ctx, module, n->body);
+  popScope(ctx, module);
+  generate(module, vm::JSAsmOperator::JMP, start);
+  auto end = (uint32_t)module->codes.size();
+  *(uint32_t *)(module->codes.data() + endOffset) = end;
+  popScope(ctx, module);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  end = (uint32_t)module->codes.size();
+  auto &chunk = *_labels.rbegin();
+  for (auto &[node, offset] : chunk.second) {
+    if (node->type == JSNodeType::STATEMENT_BREAK) {
+      *(uint32_t *)(module->codes.data() + offset) = end;
+    } else {
+      *(uint32_t *)(module->codes.data() + offset) = start;
+    }
+  }
+  _labels.pop_back();
 }
 
 void JSGenerator::resolveStatementExpression(

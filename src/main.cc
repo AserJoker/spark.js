@@ -409,6 +409,9 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::NEXT:
       out << L"next";
       break;
+    case vm::JSAsmOperator::AWAIT_NEXT:
+      out << L"await_next";
+      break;
     case vm::JSAsmOperator::REST_ARRAY:
       out << L"rest_array";
       break;

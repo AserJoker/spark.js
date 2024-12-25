@@ -1673,7 +1673,7 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
     common::AutoPtr<JSForOfStatement> node;
     auto backup = current;
     skipInvisible(filename, source, current);
-    token = readKeywordToken(filename, source, current);
+    token = readIdentifierToken(filename, source, current);
     if (token != nullptr && token->location.isEqual(source, L"await")) {
       node = new JSForAwaitOfStatement;
       node->type = JSNodeType::STATEMENT_FOR_AWAIT_OF;

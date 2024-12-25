@@ -11,7 +11,7 @@ using namespace spark::engine;
 JS_FUNC(JSGeneratorConstructor::next) {
   auto result = ctx->createObject();
   auto &co = self->getOpaque<vm::JSCoroutineContext>();
-  if (co.value != nullptr) {
+  if (co.done) {
     result->setProperty(ctx, L"value", co.value);
     result->setProperty(ctx, L"done", ctx->truly());
     return result;
@@ -45,6 +45,7 @@ JS_FUNC(JSGeneratorConstructor::next) {
     result->setProperty(ctx, L"done", ctx->truly());
     result->setProperty(ctx, L"value", task);
     co.value = task;
+    co.done = true;
     co.value->getStore()->appendChild(task->getStore());
     co.pc = co.module->codes.size();
   }

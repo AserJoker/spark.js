@@ -23,6 +23,7 @@
 #include "engine/lib/JSAsyncFunctionConstructor.hpp"
 #include "engine/lib/JSAsyncGeneratorConstructor.hpp"
 #include "engine/lib/JSAsyncGeneratorFunctionConstructor.hpp"
+#include "engine/lib/JSAsyncIteratorConstructor.hpp"
 #include "engine/lib/JSErrorConstructor.hpp"
 #include "engine/lib/JSFunctionConstructor.hpp"
 #include "engine/lib/JSGeneratorConstructor.hpp"
@@ -54,6 +55,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+
 
 using namespace spark;
 using namespace spark::engine;
@@ -125,6 +127,7 @@ void JSContext::initialize() {
   _AsyncGeneratorFunction =
       JSAsyncGeneratorFunctionConstructor::initialize(this);
   _Iterator = JSIteratorConstructor::initialize(this);
+  _AsyncIterator = JSAsyncIteratorConstructor::initialize(this);
   _Generator = JSGeneratorConstructor::initialize(this);
   _AsyncGenerator = JSAsyncGeneratorConstructor::initialize(this);
   _Promise = JSPromiseConstructor::initialize(this);
@@ -355,6 +358,7 @@ JSContext::applyGenerator(common::AutoPtr<JSValue> func,
       .eval = new vm::JSEvalContext,
       .scope = scope,
       .module = entity->getModule(),
+      .done = false,
       .funcname = func->getName(),
       .pc = entity->getAddress(),
   });
@@ -378,6 +382,7 @@ JSContext::applyAsyncGenerator(common::AutoPtr<JSValue> func,
       .eval = new vm::JSEvalContext,
       .scope = scope,
       .module = entity->getModule(),
+      .done = false,
       .funcname = func->getName(),
       .pc = entity->getAddress(),
   });
@@ -432,29 +437,22 @@ JSContext::applyAsync(common::AutoPtr<JSValue> func,
                           std::vector<common::AutoPtr<JSValue>> args)
             -> common::AutoPtr<JSValue> {
           auto generator = ctx->load(L"#generator");
+          auto reject = ctx->load(L"#reject");
           auto err = generator->getProperty(ctx, L"throw")
                          ->apply(ctx, generator, {args[0]});
           if (err->isException()) {
-            return err;
+            return reject->apply(ctx, ctx->undefined(), {err});
           }
+          reject->apply(ctx, ctx->undefined(), {args[0]});
           return ctx->undefined();
         };
         common::Map<std::wstring, common::AutoPtr<JSValue>> closure;
         closure[L"#generator"] = generator;
+        closure[L"#reject"] = reject;
         promiseValue =
-            promiseValue->getProperty(ctx, L"catch")
+            promiseValue->getProperty(ctx, L"then")
                 ->apply(ctx, promiseValue,
-                        {ctx->createNativeFunction(onerror, closure)});
-        if (promiseValue->isException()) {
-          return promiseValue;
-        }
-        promiseValue = promiseValue->getProperty(ctx, L"catch")
-                           ->apply(ctx, promiseValue, {reject});
-        if (promiseValue->isException()) {
-          return promiseValue;
-        }
-        promiseValue = promiseValue->getProperty(ctx, L"then")
-                           ->apply(ctx, promiseValue, {next});
+                        {next, ctx->createNativeFunction(onerror, closure)});
         if (promiseValue->isException()) {
           return promiseValue;
         }
@@ -843,6 +841,8 @@ common::AutoPtr<JSValue> JSContext::URIErrorError() { return _URIError; }
 common::AutoPtr<JSValue> JSContext::Array() { return _Array; }
 
 common::AutoPtr<JSValue> JSContext::Iterator() { return _Iterator; }
+
+common::AutoPtr<JSValue> JSContext::AsyncIterator() { return _AsyncIterator; }
 
 common::AutoPtr<JSValue> JSContext::ArrayIterator() { return _ArrayIterator; }
 

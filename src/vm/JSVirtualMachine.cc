@@ -460,6 +460,39 @@ JS_OPT(JSVirtualMachine::next) {
   _pc = pc;
 }
 
+JS_OPT(JSVirtualMachine::awaitNext) {
+  auto gen = *_ctx->stack.rbegin();
+  auto pc = _pc;
+  if (gen->isUndefined()) {
+    _ctx->stack.pop_back();
+    auto value = *_ctx->stack.rbegin();
+    auto iterator = value->getProperty(
+        ctx, ctx->Symbol()->getProperty(ctx, L"asyncIterator"));
+    if (!iterator->isFunction()) {
+      throw error::JSTypeError(L"for await require async iterator");
+    }
+    gen = iterator->apply(ctx, value);
+    if (gen->getType() != engine::JSValueType::JS_OBJECT) {
+      throw error::JSTypeError(
+          L"Result of the [Symbol.asyncIterator] method is not an object");
+    }
+    _ctx->stack.push_back(gen);
+  }
+  auto next = gen->getProperty(ctx, L"next");
+  if (!next->isFunction()) {
+    throw error::JSTypeError(L"array pattern require iterator");
+  }
+  auto res = next->apply(ctx, gen);
+  if (res->getType() != engine::JSValueType::JS_OBJECT) {
+    throw error::JSTypeError(
+        fmt::format(L"Iterator result '{}' is not an object",
+                    res->toString(ctx)->getString().value()));
+  }
+  _ctx->stack.push_back(ctx->createValue(
+      new engine::JSStore(new engine::JSTaskEntity(res->getStore(), _pc))));
+  _pc = module->codes.size();
+}
+
 JS_OPT(JSVirtualMachine::restArray) {
   auto gen = *_ctx->stack.rbegin();
   auto pc = _pc;
@@ -1197,6 +1230,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::NEXT:
         next(ctx, module);
+        break;
+      case vm::JSAsmOperator::AWAIT_NEXT:
+        awaitNext(ctx, module);
         break;
       case vm::JSAsmOperator::REST_ARRAY:
         restArray(ctx, module);
