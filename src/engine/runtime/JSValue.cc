@@ -1971,6 +1971,9 @@ common::AutoPtr<JSValue> JSValue:: instanceof
     throw error::JSTypeError(
         L"Right-hand side of 'instanceof' is not an object");
   }
+  if (getType() < JSValueType::JS_OBJECT) {
+    return ctx->falsely();
+  }
   auto prototype = another->getProperty(ctx, L"prototype");
   auto current = pack(ctx)->getPrototype(ctx);
   while (current->getType() >= JSValueType::JS_OBJECT) {

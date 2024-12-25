@@ -493,8 +493,7 @@ JS_OPT(JSVirtualMachine::awaitNext) {
         fmt::format(L"Iterator result '{}' is not an object",
                     res->toString(ctx)->getString().value()));
   }
-  if (res->getProperty(ctx, L"constructor")->getStore() ==
-      ctx->Promise()->getStore()) {
+  if (res->instanceof (ctx, ctx->AsyncGenerator())->getBoolean().value()) {
     _ctx->stack.push_back(ctx->createValue(
         new engine::JSStore(new engine::JSTaskEntity(res->getStore(), _pc))));
     _pc = module->codes.size();
