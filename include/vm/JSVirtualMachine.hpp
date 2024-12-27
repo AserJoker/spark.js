@@ -43,7 +43,6 @@ private:
   JS_OPT(pushAsync);
   JS_OPT(pushAsyncArrow);
   JS_OPT(pushAsyncGenerator);
-  JS_OPT(pushSuper);
   JS_OPT(pushThis);
   JS_OPT(pushBigint);
   JS_OPT(pushRegex);
@@ -92,6 +91,7 @@ private:
   JS_OPT(popScope);
   JS_OPT(call);
   JS_OPT(memberCall);
+  JS_OPT(superMemberCall);
   JS_OPT(superCall);
   JS_OPT(optionalCall);
   JS_OPT(memberOptionalCall);

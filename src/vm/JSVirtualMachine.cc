@@ -112,10 +112,6 @@ JS_OPT(JSVirtualMachine::pushThis) {
   _ctx->stack.push_back(ctx->load(L"this"));
 }
 
-JS_OPT(JSVirtualMachine::pushSuper) {
-  _ctx->stack.push_back(ctx->load(L"this")->getPrototype(ctx));
-}
-
 JS_OPT(JSVirtualMachine::pushBigint) {
   auto s = args(module);
   _ctx->stack.push_back(ctx->createBigInt(s));
@@ -136,6 +132,9 @@ JS_OPT(JSVirtualMachine::pushValue) {
 JS_OPT(JSVirtualMachine::pushClass) {
   auto extends = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
+  if (!extends->isFunction()) {
+    extends = ctx->Function();
+  }
   auto store = new engine::JSStore(
       new engine::JSFunctionEntity(extends->getStore(), module));
   store->appendChild(extends->getStore());
@@ -156,8 +155,8 @@ JS_OPT(JSVirtualMachine::setClassInitialize) {}
 
 JS_OPT(JSVirtualMachine::setFuncName) {
   auto name = args(module);
-  auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
-  func->setFuncName(name);
+  auto func = *_ctx->stack.rbegin();
+  func->setPropertyDescriptor(ctx, L"name", ctx->createString(name));
 }
 
 JS_OPT(JSVirtualMachine::setFuncLen) {
@@ -189,8 +188,29 @@ JS_OPT(JSVirtualMachine::setField) {
   _ctx->stack.push_back(obj->setProperty(ctx, name, field));
 }
 
-JS_OPT(JSVirtualMachine::setSuperField) {}
-JS_OPT(JSVirtualMachine::getSuperField) {}
+JS_OPT(JSVirtualMachine::setSuperField) {
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto self = ctx->load(L"this");
+  if (self->isFunction()) {
+    auto super = self->getPrototype(ctx);
+    super->setProperty(ctx, name, field, self);
+  }
+}
+JS_OPT(JSVirtualMachine::getSuperField) {
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto self = ctx->load(L"this");
+  if (self->isFunction()) {
+    auto super = self->getPrototype(ctx);
+    _ctx->stack.push_back(super->getProperty(ctx, name, self));
+  } else {
+    auto super = self->getPrototype(ctx)->getPrototype(ctx);
+    _ctx->stack.push_back(super->getProperty(ctx, name, self));
+  }
+}
 
 JS_OPT(JSVirtualMachine::getField) {
   auto name = *_ctx->stack.rbegin();
@@ -677,6 +697,54 @@ JS_OPT(JSVirtualMachine::memberCall) {
   _ctx->stack.pop_back();
   auto loc = module->sourceMap.at(offset);
   auto func = self->getProperty(ctx, field);
+  if (!func->isFunction()) {
+    if (field->getType() == engine::JSValueType::JS_SYMBOL) {
+      auto e = field->getEntity<engine::JSSymbolEntity>();
+      throw error::JSTypeError(fmt::format(L"{}[Symbol({})] is not a function",
+                                           self->getName(),
+                                           e->getDescription()));
+    } else {
+      throw error::JSTypeError(
+          fmt::format(L"{}['{}'] is not a function", self->getName(),
+                      field->toString(ctx)->getString().value()));
+    }
+  }
+  auto name = func->getProperty(ctx, L"name")->getString().value();
+  auto pc = _pc;
+  auto res = func->apply(
+      ctx, self, args,
+      {
+          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .line = loc.line + 1,
+          .column = loc.column + 1,
+          .funcname = name,
+      });
+  _ctx->stack.push_back(res);
+  if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+    _pc = module->codes.size();
+  } else {
+    _pc = pc;
+  }
+}
+
+JS_OPT(JSVirtualMachine::superMemberCall) {
+  auto offset = _pc - sizeof(uint16_t);
+  auto size = argi(module);
+  std::vector<common::AutoPtr<engine::JSValue>> args;
+  args.resize(size, nullptr);
+  for (auto i = 0; i < size; i++) {
+    args[size - 1 - i] = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
+  }
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto self = ctx->load(L"this");
+  auto super = self->getPrototype(ctx);
+  if (!self->isFunction()) {
+    super = super->getPrototype(ctx);
+  }
+  auto loc = module->sourceMap.at(offset);
+  auto func = super->getProperty(ctx, field);
   if (!func->isFunction()) {
     if (field->getType() == engine::JSValueType::JS_SYMBOL) {
       auto e = field->getEntity<engine::JSSymbolEntity>();
@@ -1207,9 +1275,6 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case vm::JSAsmOperator::PUSH_THIS:
         pushThis(ctx, module);
         break;
-      case vm::JSAsmOperator::PUSH_SUPER:
-        pushSuper(ctx, module);
-        break;
       case vm::JSAsmOperator::PUSH_BIGINT:
         pushBigint(ctx, module);
         break;
@@ -1347,6 +1412,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::MEMBER_CALL:
         memberCall(ctx, module);
+        break;
+      case vm::JSAsmOperator::SUPER_MEMBER_CALL:
+        superMemberCall(ctx, module);
         break;
       case vm::JSAsmOperator::SUPER_CALL:
         superCall(ctx, module);

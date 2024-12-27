@@ -27,19 +27,6 @@ JS_FUNC(JSFunctionConstructor::toString) {
       L"Function.prototype.toString called on incompatible object");
 }
 
-JS_FUNC(JSFunctionConstructor::name) {
-  if (self->getType() == JSValueType::JS_NATIVE_FUNCTION) {
-    auto entity = self->getEntity<JSNativeFunctionEntity>();
-    return ctx->createString(entity->getFunctionName());
-  }
-  if (self->getType() == JSValueType::JS_FUNCTION) {
-    auto entity = self->getEntity<JSFunctionEntity>();
-    return ctx->createString(entity->getFuncName());
-  }
-  throw error::JSTypeError(
-      L"Function.prototype.toString called on incompatible object");
-}
-
 JS_FUNC(JSFunctionConstructor::call) {
   return self->apply(ctx, args[0], std::vector(args.begin() + 1, args.end()));
 }
@@ -79,7 +66,6 @@ JS_FUNC(JSFunctionConstructor::bind) {
       auto e2 = result->getEntity<JSFunctionEntity>();
       e2->setAddress(e->getAddress());
       e2->setAsync(e->isAsync());
-      e2->setFuncName(e->getFuncName());
       e2->setLength(e->getLength());
       e2->setSource(L"function anonymouse(){ [native code] }");
       for (auto &[k, v] : e->getClosure()) {
@@ -105,9 +91,6 @@ void JSFunctionConstructor::initialize(common::AutoPtr<JSContext> ctx,
   prototype->setPropertyDescriptor(
       ctx, ctx->Symbol()->getProperty(ctx, L"toStringTag"),
       ctx->createString(L"Function"));
-
-  prototype->setPropertyDescriptor(ctx, L"name",
-                                   ctx->createNativeFunction(name), nullptr);
 
   prototype->setPropertyDescriptor(ctx, L"call",
                                    ctx->createNativeFunction(call, L"call"));

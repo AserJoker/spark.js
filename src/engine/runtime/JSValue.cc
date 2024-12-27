@@ -699,13 +699,18 @@ common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
 }
 
 common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
-                                              const std::wstring &name) {
+                                              const std::wstring &name,
+                                              common::AutoPtr<JSValue> vself) {
   auto self = pack(ctx);
   auto descriptor = self->getPropertyDescriptor(ctx, name);
   if (descriptor != nullptr) {
     if (descriptor->get) {
       auto getter = ctx->createValue(descriptor->get);
-      return getter->apply(ctx, self);
+      if (vself != nullptr) {
+        return getter->apply(ctx, vself);
+      } else {
+        return getter->apply(ctx, self);
+      }
     }
     if (descriptor->value) {
       return ctx->createValue(descriptor->value);
@@ -716,11 +721,12 @@ common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
 
 common::AutoPtr<JSValue>
 JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
-                     const common::AutoPtr<JSValue> &field) {
+                     const common::AutoPtr<JSValue> &field,
+                     common::AutoPtr<JSValue> vself) {
   auto self = pack(ctx);
   auto store = self->getStore();
   auto entity = self->getEntity<JSObjectEntity>();
-  auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
+  auto descriptor = self->getPropertyDescriptor(ctx, name);
   if (descriptor && descriptor->value == field->getStore()) {
     return ctx->truly();
   }
@@ -747,8 +753,21 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
           name));
     }
   }
-  if (descriptor) {
-    if (descriptor->value != nullptr) {
+  if (descriptor && descriptor->set) {
+    auto setter = ctx->createValue(descriptor->set);
+    if (vself != nullptr) {
+      return setter->apply(ctx, vself, {field});
+    } else {
+      return setter->apply(ctx, self, {field});
+    }
+  } else {
+    if (vself != nullptr) {
+      self = vself;
+      store = vself->getStore();
+      entity = vself->getEntity<JSObjectEntity>();
+    }
+    auto ownDescriptor = self->getOwnPropertyDescriptor(ctx, name);
+    if (ownDescriptor && ownDescriptor->value != nullptr) {
       if (descriptor->value != field->getStore()) {
         store->removeChild(descriptor->value);
         ctx->getScope()->getRoot()->appendChild(descriptor->value);
@@ -756,19 +775,16 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
         descriptor->value = (JSStore *)(field->getStore());
       }
     } else {
-      auto setter = ctx->createValue(descriptor->set);
-      return setter->apply(ctx, self, {field});
+      entity->getProperties()[name] = JSObjectEntity::JSField{
+          .configurable = true,
+          .enumable = true,
+          .value = (JSStore *)field->getStore(),
+          .writable = true,
+          .get = nullptr,
+          .set = nullptr,
+      };
+      store->appendChild((JSStore *)field->getStore());
     }
-  } else {
-    entity->getProperties()[name] = JSObjectEntity::JSField{
-        .configurable = true,
-        .enumable = true,
-        .value = (JSStore *)field->getStore(),
-        .writable = true,
-        .get = nullptr,
-        .set = nullptr,
-    };
-    store->appendChild((JSStore *)field->getStore());
   }
   return ctx->truly();
 }
@@ -853,7 +869,7 @@ JSValue::setIndex(common::AutoPtr<JSContext> ctx, const uint32_t &index,
     store->appendChild((JSStore *)field->getStore());
     return ctx->truly();
   }
-  return setProperty(ctx, fmt::format(L"{}", index), field);
+  return ctx->falsely();
 }
 
 common::AutoPtr<JSValue> JSValue::getKeys(common::AutoPtr<JSContext> ctx) {
@@ -1093,7 +1109,8 @@ common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
                                });
 }
 common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
-                                              common::AutoPtr<JSValue> name) {
+                                              common::AutoPtr<JSValue> name,
+                                              common::AutoPtr<JSValue> vself) {
   auto key = name->toPrimitive(ctx);
   if (key->getType() != JSValueType::JS_SYMBOL) {
     if (getType() == JSValueType::JS_ARRAY) {
@@ -1102,14 +1119,18 @@ common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
         return getIndex(ctx, num.value());
       }
     }
-    return getProperty(ctx, key->toString(ctx)->getString().value());
+    return getProperty(ctx, key->toString(ctx)->getString().value(), vself);
   }
   auto self = pack(ctx);
   auto descriptor = self->getPropertyDescriptor(ctx, name);
   if (descriptor != nullptr) {
     if (descriptor->get) {
       auto getter = ctx->createValue(descriptor->get);
-      return getter->apply(ctx, self);
+      if (vself != nullptr) {
+        return getter->apply(ctx, vself);
+      } else {
+        return getter->apply(ctx, self);
+      }
     }
     if (descriptor->value) {
       return ctx->createValue(descriptor->value);
@@ -1118,27 +1139,30 @@ common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
   return ctx->undefined();
 }
 
-common::AutoPtr<JSValue>
-JSValue::setProperty(common::AutoPtr<JSContext> ctx,
-                     common::AutoPtr<JSValue> name,
-                     const common::AutoPtr<JSValue> &field) {
+common::AutoPtr<JSValue> JSValue::setProperty(
+    common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> name,
+    const common::AutoPtr<JSValue> &field, common::AutoPtr<JSValue> vself) {
   auto key = name->toPrimitive(ctx);
   if (getType() == JSValueType::JS_ARRAY) {
     auto num = key->toNumber(ctx)->getNumber();
     if (num.has_value()) {
+      if (vself != nullptr) {
+        return vself->setIndex(ctx, num.value(), field);
+      }
       return setIndex(ctx, num.value(), field);
     }
   }
   if (key->getType() != JSValueType::JS_SYMBOL) {
-    return setProperty(ctx, key->toString(ctx)->getString().value(), field);
+    return setProperty(ctx, key->toString(ctx)->getString().value(), field,
+                       vself);
   }
   auto self = pack(ctx);
+  if (vself != nullptr) {
+    self = vself;
+  }
   auto entity = self->getEntity<JSObjectEntity>();
   auto store = self->getStore();
-  auto descriptor = self->getOwnPropertyDescriptor(ctx, name);
-  if (descriptor && descriptor->value == field->getStore()) {
-    return ctx->truly();
-  }
+  auto descriptor = self->getPropertyDescriptor(ctx, name);
   if (!descriptor) {
     if (entity->isFrozen() || entity->isSealed() || !entity->isExtensible()) {
       throw error::JSTypeError(fmt::format(
@@ -1166,8 +1190,21 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx,
                       key->getEntity<JSSymbolEntity>()->getDescription()));
     }
   }
-  if (descriptor) {
-    if (descriptor->value != nullptr) {
+  if (descriptor && descriptor->set) {
+    auto setter = ctx->createValue(descriptor->set);
+    if (vself != nullptr) {
+      return setter->apply(ctx, vself, {field});
+    } else {
+      return setter->apply(ctx, self, {field});
+    }
+  } else {
+    if (vself != nullptr) {
+      self = vself;
+      store = vself->getStore();
+      entity = vself->getEntity<JSObjectEntity>();
+    }
+    auto ownDescriptor = self->getOwnPropertyDescriptor(ctx, name);
+    if (ownDescriptor && ownDescriptor->value != nullptr) {
       if (descriptor->value != field->getStore()) {
         store->removeChild(descriptor->value);
         ctx->getScope()->getRoot()->appendChild(descriptor->value);
@@ -1175,20 +1212,17 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx,
         descriptor->value = (JSStore *)(field->getStore());
       }
     } else {
-      auto setter = ctx->createValue(descriptor->set);
-      return setter->apply(ctx, self, {field});
+      entity->getSymbolProperties()[name->getStore()] = JSObjectEntity::JSField{
+          .configurable = true,
+          .enumable = true,
+          .value = (JSStore *)field->getStore(),
+          .writable = true,
+          .get = nullptr,
+          .set = nullptr,
+      };
+      store->appendChild((JSStore *)field->getStore());
+      store->appendChild(name->getStore());
     }
-  } else {
-    entity->getSymbolProperties()[key->getStore()] = JSObjectEntity::JSField{
-        .configurable = true,
-        .enumable = true,
-        .value = (JSStore *)field->getStore(),
-        .writable = true,
-        .get = nullptr,
-        .set = nullptr,
-    };
-    store->appendChild((JSStore *)field->getStore());
-    store->appendChild((JSStore *)key->getStore());
   }
   return ctx->truly();
 }

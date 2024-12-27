@@ -137,11 +137,13 @@ public:
       bool configurable = true, bool enumable = false);
 
   common::AutoPtr<JSValue> getProperty(common::AutoPtr<JSContext> ctx,
-                                       const std::wstring &name);
+                                       const std::wstring &name,
+                                       common::AutoPtr<JSValue> self = nullptr);
 
   common::AutoPtr<JSValue> setProperty(common::AutoPtr<JSContext> ctx,
                                        const std::wstring &name,
-                                       const common::AutoPtr<JSValue> &field);
+                                       const common::AutoPtr<JSValue> &field,
+                                       common::AutoPtr<JSValue> self = nullptr);
 
   common::AutoPtr<JSValue> getIndex(common::AutoPtr<JSContext> ctx,
                                     const uint32_t &name);
@@ -182,11 +184,13 @@ public:
       bool configurable = true, bool enumable = false);
 
   common::AutoPtr<JSValue> getProperty(common::AutoPtr<JSContext> ctx,
-                                       common::AutoPtr<JSValue> name);
+                                       common::AutoPtr<JSValue> name,
+                                       common::AutoPtr<JSValue> self = nullptr);
 
   common::AutoPtr<JSValue> setProperty(common::AutoPtr<JSContext> ctx,
                                        common::AutoPtr<JSValue> name,
-                                       const common::AutoPtr<JSValue> &field);
+                                       const common::AutoPtr<JSValue> &field,
+                                       common::AutoPtr<JSValue> self = nullptr);
 
   common::AutoPtr<JSValue> removeProperty(common::AutoPtr<JSContext> ctx,
                                           common::AutoPtr<JSValue> name);

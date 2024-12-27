@@ -4184,7 +4184,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
     if (token != nullptr && token->location.isEqual(source, L"extends")) {
       next = current;
       skipInvisible(filename, source, current);
-      node->extends = readValue(filename, source, current);
+      node->extends = readRValue(filename, source, current, 2);
       if (!node->extends) {
         throw error::JSSyntaxError(
             formatException(L"Unexcepted token", filename, source, current),

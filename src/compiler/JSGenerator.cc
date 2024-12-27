@@ -83,28 +83,32 @@ void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
     generate(module, vm::JSAsmOperator::PUSH_UNINITIALIZED);
     break;
   case JSSourceDeclaration::TYPE::FUNCTION: {
-    auto n = (JSFunctionDeclaration *)declaration.node;
-    if (n->generator) {
-      if (n->async) {
-        generate(module, vm::JSAsmOperator::PUSH_ASYNC_GENERATOR);
-      } else {
-        generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
-      }
+    if (declaration.node->type == JSNodeType::DECLARATION_CLASS) {
+      generate(module, vm::JSAsmOperator::PUSH_UNINITIALIZED);
+      generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
     } else {
-      if (n->async) {
-        generate(module, vm::JSAsmOperator::PUSH_ASYNC);
+      auto n = (JSFunctionDeclaration *)declaration.node;
+      if (n->generator) {
+        if (n->async) {
+          generate(module, vm::JSAsmOperator::PUSH_ASYNC_GENERATOR);
+        } else {
+          generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
+        }
       } else {
-        generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+        if (n->async) {
+          generate(module, vm::JSAsmOperator::PUSH_ASYNC);
+        } else {
+          generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+        }
       }
+      ctx.currentScope->functionAddr[declaration.node->id] =
+          module->codes.size() + sizeof(uint16_t);
+
+      generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
+      generate(module, vm::JSAsmOperator::SET_FUNC_NAME, name);
+      generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
+               n->location.getSource(module->source));
     }
-
-    ctx.currentScope->functionAddr[declaration.node->id] =
-        module->codes.size() + sizeof(uint16_t);
-
-    generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
-    generate(module, vm::JSAsmOperator::SET_FUNC_NAME, name);
-    generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
-             n->location.getSource(module->source));
     break;
   }
   }
@@ -1027,7 +1031,6 @@ void JSGenerator::resolveVariableIdentifier(
   } else if (node->type == JSNodeType::EXPRESSION_MEMBER) {
     auto n = node.cast<JSMemberExpression>();
     if (n->left->type == JSNodeType::SUPER) {
-      generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
       generate(module, vm::JSAsmOperator::LOAD_CONST,
                n->right.cast<JSIdentifierLiteral>()->value);
       generate(module, vm::JSAsmOperator::SET_SUPER_FIELD);
@@ -1047,7 +1050,6 @@ void JSGenerator::resolveVariableIdentifier(
   } else if (node->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
     auto n = node.cast<JSComputedMemberExpression>();
     if (n->left->type == JSNodeType::SUPER) {
-      generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
       resolveNode(ctx, module, n->right);
       generate(module, vm::JSAsmOperator::SET_SUPER_FIELD);
     } else {
@@ -1425,7 +1427,7 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
         generate(module, vm::JSAsmOperator::LOAD_CONST,
                  member->right.cast<JSIdentifierLiteral>()->value);
       }
-      opt = vm::JSAsmOperator::SUPER_CALL;
+      opt = vm::JSAsmOperator::SUPER_MEMBER_CALL;
     } else {
       resolveMemberChian(ctx, module, member->left, offsets);
       if (func->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
@@ -1785,7 +1787,7 @@ void JSGenerator::resolveClassAccessor(JSGeneratorContext &ctx,
   generate(module, vm::JSAsmOperator::SET_ACCESSOR,
            n->kind == JSAccessorKind::GET ? 1U : 0U);
   generate(module, vm::JSAsmOperator::POP, 1U);
-  if (n->static_) {
+  if (!n->static_) {
     generate(module, vm::JSAsmOperator::POP, 1U);
   }
 }
@@ -2174,7 +2176,8 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
     resolveNode(ctx, module, n->extends);
     generate(module, vm::JSAsmOperator::PUSH_CLASS);
   } else {
-    generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+    generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+    generate(module, vm::JSAsmOperator::PUSH_CLASS);
   }
   auto address = module->codes.size() + sizeof(uint16_t);
   generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
@@ -2182,13 +2185,14 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
     generate(module, vm::JSAsmOperator::SET_FUNC_NAME,
              n->identifier.cast<JSIdentifierLiteral>()->value);
     generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
-             L"class " + n->identifier.cast<JSIdentifierLiteral>()->value +
-                 L"{ [native code] }");
+             L"[class " + n->identifier.cast<JSIdentifierLiteral>()->value +
+                 L"]");
   } else {
 
     generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
-             L"class { [native code] }");
+             L"[class (anonymous)]");
   }
+  pushLexScope(ctx, module, n->scope);
   auto closures = resolveClosure(ctx, module, node);
   for (auto &closure : closures) {
     generate(module, vm::JSAsmOperator::SET_CLOSURE, closure);
@@ -2198,6 +2202,8 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
     generate(module, vm::JSAsmOperator::STORE, identifier);
     generate(module, vm::JSAsmOperator::LOAD, identifier);
   }
+  generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
+  generate(module, vm::JSAsmOperator::CREATE_CONST, L"this");
   common::AutoPtr<JSNode> constructor;
   std::vector<common::AutoPtr<JSNode>> properties;
   for (auto &item : n->properties) {
@@ -2223,7 +2229,6 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
   }
   auto offset = module->codes.size() + sizeof(uint16_t);
   generate(module, vm::JSAsmOperator::JMP, 0U);
-  pushLexScope(ctx, module, n->scope);
   *(uint32_t *)&module->codes[address] = (uint32_t)module->codes.size();
   generate(module, vm::JSAsmOperator::LOAD, L"this");
   for (auto &prop : properties) {
@@ -2266,12 +2271,16 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
       generate(module, vm::JSAsmOperator::POP, 1U);
     }
     auto old = ctx.lexContextType;
+    ctx.lexContextType = engine::JSEvalType::FUNCTION;
     resolveNode(ctx, module, n->body);
     ctx.lexContextType = old;
     popLexScope(ctx, module);
   }
   generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
   generate(module, vm::JSAsmOperator::RET);
+  for (auto &item : ctx.currentScope->functionDeclarations) {
+    resolveDeclarationFunction(ctx, module, item);
+  }
   popLexScope(ctx, module);
   *(uint32_t *)&module->codes[offset] = (uint32_t)module->codes.size();
   if (n->identifier != nullptr) {

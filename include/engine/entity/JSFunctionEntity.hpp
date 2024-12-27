@@ -13,7 +13,6 @@ private:
   uint32_t _length;
   std::unordered_map<std::wstring, JSStore *> _closure;
   common::AutoPtr<compiler::JSModule> _module;
-  std::wstring _name;
   std::wstring _source;
   JSStore *_bind;
 
@@ -25,7 +24,6 @@ public:
   void setAddress(uint32_t address);
   void setLength(uint32_t length);
   void setClosure(const std::wstring &name, JSStore *entity);
-  void setFuncName(const std::wstring &name);
   void setSource(const std::wstring &name);
 
   void bind(JSStore *self);
@@ -36,7 +34,6 @@ public:
   bool isGenerator() const;
   uint32_t getAddress() const;
   uint32_t getLength() const;
-  const std::wstring &getFuncName() const;
   const std::wstring &getFunctionSource() const;
 
   const common::AutoPtr<compiler::JSModule> &getModule() const;

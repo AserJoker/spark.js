@@ -150,9 +150,6 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::PUSH_THIS:
       out << L"push_this";
       break;
-    case vm::JSAsmOperator::PUSH_SUPER:
-      out << L"push_super";
-      break;
     case vm::JSAsmOperator::PUSH_VALUE:
       out << L"push_value " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
@@ -291,6 +288,10 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       break;
     case vm::JSAsmOperator::MEMBER_CALL:
       out << L"member_call " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::SUPER_MEMBER_CALL:
+      out << L"super_member_call " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
     case vm::JSAsmOperator::OPTIONAL_CALL:
