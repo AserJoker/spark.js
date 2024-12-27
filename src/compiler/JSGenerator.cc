@@ -109,9 +109,9 @@ void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
   }
   }
   if (declaration.isConst) {
-    generate(module, vm::JSAsmOperator::STORE_CONST, name);
+    generate(module, vm::JSAsmOperator::CREATE_CONST, name);
   } else {
-    generate(module, vm::JSAsmOperator::STORE, name);
+    generate(module, vm::JSAsmOperator::CREATE, name);
   }
 }
 
@@ -216,14 +216,25 @@ void JSGenerator::resolveMemberChian(JSGeneratorContext &ctx,
                                      std::vector<size_t> &offsets) {
   auto n = node.cast<JSBinaryExpression>();
   if (node->type == JSNodeType::EXPRESSION_MEMBER) {
-    resolveNode(ctx, module, n->left);
-    generate(module, vm::JSAsmOperator::LOAD_CONST,
-             n->right.cast<JSIdentifierLiteral>()->value);
-    generate(module, vm::JSAsmOperator::GET_FIELD);
+    if (n->left->type == JSNodeType::SUPER) {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->right.cast<JSIdentifierLiteral>()->value);
+      generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
+    } else {
+      resolveNode(ctx, module, n->left);
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->right.cast<JSIdentifierLiteral>()->value);
+      generate(module, vm::JSAsmOperator::GET_FIELD);
+    }
   } else if (node->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
-    resolveNode(ctx, module, n->left);
-    resolveNode(ctx, module, n->right);
-    generate(module, vm::JSAsmOperator::GET_FIELD);
+    if (n->left->type == JSNodeType::SUPER) {
+      resolveNode(ctx, module, n->right);
+      generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
+    } else {
+      resolveNode(ctx, module, n->left);
+      resolveNode(ctx, module, n->right);
+      generate(module, vm::JSAsmOperator::GET_FIELD);
+    }
   } else if (node->type == JSNodeType::EXPRESSION_OPTIONAL_MEMBER) {
     resolveNode(ctx, module, n->left);
     offsets.push_back(module->codes.size() + sizeof(uint16_t));
@@ -436,7 +447,10 @@ void JSGenerator::resolveThis(JSGeneratorContext &ctx,
 void JSGenerator::resolveSuper(JSGeneratorContext &ctx,
                                common::AutoPtr<JSModule> &module,
                                const common::AutoPtr<JSNode> &node) {
-  generate(module, vm::JSAsmOperator::LOAD, L"super");
+  throw error::JSSyntaxError(L"Invalid super",
+                             {.line = node->location.start.line,
+                              .column = node->location.start.column,
+                              .funcname = L"constructor"});
 }
 
 void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
@@ -1012,29 +1026,42 @@ void JSGenerator::resolveVariableIdentifier(
     generate(module, vm::JSAsmOperator::STORE, name);
   } else if (node->type == JSNodeType::EXPRESSION_MEMBER) {
     auto n = node.cast<JSMemberExpression>();
-    resolveMemberChian(ctx, module, n->left, offsets);
-    if (!offsets.empty()) {
-      throw error::JSSyntaxError(L"Invalid left-hand side in assignment");
+    if (n->left->type == JSNodeType::SUPER) {
+      generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->right.cast<JSIdentifierLiteral>()->value);
+      generate(module, vm::JSAsmOperator::SET_SUPER_FIELD);
+    } else {
+      resolveMemberChian(ctx, module, n->left, offsets);
+      if (!offsets.empty()) {
+        throw error::JSSyntaxError(L"Invalid left-hand side in assignment");
+      }
+      generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->right.cast<JSIdentifierLiteral>()->value);
+      generate(module, vm::JSAsmOperator::SET_FIELD);
+      generate(module, vm::JSAsmOperator::POP, 1U); // set_field result
+      generate(module, vm::JSAsmOperator::POP, 1U); // self
+      generate(module, vm::JSAsmOperator::POP, 1U); // raw_value
     }
-    generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
-    generate(module, vm::JSAsmOperator::LOAD_CONST,
-             n->right.cast<JSIdentifierLiteral>()->value);
-    generate(module, vm::JSAsmOperator::SET_FIELD);
-    generate(module, vm::JSAsmOperator::POP, 1U); // set_field result
-    generate(module, vm::JSAsmOperator::POP, 1U); // self
-    generate(module, vm::JSAsmOperator::POP, 1U); // raw_value
   } else if (node->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
     auto n = node.cast<JSComputedMemberExpression>();
-    resolveMemberChian(ctx, module, n->left, offsets);
-    if (!offsets.empty()) {
-      throw error::JSSyntaxError(L"Invalid left-hand side in assignment");
+    if (n->left->type == JSNodeType::SUPER) {
+      generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+      resolveNode(ctx, module, n->right);
+      generate(module, vm::JSAsmOperator::SET_SUPER_FIELD);
+    } else {
+      resolveMemberChian(ctx, module, n->left, offsets);
+      if (!offsets.empty()) {
+        throw error::JSSyntaxError(L"Invalid left-hand side in assignment");
+      }
+      generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
+      resolveNode(ctx, module, n->right);
+      generate(module, vm::JSAsmOperator::SET_FIELD);
+      generate(module, vm::JSAsmOperator::POP, 1U); // set_field result
+      generate(module, vm::JSAsmOperator::POP, 1U); // self
+      generate(module, vm::JSAsmOperator::POP, 1U); // raw_value
     }
-    generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
-    resolveNode(ctx, module, n->right);
-    generate(module, vm::JSAsmOperator::SET_FIELD);
-    generate(module, vm::JSAsmOperator::POP, 1U); // set_field result
-    generate(module, vm::JSAsmOperator::POP, 1U); // self
-    generate(module, vm::JSAsmOperator::POP, 1U); // raw_value
   } else if (node->type == JSNodeType::PATTERN_ARRAY) {
     auto arr = node.cast<JSArrayPattern>();
     generate(module, vm::JSAsmOperator::PUSH_UNDEFINED); // generator
@@ -1295,13 +1322,19 @@ void JSGenerator::resolveExpressionMember(JSGeneratorContext &ctx,
                                           const common::AutoPtr<JSNode> &node) {
   std::vector<size_t> offsets;
   auto n = node.cast<JSMemberExpression>();
-  resolveMemberChian(ctx, module, n->left, offsets);
-  generate(module, vm::JSAsmOperator::LOAD_CONST,
-           n->right.cast<JSIdentifierLiteral>()->value);
-  generate(module, vm::JSAsmOperator::GET_FIELD);
-  for (auto &offset : offsets) {
-    *(uint32_t *)(module->codes.data() + offset) =
-        (uint32_t)(module->codes.size());
+  if (n->left->type == JSNodeType::SUPER) {
+    generate(module, vm::JSAsmOperator::LOAD_CONST,
+             n->right.cast<JSIdentifierLiteral>()->value);
+    generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
+  } else {
+    resolveMemberChian(ctx, module, n->left, offsets);
+    generate(module, vm::JSAsmOperator::LOAD_CONST,
+             n->right.cast<JSIdentifierLiteral>()->value);
+    generate(module, vm::JSAsmOperator::GET_FIELD);
+    for (auto &offset : offsets) {
+      *(uint32_t *)(module->codes.data() + offset) =
+          (uint32_t)(module->codes.size());
+    }
   }
 }
 
@@ -1327,12 +1360,17 @@ void JSGenerator::resolveExpressionComputedMember(
     const common::AutoPtr<JSNode> &node) {
   std::vector<size_t> offsets;
   auto n = node.cast<JSComputedMemberExpression>();
-  resolveMemberChian(ctx, module, n->left, offsets);
-  resolveNode(ctx, module, n->right);
-  generate(module, vm::JSAsmOperator::GET_FIELD);
-  for (auto &offset : offsets) {
-    *(uint32_t *)(module->codes.data() + offset) =
-        (uint32_t)(module->codes.size());
+  if (n->left->type == JSNodeType::SUPER) {
+    resolveNode(ctx, module, n->right);
+    generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
+  } else {
+    resolveMemberChian(ctx, module, n->left, offsets);
+    resolveNode(ctx, module, n->right);
+    generate(module, vm::JSAsmOperator::GET_FIELD);
+    for (auto &offset : offsets) {
+      *(uint32_t *)(module->codes.data() + offset) =
+          (uint32_t)(module->codes.size());
+    }
   }
 }
 
@@ -1380,14 +1418,24 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
   if (func->type == JSNodeType::EXPRESSION_MEMBER ||
       func->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
     auto member = func.cast<JSBinaryExpression>();
-    resolveMemberChian(ctx, module, member->left, offsets);
-    if (func->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
-      resolveNode(ctx, module, member->right);
+    if (member->left->type == JSNodeType::SUPER) {
+      if (func->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+        resolveNode(ctx, module, member->right);
+      } else {
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 member->right.cast<JSIdentifierLiteral>()->value);
+      }
+      opt = vm::JSAsmOperator::SUPER_CALL;
     } else {
-      generate(module, vm::JSAsmOperator::LOAD_CONST,
-               member->right.cast<JSIdentifierLiteral>()->value);
+      resolveMemberChian(ctx, module, member->left, offsets);
+      if (func->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
+        resolveNode(ctx, module, member->right);
+      } else {
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 member->right.cast<JSIdentifierLiteral>()->value);
+      }
+      opt = vm::JSAsmOperator::MEMBER_CALL;
     }
-    opt = vm::JSAsmOperator::MEMBER_CALL;
   } else if (func->type == JSNodeType::EXPRESSION_OPTIONAL_MEMBER) {
     auto member = func.cast<JSOptionalMemberExpression>();
     resolveMemberChian(ctx, module, member->left, offsets);
@@ -1403,6 +1451,8 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
     generate(module, vm::JSAsmOperator::JNULL, 0U);
     resolveNode(ctx, module, member->right);
     opt = vm::JSAsmOperator::MEMBER_CALL;
+  } else if (func->type == JSNodeType::SUPER) {
+    opt = vm::JSAsmOperator::SUPER_CALL;
   } else {
     resolveNode(ctx, module, n->left);
   }
@@ -1639,25 +1689,116 @@ void JSGenerator::resolveExpressionAssigment(
 void JSGenerator::resolveClassMethod(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
                                      const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSClassMethod>();
+  if ((n->identifier->type == JSNodeType::LITERAL_IDENTITY &&
+       n->identifier.cast<JSIdentifierLiteral>()->value == L"constructor") ||
+      (n->identifier->type == JSNodeType::LITERAL_STRING &&
+       n->identifier.cast<JSStringLiteral>()->value == L"constructor")) {
+    return;
+  }
+  if (!n->static_) {
+    generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
+    generate(module, vm::JSAsmOperator::LOAD_CONST, L"prototype");
+    generate(module, vm::JSAsmOperator::GET_FIELD);
+  }
+  ctx.currentScope->functionDeclarations.push_back(
+      (JSNode *)node.getRawPointer());
+  if (n->generator) {
+    if (n->async) {
+      generate(module, vm::JSAsmOperator::PUSH_ASYNC_GENERATOR);
+    } else {
+      generate(module, vm::JSAsmOperator::PUSH_GENERATOR);
+    }
+  } else {
+    if (n->async) {
+      generate(module, vm::JSAsmOperator::PUSH_ASYNC);
+    } else {
+      generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+    }
+  }
+  ctx.currentScope->functionAddr[node->id] =
+      module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
+  generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
+           node->location.getSource(module->source));
+  if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+    generate(module, vm::JSAsmOperator::LOAD_CONST,
+             n->identifier.cast<JSIdentifierLiteral>()->value);
+  } else {
+    resolveNode(ctx, module, n->identifier);
+  }
+  generate(module, vm::JSAsmOperator::SET_FIELD);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  if (!n->static_) {
+    generate(module, vm::JSAsmOperator::POP, 1U);
+  }
 }
 
 void JSGenerator::resolveClassProperty(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
                                        const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSClassProperty>();
+  if (n->static_) {
+    if (n->value != nullptr) {
+      resolveNode(ctx, module, n->value);
+    } else {
+      generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+    }
+    if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->identifier.cast<JSIdentifierLiteral>()->value);
+    } else if (n->identifier->type == JSNodeType::LITERAL_STRING) {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->identifier.cast<JSStringLiteral>()->value);
+    } else {
+      resolveNode(ctx, module, n->identifier);
+    }
+    generate(module, vm::JSAsmOperator::SET_FIELD);
+    generate(module, vm::JSAsmOperator::POP, 1U);
+  }
 }
 
 void JSGenerator::resolveClassAccessor(JSGeneratorContext &ctx,
                                        common::AutoPtr<JSModule> &module,
                                        const common::AutoPtr<JSNode> &node) {
-  // TODO:
+
+  auto n = node.cast<JSClassAccessor>();
+  if (!n->static_) {
+    generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
+    generate(module, vm::JSAsmOperator::LOAD_CONST, L"prototype");
+    generate(module, vm::JSAsmOperator::GET_FIELD);
+  }
+  ctx.currentScope->functionDeclarations.push_back(
+      (JSNode *)node.getRawPointer());
+  generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+  ctx.currentScope->functionAddr[node->id] =
+      module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
+  generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
+           node->location.getSource(module->source));
+  if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+    generate(module, vm::JSAsmOperator::LOAD_CONST,
+             n->identifier.cast<JSIdentifierLiteral>()->value);
+  } else {
+    resolveNode(ctx, module, n->identifier);
+  }
+  generate(module, vm::JSAsmOperator::SET_ACCESSOR,
+           n->kind == JSAccessorKind::GET ? 1U : 0U);
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  if (n->static_) {
+    generate(module, vm::JSAsmOperator::POP, 1U);
+  }
 }
 
 void JSGenerator::resolveStaticBlock(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
                                      const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSBlockStatement>();
+  generate(module, vm::JSAsmOperator::PUSH_SCOPE);
+  generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
+  generate(module, vm::JSAsmOperator::CREATE_CONST, L"this");
+  resolveStatementBlock(ctx, module, node);
+  generate(module, vm::JSAsmOperator::POP_SCOPE);
 }
 
 void JSGenerator::resolveImportDeclaration(
@@ -2028,7 +2169,114 @@ void JSGenerator::resolveDeclarationArray(JSGeneratorContext &ctx,
 void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
                                           const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto n = node.cast<JSClassDeclaration>();
+  if (n->extends != nullptr) {
+    resolveNode(ctx, module, n->extends);
+    generate(module, vm::JSAsmOperator::PUSH_CLASS);
+  } else {
+    generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
+  }
+  auto address = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
+  if (n->identifier != nullptr) {
+    generate(module, vm::JSAsmOperator::SET_FUNC_NAME,
+             n->identifier.cast<JSIdentifierLiteral>()->value);
+    generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
+             L"class " + n->identifier.cast<JSIdentifierLiteral>()->value +
+                 L"{ [native code] }");
+  } else {
+
+    generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
+             L"class { [native code] }");
+  }
+  auto closures = resolveClosure(ctx, module, node);
+  for (auto &closure : closures) {
+    generate(module, vm::JSAsmOperator::SET_CLOSURE, closure);
+  }
+  if (n->identifier != nullptr) {
+    auto identifier = n->identifier.cast<JSIdentifierLiteral>()->value;
+    generate(module, vm::JSAsmOperator::STORE, identifier);
+    generate(module, vm::JSAsmOperator::LOAD, identifier);
+  }
+  common::AutoPtr<JSNode> constructor;
+  std::vector<common::AutoPtr<JSNode>> properties;
+  for (auto &item : n->properties) {
+    if (item->type == JSNodeType::CLASS_METHOD) {
+      auto citem = item.cast<JSClassMethod>();
+      if ((citem->identifier->type == JSNodeType::LITERAL_IDENTITY &&
+           citem->identifier.cast<JSIdentifierLiteral>()->value ==
+               L"constructor") ||
+          (citem->identifier->type == JSNodeType::LITERAL_STRING &&
+           citem->identifier.cast<JSStringLiteral>()->value ==
+               L"constructor")) {
+        constructor = citem;
+        continue;
+      }
+    }
+    if (item->type == JSNodeType::CLASS_PROPERTY) {
+      auto citem = item.cast<JSClassProperty>();
+      if (!citem->static_) {
+        properties.push_back(citem);
+      }
+    }
+    resolveNode(ctx, module, item);
+  }
+  auto offset = module->codes.size() + sizeof(uint16_t);
+  generate(module, vm::JSAsmOperator::JMP, 0U);
+  pushLexScope(ctx, module, n->scope);
+  *(uint32_t *)&module->codes[address] = (uint32_t)module->codes.size();
+  generate(module, vm::JSAsmOperator::LOAD, L"this");
+  for (auto &prop : properties) {
+    auto item = prop.cast<JSClassProperty>();
+    if (item->value != nullptr) {
+      resolveNode(ctx, module, item->value);
+    }
+    if (item->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               item->identifier.cast<JSIdentifierLiteral>()->value);
+    } else if (item->identifier->type == JSNodeType::LITERAL_STRING) {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               item->identifier.cast<JSStringLiteral>()->value);
+    } else {
+      resolveNode(ctx, module, n->identifier);
+    }
+    generate(module, vm::JSAsmOperator::SET_FIELD);
+    generate(module, vm::JSAsmOperator::POP, 1U);
+  }
+  generate(module, vm::JSAsmOperator::POP, 1U);
+  if (constructor != nullptr) {
+    auto n = constructor.cast<JSClassMethod>();
+    pushLexScope(ctx, module, n->scope);
+    if (n->arguments.size()) {
+      generate(module, vm::JSAsmOperator::LOAD, L"arguments");
+      generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+      for (auto &arg : n->arguments) {
+        if (arg->type == JSNodeType::DECLARATION_PARAMETER) {
+          auto a = arg.cast<JSParameterDeclaration>();
+          generate(module, vm::JSAsmOperator::NEXT);
+          generate(module, vm::JSAsmOperator::POP, 1U);
+          resolveDeclarationParameter(ctx, module, arg);
+        } else {
+          auto a = arg.cast<JSRestPatternItem>();
+          generate(module, vm::JSAsmOperator::REST_ARRAY);
+          resolveVariableIdentifier(ctx, module, a->identifier);
+        }
+      }
+      generate(module, vm::JSAsmOperator::POP, 1U);
+      generate(module, vm::JSAsmOperator::POP, 1U);
+    }
+    auto old = ctx.lexContextType;
+    resolveNode(ctx, module, n->body);
+    ctx.lexContextType = old;
+    popLexScope(ctx, module);
+  }
+  generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
+  generate(module, vm::JSAsmOperator::RET);
+  popLexScope(ctx, module);
+  *(uint32_t *)&module->codes[offset] = (uint32_t)module->codes.size();
+  if (n->identifier != nullptr) {
+    generate(module, vm::JSAsmOperator::POP, 1U);
+  }
 }
 
 void JSGenerator::resolveNode(JSGeneratorContext &ctx,

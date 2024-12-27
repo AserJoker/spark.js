@@ -13,6 +13,7 @@
 #include "engine/entity/JSTasKEntity.hpp"
 #include "engine/runtime/JSContext.hpp"
 #include "engine/runtime/JSScope.hpp"
+#include "engine/runtime/JSStore.hpp"
 #include "engine/runtime/JSValue.hpp"
 #include "error/JSError.hpp"
 #include "error/JSSyntaxError.hpp"
@@ -111,7 +112,9 @@ JS_OPT(JSVirtualMachine::pushThis) {
   _ctx->stack.push_back(ctx->load(L"this"));
 }
 
-JS_OPT(JSVirtualMachine::pushSuper) {}
+JS_OPT(JSVirtualMachine::pushSuper) {
+  _ctx->stack.push_back(ctx->load(L"this")->getPrototype(ctx));
+}
 
 JS_OPT(JSVirtualMachine::pushBigint) {
   auto s = args(module);
@@ -130,11 +133,26 @@ JS_OPT(JSVirtualMachine::pushValue) {
   }
 }
 
+JS_OPT(JSVirtualMachine::pushClass) {
+  auto extends = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto store = new engine::JSStore(
+      new engine::JSFunctionEntity(extends->getStore(), module));
+  store->appendChild(extends->getStore());
+  auto func = ctx->createValue(store);
+  auto prototype = ctx->createObject(extends->getProperty(ctx, L"prototype"));
+  prototype->setPropertyDescriptor(ctx, L"constructor", func);
+  func->setPropertyDescriptor(ctx, L"prototype", prototype);
+  _ctx->stack.push_back(func);
+}
+
 JS_OPT(JSVirtualMachine::setAddress) {
   auto addr = argi(module);
   auto func = (*_ctx->stack.rbegin())->getEntity<engine::JSFunctionEntity>();
   func->setAddress(addr);
 }
+
+JS_OPT(JSVirtualMachine::setClassInitialize) {}
 
 JS_OPT(JSVirtualMachine::setFuncName) {
   auto name = args(module);
@@ -170,6 +188,9 @@ JS_OPT(JSVirtualMachine::setField) {
   auto obj = *_ctx->stack.rbegin();
   _ctx->stack.push_back(obj->setProperty(ctx, name, field));
 }
+
+JS_OPT(JSVirtualMachine::setSuperField) {}
+JS_OPT(JSVirtualMachine::getSuperField) {}
 
 JS_OPT(JSVirtualMachine::getField) {
   auto name = *_ctx->stack.rbegin();
@@ -287,29 +308,26 @@ JS_OPT(JSVirtualMachine::pop) {
   }
 }
 
-JS_OPT(JSVirtualMachine::storeConst) {
-  auto name = args(module);
-  auto value = *_ctx->stack.rbegin();
-  _ctx->stack.pop_back();
-  auto val = ctx->getScope()->getValue(name);
-  if (val == nullptr) {
-    val = ctx->createValue(value, name);
-  } else {
-    val->setStore(value->getStore());
-  }
-  val->setConst();
-}
-
 JS_OPT(JSVirtualMachine::store) {
   auto name = args(module);
   auto value = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
-  auto val = ctx->getScope()->getValue(name);
-  if (val == nullptr) {
-    ctx->createValue(value, name);
-  } else {
-    val->setStore(value->getStore());
-  }
+  auto val = ctx->load(name);
+  val->setStore(value->getStore());
+}
+
+JS_OPT(JSVirtualMachine::create) {
+  auto name = args(module);
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  ctx->createValue(value, name);
+}
+
+JS_OPT(JSVirtualMachine::createConst) {
+  auto name = args(module);
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  ctx->createValue(value, name)->setConst();
 }
 
 JS_OPT(JSVirtualMachine::load) {
@@ -670,6 +688,40 @@ JS_OPT(JSVirtualMachine::memberCall) {
           fmt::format(L"{}['{}'] is not a function", self->getName(),
                       field->toString(ctx)->getString().value()));
     }
+  }
+  auto name = func->getProperty(ctx, L"name")->getString().value();
+  auto pc = _pc;
+  auto res = func->apply(
+      ctx, self, args,
+      {
+          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .line = loc.line + 1,
+          .column = loc.column + 1,
+          .funcname = name,
+      });
+  _ctx->stack.push_back(res);
+  if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+    _pc = module->codes.size();
+  } else {
+    _pc = pc;
+  }
+}
+
+JS_OPT(JSVirtualMachine::superCall) {
+  auto offset = _pc - sizeof(uint16_t);
+  auto size = argi(module);
+  std::vector<common::AutoPtr<engine::JSValue>> args;
+  args.resize(size, nullptr);
+  for (auto i = 0; i < size; i++) {
+    args[size - 1 - i] = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
+  }
+  auto self = ctx->load(L"this");
+  auto loc = module->sourceMap.at(offset);
+  auto func = self->getProperty(ctx, L"constructor");
+  func = func->getPrototype(ctx);
+  if (!func->isFunction()) {
+    throw error::JSSyntaxError(L"'super' keyword unexpected here");
   }
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _pc;
@@ -1167,6 +1219,12 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case vm::JSAsmOperator::PUSH_VALUE:
         pushValue(ctx, module);
         break;
+      case vm::JSAsmOperator::PUSH_CLASS:
+        pushClass(ctx, module);
+        break;
+      case vm::JSAsmOperator::SET_CLASS_INITIALIZE:
+        setClassInitialize(ctx, module);
+        break;
       case vm::JSAsmOperator::SET_FUNC_ADDRESS:
         setAddress(ctx, module);
         break;
@@ -1187,6 +1245,12 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::GET_FIELD:
         getField(ctx, module);
+        break;
+      case vm::JSAsmOperator::SET_SUPER_FIELD:
+        setSuperField(ctx, module);
+        break;
+      case vm::JSAsmOperator::GET_SUPER_FIELD:
+        getSuperField(ctx, module);
         break;
       case vm::JSAsmOperator::GET_KEYS:
         getKeys(ctx, module);
@@ -1218,11 +1282,14 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case vm::JSAsmOperator::POP:
         pop(ctx, module);
         break;
-      case vm::JSAsmOperator::STORE_CONST:
-        storeConst(ctx, module);
-        break;
       case vm::JSAsmOperator::STORE:
         store(ctx, module);
+        break;
+      case vm::JSAsmOperator::CREATE:
+        create(ctx, module);
+        break;
+      case vm::JSAsmOperator::CREATE_CONST:
+        createConst(ctx, module);
         break;
       case vm::JSAsmOperator::LOAD:
         load(ctx, module);
@@ -1280,6 +1347,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::MEMBER_CALL:
         memberCall(ctx, module);
+        break;
+      case vm::JSAsmOperator::SUPER_CALL:
+        superCall(ctx, module);
         break;
       case vm::JSAsmOperator::OPTIONAL_CALL:
         optionalCall(ctx, module);

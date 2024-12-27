@@ -191,6 +191,12 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::GET_FIELD:
       out << L"get_field";
       break;
+    case vm::JSAsmOperator::SET_SUPER_FIELD:
+      out << L"set_super_field";
+      break;
+    case vm::JSAsmOperator::GET_SUPER_FIELD:
+      out << L"get_super_field";
+      break;
     case vm::JSAsmOperator::GET_KEYS:
       out << L"get_keys";
       break;
@@ -223,8 +229,12 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"pop " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
-    case vm::JSAsmOperator::STORE_CONST:
-      out << L"store_const " << *(uint32_t *)(buffer + offset);
+    case vm::JSAsmOperator::CREATE:
+      out << L"create " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::CREATE_CONST:
+      out << L"create_const " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
     case vm::JSAsmOperator::STORE:
@@ -432,6 +442,17 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       break;
     case vm::JSAsmOperator::EXPORT:
       out << L"export " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::PUSH_CLASS:
+      out << L"push_class";
+      break;
+    case vm::JSAsmOperator::SET_CLASS_INITIALIZE:
+      out << L"set_class_initialize " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::SUPER_CALL:
+      out << L"super_call " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
     }

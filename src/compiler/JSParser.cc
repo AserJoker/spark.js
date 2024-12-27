@@ -377,6 +377,7 @@ void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
   if (type == JSSourceDeclaration::TYPE::UNDEFINED) {
     while (scope->parent &&
            scope->node->type != JSNodeType::DECLARATION_FUNCTION &&
+           scope->node->type != JSNodeType::DECLARATION_CLASS &&
            scope->node->type != JSNodeType::DECLARATION_ARROW_FUNCTION &&
            scope->node->type != JSNodeType::OBJECT_METHOD &&
            scope->node->type != JSNodeType::OBJECT_ACCESSOR &&
@@ -4174,6 +4175,8 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
     node->identifier = readIdentifierLiteral(filename, source, current);
     if (node->identifier != nullptr) {
       node->identifier->addParent(node);
+      declareVariable(filename, source, node, node->identifier,
+                      JSSourceDeclaration::TYPE::FUNCTION, false);
     }
     auto next = current;
     skipInvisible(filename, source, current);
@@ -4200,6 +4203,11 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     skipNewLine(filename, source, current);
+    auto parentScope = _currentScope;
+    node->scope = new JSSourceScope(parentScope);
+    node->scope->node = node.getRawPointer();
+    _currentScope = node->scope.getRawPointer();
+
     auto item = readClassProperty(filename, source, current);
     while (item != nullptr) {
       skipNewLine(filename, source, current);
@@ -4232,6 +4240,8 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
           {filename, current.line, current.column});
     }
     node->location = getLocation(source, position, current);
+
+    _currentScope = parentScope;
     position = current;
     return node;
   }
