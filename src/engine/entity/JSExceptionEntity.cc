@@ -34,9 +34,8 @@ std::wstring JSExceptionEntity::toString(common::AutoPtr<JSContext> ctx) const {
   }
   std::wstring result =
       fmt::format(L"{}: {}", getExceptionType(), getMessage());
-  for (auto &[fnindex, line, column, funcname] : getStack()) {
-    auto &filename = ctx->getRuntime()->getSourceFilename(fnindex);
-    if (fnindex != 0) {
+  for (auto &[filename, line, column, funcname] : getStack()) {
+    if (!filename.empty()) {
       result +=
           fmt::format(L"\n at {}({}:{}:{})", funcname, filename, line, column);
     } else {

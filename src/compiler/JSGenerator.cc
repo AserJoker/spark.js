@@ -85,7 +85,6 @@ void JSGenerator::resolveDeclaration(JSGeneratorContext &ctx,
   case JSSourceDeclaration::TYPE::FUNCTION: {
     if (declaration.node->type == JSNodeType::DECLARATION_CLASS) {
       generate(module, vm::JSAsmOperator::PUSH_UNINITIALIZED);
-      generate(module, vm::JSAsmOperator::PUSH_FUNCTION);
     } else {
       auto n = (JSFunctionDeclaration *)declaration.node;
       if (n->generator) {
@@ -198,7 +197,8 @@ void JSGenerator::pushScope(JSGeneratorContext &ctx,
   std::vector<JSSourceDeclaration> closures;
   for (auto &declar : scope->declarations) {
     resolveDeclaration(ctx, module, declar);
-    if (declar.type == JSSourceDeclaration::TYPE::FUNCTION) {
+    if (declar.type == JSSourceDeclaration::TYPE::FUNCTION &&
+        declar.node->type != JSNodeType::DECLARATION_CLASS) {
       closures.push_back(declar);
     }
   }
@@ -2188,11 +2188,15 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
              L"[class " + n->identifier.cast<JSIdentifierLiteral>()->value +
                  L"]");
   } else {
-
     generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
              L"[class (anonymous)]");
   }
   pushLexScope(ctx, module, n->scope);
+  if (n->identifier != nullptr) {
+    auto name = n->identifier.cast<JSIdentifierLiteral>()->value;
+    generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
+    generate(module, vm::JSAsmOperator::CREATE_CONST, name);
+  }
   auto closures = resolveClosure(ctx, module, node);
   for (auto &closure : closures) {
     generate(module, vm::JSAsmOperator::SET_CLOSURE, closure);

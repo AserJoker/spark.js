@@ -17,7 +17,8 @@ private:
   JSSourceScope *_currentScope;
 
 private:
-  std::wstring formatException(const std::wstring &message, uint32_t filename,
+  std::wstring formatException(const std::wstring &message,
+                               const std::wstring &filename,
                                const std::wstring &source,
                                JSSourceLocation::Position position);
 
@@ -25,7 +26,7 @@ private:
                                JSSourceLocation::Position &start,
                                JSSourceLocation::Position &end);
 
-  void declareVariable(uint32_t filename, const std::wstring &source,
+  void declareVariable(const std::wstring &filename, const std::wstring &source,
                        common::AutoPtr<JSNode> declarator,
                        common::AutoPtr<JSNode> identifier,
                        JSSourceDeclaration::TYPE type, bool isConst);
@@ -35,440 +36,466 @@ private:
   void bindDeclaration(common::AutoPtr<JSIdentifierLiteral> node);
 
 private:
-  bool skipWhiteSpace(uint32_t filename, const std::wstring &source,
+  bool skipWhiteSpace(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
-  bool skipComment(uint32_t filename, const std::wstring &source,
+  bool skipComment(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
-  bool skipLineTerminatior(uint32_t filename, const std::wstring &source,
+  bool skipLineTerminatior(const std::wstring &filename,
+                           const std::wstring &source,
                            JSSourceLocation::Position &position);
 
-  bool skipSemi(uint32_t filename, const std::wstring &source,
+  bool skipSemi(const std::wstring &filename, const std::wstring &source,
                 JSSourceLocation::Position &position);
 
-  void skipInvisible(uint32_t filename, const std::wstring &source,
+  void skipInvisible(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position,
                      bool *isNewline = nullptr);
 
-  void skipNewLine(uint32_t filename, const std::wstring &source,
+  void skipNewLine(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position,
                    bool *isNewline = nullptr);
 
 private:
   common::AutoPtr<JSToken>
-  readStringToken(uint32_t filename, const std::wstring &source,
+  readStringToken(const std::wstring &filename, const std::wstring &source,
                   JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readNumberToken(uint32_t filename, const std::wstring &source,
+  readNumberToken(const std::wstring &filename, const std::wstring &source,
                   JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readBigIntToken(uint32_t filename, const std::wstring &source,
+  readBigIntToken(const std::wstring &filename, const std::wstring &source,
                   JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSToken> readRegexToken(uint32_t filename,
+  common::AutoPtr<JSToken> readRegexToken(const std::wstring &filename,
                                           const std::wstring &source,
                                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readCommentToken(uint32_t filename, const std::wstring &source,
+  readCommentToken(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readBooleanToken(uint32_t filename, const std::wstring &source,
+  readBooleanToken(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSToken> readNullToken(uint32_t filename,
+  common::AutoPtr<JSToken> readNullToken(const std::wstring &filename,
                                          const std::wstring &source,
                                          JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readUndefinedToken(uint32_t filename, const std::wstring &source,
+  readUndefinedToken(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readKeywordToken(uint32_t filename, const std::wstring &source,
+  readKeywordToken(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readIdentifierToken(uint32_t filename, const std::wstring &source,
+  readIdentifierToken(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position,
                       bool allowKeyword = false);
 
   common::AutoPtr<JSToken>
-  readSymbolToken(uint32_t filename, const std::wstring &source,
+  readSymbolToken(const std::wstring &filename, const std::wstring &source,
                   JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readTemplateToken(uint32_t filename, const std::wstring &source,
+  readTemplateToken(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readTemplateStartToken(uint32_t filename, const std::wstring &source,
+  readTemplateStartToken(const std::wstring &filename,
+                         const std::wstring &source,
                          JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readTemplatePatternToken(uint32_t filename, const std::wstring &source,
+  readTemplatePatternToken(const std::wstring &filename,
+                           const std::wstring &source,
                            JSSourceLocation::Position &position);
 
   common::AutoPtr<JSToken>
-  readTemplateEndToken(uint32_t filename, const std::wstring &source,
+  readTemplateEndToken(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
 private:
-  common::AutoPtr<JSNode> readProgram(uint32_t filename,
+  common::AutoPtr<JSNode> readProgram(const std::wstring &filename,
                                       const std::wstring &source,
                                       JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readStatement(uint32_t filename,
+  common::AutoPtr<JSNode> readStatement(const std::wstring &filename,
                                         const std::wstring &source,
                                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readEmptyStatement(uint32_t filename, const std::wstring &source,
+  readEmptyStatement(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readDebuggerStatement(uint32_t filename, const std::wstring &source,
+  readDebuggerStatement(const std::wstring &filename,
+                        const std::wstring &source,
                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readWhileStatement(uint32_t filename, const std::wstring &source,
+  readWhileStatement(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readDoWhileStatement(uint32_t filename, const std::wstring &source,
+  readDoWhileStatement(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readForStatement(uint32_t filename, const std::wstring &source,
+  readForStatement(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readForInStatement(uint32_t filename, const std::wstring &source,
+  readForInStatement(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readForOfStatement(uint32_t filename, const std::wstring &source,
+  readForOfStatement(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readBlockStatement(uint32_t filename, const std::wstring &source,
+  readBlockStatement(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readReturnStatement(uint32_t filename, const std::wstring &source,
+  readReturnStatement(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readThrowStatement(uint32_t filename, const std::wstring &source,
+  readThrowStatement(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readBreakStatement(uint32_t filename, const std::wstring &source,
+  readBreakStatement(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readContinueStatement(uint32_t filename, const std::wstring &source,
+  readContinueStatement(const std::wstring &filename,
+                        const std::wstring &source,
                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readLabelStatement(uint32_t filename, const std::wstring &source,
+  readLabelStatement(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readIfStatement(uint32_t filename,
+  common::AutoPtr<JSNode> readIfStatement(const std::wstring &filename,
                                           const std::wstring &source,
                                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readSwitchStatement(uint32_t filename, const std::wstring &source,
+  readSwitchStatement(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
+  readSwitchCaseStatement(const std::wstring &filename,
+                          const std::wstring &source,
                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readTryStatement(uint32_t filename, const std::wstring &source,
+  readTryStatement(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readTryCatchStatement(uint32_t filename, const std::wstring &source,
+  readTryCatchStatement(const std::wstring &filename,
+                        const std::wstring &source,
                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readExpressionStatement(uint32_t filename, const std::wstring &source,
+  readExpressionStatement(const std::wstring &filename,
+                          const std::wstring &source,
                           JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readValue(uint32_t filename,
+  common::AutoPtr<JSNode> readValue(const std::wstring &filename,
                                     const std::wstring &source,
                                     JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readRValue(uint32_t filename,
+  common::AutoPtr<JSNode> readRValue(const std::wstring &filename,
                                      const std::wstring &source,
                                      JSSourceLocation::Position &position,
                                      int level);
 
-  common::AutoPtr<JSNode> readDecorator(uint32_t filename,
+  common::AutoPtr<JSNode> readDecorator(const std::wstring &filename,
                                         const std::wstring &source,
                                         JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readExpression(uint32_t filename,
+  common::AutoPtr<JSNode> readExpression(const std::wstring &filename,
                                          const std::wstring &source,
                                          JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readExpressions(uint32_t filename,
+  common::AutoPtr<JSNode> readExpressions(const std::wstring &filename,
                                           const std::wstring &source,
                                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readInterpreterDirective(uint32_t filename, const std::wstring &source,
+  readInterpreterDirective(const std::wstring &filename,
+                           const std::wstring &source,
                            JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readDirective(uint32_t filename,
+  common::AutoPtr<JSNode> readDirective(const std::wstring &filename,
                                         const std::wstring &source,
                                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readStringLiteral(uint32_t filename, const std::wstring &source,
+  readStringLiteral(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readNumberLiteral(uint32_t filename, const std::wstring &source,
+  readNumberLiteral(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readBigIntLiteral(uint32_t filename, const std::wstring &source,
+  readBigIntLiteral(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readBooleanLiteral(uint32_t filename, const std::wstring &source,
+  readBooleanLiteral(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readUndefinedLiteral(uint32_t filename, const std::wstring &source,
+  readUndefinedLiteral(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readNullLiteral(uint32_t filename,
+  common::AutoPtr<JSNode> readNullLiteral(const std::wstring &filename,
                                           const std::wstring &source,
                                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readIdentifierLiteral(uint32_t filename, const std::wstring &source,
+  readIdentifierLiteral(const std::wstring &filename,
+                        const std::wstring &source,
                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readMemberLiteral(uint32_t filename, const std::wstring &source,
+  readMemberLiteral(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readPrivateName(uint32_t filename,
+  common::AutoPtr<JSNode> readPrivateName(const std::wstring &filename,
                                           const std::wstring &source,
                                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readRegexLiteral(uint32_t filename, const std::wstring &source,
+  readRegexLiteral(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readTemplateLiteral(uint32_t filename, const std::wstring &source,
+  readTemplateLiteral(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readBinaryExpression(uint32_t filename, const std::wstring &source,
+  readBinaryExpression(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readAssigmentExpression(uint32_t filename, const std::wstring &source,
+  readAssigmentExpression(const std::wstring &filename,
+                          const std::wstring &source,
                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readConditionExpression(uint32_t filename, const std::wstring &source,
+  readConditionExpression(const std::wstring &filename,
+                          const std::wstring &source,
                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readUpdateExpression(uint32_t filename, const std::wstring &source,
+  readUpdateExpression(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readUnaryExpression(uint32_t filename, const std::wstring &source,
+  readUnaryExpression(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readGroupExpression(uint32_t filename, const std::wstring &source,
+  readGroupExpression(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readMemberExpression(uint32_t filename, const std::wstring &source,
+  readMemberExpression(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readCallExpression(uint32_t filename, const std::wstring &source,
+  readCallExpression(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readRestExpression(uint32_t filename, const std::wstring &source,
+  readRestExpression(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readAwaitExpression(uint32_t filename, const std::wstring &source,
+  readAwaitExpression(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readYieldExpression(uint32_t filename, const std::wstring &source,
+  readYieldExpression(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readTypeofExpression(uint32_t filename, const std::wstring &source,
+  readTypeofExpression(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readVoidExpression(uint32_t filename, const std::wstring &source,
+  readVoidExpression(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readDeleteExpression(uint32_t filename, const std::wstring &source,
+  readDeleteExpression(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readNewExpression(uint32_t filename, const std::wstring &source,
+  readNewExpression(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readInExpression(uint32_t filename, const std::wstring &source,
+  readInExpression(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readInstanceOfExpression(uint32_t filename, const std::wstring &source,
+  readInstanceOfExpression(const std::wstring &filename,
+                           const std::wstring &source,
                            JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readParameter(uint32_t filename,
+  common::AutoPtr<JSNode> readParameter(const std::wstring &filename,
                                         const std::wstring &source,
                                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readArrowFunctionDeclaration(uint32_t filename, const std::wstring &source,
+  readArrowFunctionDeclaration(const std::wstring &filename,
+                               const std::wstring &source,
                                JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readFunctionDeclaration(uint32_t filename, const std::wstring &source,
+  readFunctionDeclaration(const std::wstring &filename,
+                          const std::wstring &source,
                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readFunctionBody(uint32_t filename, const std::wstring &source,
+  readFunctionBody(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readArrayDeclaration(uint32_t filename, const std::wstring &source,
+  readArrayDeclaration(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readObjectDeclaration(uint32_t filename, const std::wstring &source,
+  readObjectDeclaration(const std::wstring &filename,
+                        const std::wstring &source,
                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readObjectProperty(uint32_t filename, const std::wstring &source,
+  readObjectProperty(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readObjectMethod(uint32_t filename, const std::wstring &source,
+  readObjectMethod(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readObjectAccessor(uint32_t filename, const std::wstring &source,
+  readObjectAccessor(const std::wstring &filename, const std::wstring &source,
                      JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readClassDeclaration(uint32_t filename, const std::wstring &source,
+  readClassDeclaration(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readClassProperty(uint32_t filename, const std::wstring &source,
+  readClassProperty(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readClassMethod(uint32_t filename,
+  common::AutoPtr<JSNode> readClassMethod(const std::wstring &filename,
                                           const std::wstring &source,
                                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readClassAccessor(uint32_t filename, const std::wstring &source,
+  readClassAccessor(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readStaticBlock(uint32_t filename,
+  common::AutoPtr<JSNode> readStaticBlock(const std::wstring &filename,
                                           const std::wstring &source,
                                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readVariableDeclarator(uint32_t filename, const std::wstring &source,
+  readVariableDeclarator(const std::wstring &filename,
+                         const std::wstring &source,
                          JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readVariableDeclaration(uint32_t filename, const std::wstring &source,
+  readVariableDeclaration(const std::wstring &filename,
+                          const std::wstring &source,
                           JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readObjectPattern(uint32_t filename, const std::wstring &source,
+  readObjectPattern(const std::wstring &filename, const std::wstring &source,
                     JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readObjectPatternItem(uint32_t filename, const std::wstring &source,
+  readObjectPatternItem(const std::wstring &filename,
+                        const std::wstring &source,
                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readArrayPattern(uint32_t filename, const std::wstring &source,
+  readArrayPattern(const std::wstring &filename, const std::wstring &source,
                    JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readArrayPatternItem(uint32_t filename, const std::wstring &source,
+  readArrayPatternItem(const std::wstring &filename, const std::wstring &source,
                        JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readRestPattern(uint32_t filename,
+  common::AutoPtr<JSNode> readRestPattern(const std::wstring &filename,
                                           const std::wstring &source,
                                           JSSourceLocation::Position &position);
 
-  common::AutoPtr<JSNode> readComment(uint32_t filename,
+  common::AutoPtr<JSNode> readComment(const std::wstring &filename,
                                       const std::wstring &source,
                                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readImportSpecifier(uint32_t filename, const std::wstring &source,
+  readImportSpecifier(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readImportAttriabue(uint32_t filename, const std::wstring &source,
+  readImportAttriabue(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readImportDefaultSpecifier(uint32_t filename, const std::wstring &source,
+  readImportDefaultSpecifier(const std::wstring &filename,
+                             const std::wstring &source,
                              JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readImportNamespaceSpecifier(uint32_t filename, const std::wstring &source,
+  readImportNamespaceSpecifier(const std::wstring &filename,
+                               const std::wstring &source,
                                JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readImportDeclaration(uint32_t filename, const std::wstring &source,
+  readImportDeclaration(const std::wstring &filename,
+                        const std::wstring &source,
                         JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readExportSpecifier(uint32_t filename, const std::wstring &source,
+  readExportSpecifier(const std::wstring &filename, const std::wstring &source,
                       JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readExportDefaultSpecifier(uint32_t filename, const std::wstring &source,
+  readExportDefaultSpecifier(const std::wstring &filename,
+                             const std::wstring &source,
                              JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readExportAllSpecifier(uint32_t filename, const std::wstring &source,
+  readExportAllSpecifier(const std::wstring &filename,
+                         const std::wstring &source,
                          JSSourceLocation::Position &position);
 
   common::AutoPtr<JSNode>
-  readExportDeclaration(uint32_t filename, const std::wstring &source,
+  readExportDeclaration(const std::wstring &filename,
+                        const std::wstring &source,
                         JSSourceLocation::Position &position);
 
 public:
-  common::AutoPtr<JSNode> parse(uint32_t filename, const std::wstring &source);
+  common::AutoPtr<JSNode> parse(const std::wstring &filename,
+                                const std::wstring &source);
 
   std::wstring toJSON(const std::wstring &filename, const std::wstring &source,
                       common::AutoPtr<JSNode> node);

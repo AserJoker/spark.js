@@ -14,7 +14,6 @@ using namespace spark::engine;
 
 JSRuntime::JSRuntime(int argc, char **argv) {
   std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-  _sources = {{0, L"<spark:internal>"}};
   _parser = new compiler::JSParser();
   _generator = new compiler::JSGenerator();
   _vm = new vm::JSVirtualMachine();
@@ -67,22 +66,6 @@ std::wstring JSRuntime::defaultPathResolver(const std::wstring &current,
 }
 
 JSRuntime::~JSRuntime(){};
-
-const std::wstring &JSRuntime::getSourceFilename(uint32_t index) {
-  return _sources.at(index);
-}
-
-uint32_t JSRuntime::setSourceFilename(const std::wstring &filename) {
-  static uint32_t index = 1;
-  for (auto &[k, v] : _sources) {
-    if (v == filename) {
-      return k;
-    }
-  }
-  _sources[index] = filename;
-  index++;
-  return (uint32_t)(_sources.size() - 1);
-}
 
 std::wstring JSRuntime::getCurrentPath() {
   auto current = std::filesystem::current_path().wstring();

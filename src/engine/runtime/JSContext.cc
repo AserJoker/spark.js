@@ -56,7 +56,6 @@
 #include <thread>
 #include <vector>
 
-
 using namespace spark;
 using namespace spark::engine;
 
@@ -203,8 +202,7 @@ JSContext::compile(const std::wstring &source, const std::wstring &filename,
                    const JSEvalType &type) {
   auto parser = _runtime->getParser();
   auto generator = _runtime->getGenerator();
-  auto index = _runtime->setSourceFilename(filename);
-  auto ast = parser->parse(index, source);
+  auto ast = parser->parse(filename, source);
   return generator->resolve(filename, source, ast, type);
 }
 
@@ -637,9 +635,8 @@ JSContext::createError(common::AutoPtr<JSValue> exception,
   auto result = constructObject(error, {createString(e->getMessage())});
   auto stack = e->getStack();
   std::wstring st;
-  for (auto &[fnindex, line, column, funcname] : e->getStack()) {
-    auto &filename = getRuntime()->getSourceFilename(fnindex);
-    if (fnindex != 0) {
+  for (auto &[filename, line, column, funcname] : e->getStack()) {
+    if (!filename.empty()) {
       st +=
           fmt::format(L"\n at {}({}:{}:{})", funcname, filename, line, column);
     } else {

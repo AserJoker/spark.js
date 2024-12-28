@@ -175,7 +175,7 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
                     toString(ctx)->getString().value()),
         location);
   }
-  if (!location.funcname.empty() || location.filename != 0 ||
+  if (!location.funcname.empty() || !location.filename.empty() ||
       location.column != 0 || location.line != 0) {
     ctx->pushCallStack(location);
   }
@@ -198,7 +198,7 @@ JSValue::apply(common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> self,
   while (ctx->getScope() != scope) {
     ctx->popScope();
   }
-  if (!location.funcname.empty() || location.filename != 0 ||
+  if (!location.funcname.empty() || !location.filename.empty() ||
       location.column != 0 || location.line != 0) {
     ctx->popCallStack();
   }

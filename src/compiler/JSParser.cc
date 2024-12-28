@@ -321,7 +321,7 @@ void JSParser::bindScope(common::AutoPtr<JSNode> node) {
   _currentScope = scope;
 }
 
-common::AutoPtr<JSNode> JSParser::parse(uint32_t filename,
+common::AutoPtr<JSNode> JSParser::parse(const std::wstring& filename,
                                         const std::wstring &source) {
   JSSourceLocation::Position position = {0, 0, 0};
   auto root = readProgram(filename, source, position);
@@ -332,7 +332,7 @@ common::AutoPtr<JSNode> JSParser::parse(uint32_t filename,
 }
 
 std::wstring JSParser::formatException(const std::wstring &message,
-                                       uint32_t filename,
+                                       const std::wstring& filename,
                                        const std::wstring &source,
                                        JSSourceLocation::Position position) {
   static std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
@@ -369,7 +369,7 @@ JSSourceLocation JSParser::getLocation(const std::wstring &source,
   return loc;
 }
 
-void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
+void JSParser::declareVariable(const std::wstring& filename, const std::wstring &source,
                                common::AutoPtr<JSNode> declarator,
                                common::AutoPtr<JSNode> identifier,
                                JSSourceDeclaration::TYPE type, bool isConst) {
@@ -377,12 +377,12 @@ void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
   if (type == JSSourceDeclaration::TYPE::UNDEFINED) {
     while (scope->parent &&
            scope->node->type != JSNodeType::DECLARATION_FUNCTION &&
-           scope->node->type != JSNodeType::DECLARATION_CLASS &&
            scope->node->type != JSNodeType::DECLARATION_ARROW_FUNCTION &&
            scope->node->type != JSNodeType::OBJECT_METHOD &&
            scope->node->type != JSNodeType::OBJECT_ACCESSOR &&
            scope->node->type != JSNodeType::CLASS_ACCESSOR &&
-           scope->node->type != JSNodeType::CLASS_METHOD) {
+           scope->node->type != JSNodeType::CLASS_METHOD &&
+           scope->node->type != JSNodeType::STATIC_BLOCK) {
       scope = scope->parent;
     }
   }
@@ -441,7 +441,8 @@ void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
     }
   }
   if (decr != nullptr) {
-    if (type == JSSourceDeclaration::TYPE::UNINITIALIZED) {
+    if (type == JSSourceDeclaration::TYPE::UNINITIALIZED ||
+        type == JSSourceDeclaration::TYPE::FUNCTION) {
       throw error::JSSyntaxError(
           formatException(
               fmt::format(L"Identifier '{}' has already been declared",
@@ -455,7 +456,7 @@ void JSParser::declareVariable(uint32_t filename, const std::wstring &source,
   }
 }
 
-bool JSParser::skipWhiteSpace(uint32_t filename, const std::wstring &source,
+bool JSParser::skipWhiteSpace(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto &chr = source[position.offset];
   if (std::find(WSC.begin(), WSC.end(), chr) == WSC.end()) {
@@ -473,7 +474,7 @@ bool JSParser::skipWhiteSpace(uint32_t filename, const std::wstring &source,
   return true;
 }
 
-bool JSParser::skipComment(uint32_t filename, const std::wstring &source,
+bool JSParser::skipComment(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto node = readComment(filename, source, position);
   if (node != nullptr) {
@@ -486,7 +487,7 @@ bool JSParser::skipComment(uint32_t filename, const std::wstring &source,
   return false;
 }
 
-bool JSParser::skipLineTerminatior(uint32_t filename,
+bool JSParser::skipLineTerminatior(const std::wstring& filename,
                                    const std::wstring &source,
                                    JSSourceLocation::Position &position) {
   auto &chr = source[position.offset];
@@ -511,7 +512,7 @@ bool JSParser::skipLineTerminatior(uint32_t filename,
   return true;
 }
 
-bool JSParser::skipSemi(uint32_t filename, const std::wstring &source,
+bool JSParser::skipSemi(const std::wstring& filename, const std::wstring &source,
                         JSSourceLocation::Position &position) {
   auto &chr = source[position.offset];
   if (chr == ';') {
@@ -522,7 +523,7 @@ bool JSParser::skipSemi(uint32_t filename, const std::wstring &source,
   return false;
 }
 
-void JSParser::skipInvisible(uint32_t filename, const std::wstring &source,
+void JSParser::skipInvisible(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position,
                              bool *isNewline) {
   auto current = position;
@@ -536,7 +537,7 @@ void JSParser::skipInvisible(uint32_t filename, const std::wstring &source,
   }
 }
 
-void JSParser::skipNewLine(uint32_t filename, const std::wstring &source,
+void JSParser::skipNewLine(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position,
                            bool *isNewline) {
   auto current = position;
@@ -551,7 +552,7 @@ void JSParser::skipNewLine(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readStringToken(uint32_t filename, const std::wstring &source,
+JSParser::readStringToken(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
@@ -590,7 +591,7 @@ JSParser::readStringToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readCommentToken(uint32_t filename, const std::wstring &source,
+JSParser::readCommentToken(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
@@ -646,7 +647,7 @@ JSParser::readCommentToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readNumberToken(uint32_t filename, const std::wstring &source,
+JSParser::readNumberToken(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
 
   auto current = position;
@@ -720,7 +721,7 @@ JSParser::readNumberToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readBigIntToken(uint32_t filename, const std::wstring &source,
+JSParser::readBigIntToken(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
 
   auto current = position;
@@ -790,7 +791,7 @@ JSParser::readBigIntToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readRegexToken(uint32_t filename, const std::wstring &source,
+JSParser::readRegexToken(const std::wstring& filename, const std::wstring &source,
                          JSSourceLocation::Position &position) {
   static std::array regexFlags = {'d', 'g', 'i', 'm', 's', 'y'};
   auto current = position;
@@ -852,7 +853,7 @@ JSParser::readRegexToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readBooleanToken(uint32_t filename, const std::wstring &source,
+JSParser::readBooleanToken(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   static wchar_t t[] = L"true";
   static wchar_t f[] = L"false";
@@ -884,7 +885,7 @@ JSParser::readBooleanToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readNullToken(uint32_t filename, const std::wstring &source,
+JSParser::readNullToken(const std::wstring& filename, const std::wstring &source,
                         JSSourceLocation::Position &position) {
   static wchar_t s[] = L"null";
   auto current = position;
@@ -911,7 +912,7 @@ JSParser::readNullToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readUndefinedToken(uint32_t filename, const std::wstring &source,
+JSParser::readUndefinedToken(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   static wchar_t s[] = L"undefined";
   auto current = position;
@@ -937,7 +938,7 @@ JSParser::readUndefinedToken(uint32_t filename, const std::wstring &source,
   return token;
 }
 common::AutoPtr<JSParser::JSToken>
-JSParser::readKeywordToken(uint32_t filename, const std::wstring &source,
+JSParser::readKeywordToken(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
@@ -968,7 +969,7 @@ JSParser::readKeywordToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readIdentifierToken(uint32_t filename, const std::wstring &source,
+JSParser::readIdentifierToken(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position,
                               bool allowKeyword) {
   // TODO: unicode support
@@ -1006,7 +1007,7 @@ JSParser::readIdentifierToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readSymbolToken(uint32_t filename, const std::wstring &source,
+JSParser::readSymbolToken(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   static const std::vector<std::wstring> operators = {
       L">>>=",   L"...", L"<<=", L">>>", L"===", L"!==", L"**=", L">>=", L"&&=",
@@ -1045,7 +1046,7 @@ JSParser::readSymbolToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readTemplateToken(uint32_t filename, const std::wstring &source,
+JSParser::readTemplateToken(const std::wstring& filename, const std::wstring &source,
                             JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
@@ -1096,7 +1097,7 @@ JSParser::readTemplateToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readTemplateStartToken(uint32_t filename, const std::wstring &source,
+JSParser::readTemplateStartToken(const std::wstring& filename, const std::wstring &source,
                                  JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
@@ -1147,7 +1148,7 @@ JSParser::readTemplateStartToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readTemplatePatternToken(uint32_t filename,
+JSParser::readTemplatePatternToken(const std::wstring& filename,
                                    const std::wstring &source,
                                    JSSourceLocation::Position &position) {
 
@@ -1200,7 +1201,7 @@ JSParser::readTemplatePatternToken(uint32_t filename,
 }
 
 common::AutoPtr<JSParser::JSToken>
-JSParser::readTemplateEndToken(uint32_t filename, const std::wstring &source,
+JSParser::readTemplateEndToken(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   auto &chr = source[current.offset];
@@ -1251,7 +1252,7 @@ JSParser::readTemplateEndToken(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readProgram(uint32_t filename, const std::wstring &source,
+JSParser::readProgram(const std::wstring& filename, const std::wstring &source,
                       JSSourceLocation::Position &position) {
   auto current = position;
   auto interpreter = readInterpreterDirective(filename, source, current);
@@ -1295,7 +1296,7 @@ JSParser::readProgram(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readStatement(uint32_t filename, const std::wstring &source,
+JSParser::readStatement(const std::wstring& filename, const std::wstring &source,
                         JSSourceLocation::Position &position) {
   common::AutoPtr<JSNode> node = nullptr;
   auto current = position;
@@ -1394,7 +1395,7 @@ JSParser::readStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readDebuggerStatement(uint32_t filename, const std::wstring &source,
+JSParser::readDebuggerStatement(const std::wstring& filename, const std::wstring &source,
                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1410,7 +1411,7 @@ JSParser::readDebuggerStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
+JSParser::readWhileStatement(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1453,7 +1454,7 @@ JSParser::readWhileStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readDoWhileStatement(uint32_t filename, const std::wstring &source,
+JSParser::readDoWhileStatement(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1504,7 +1505,7 @@ JSParser::readDoWhileStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readForStatement(uint32_t filename, const std::wstring &source,
+JSParser::readForStatement(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1577,7 +1578,7 @@ JSParser::readForStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
+JSParser::readForInStatement(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1665,7 +1666,7 @@ JSParser::readForInStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
+JSParser::readForOfStatement(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1761,7 +1762,7 @@ JSParser::readForOfStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readEmptyStatement(uint32_t filename, const std::wstring &source,
+JSParser::readEmptyStatement(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1777,7 +1778,7 @@ JSParser::readEmptyStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readYieldExpression(uint32_t filename, const std::wstring &source,
+JSParser::readYieldExpression(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1814,7 +1815,7 @@ JSParser::readYieldExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readReturnStatement(uint32_t filename, const std::wstring &source,
+JSParser::readReturnStatement(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1837,7 +1838,7 @@ JSParser::readReturnStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readThrowStatement(uint32_t filename, const std::wstring &source,
+JSParser::readThrowStatement(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1860,7 +1861,7 @@ JSParser::readThrowStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readBreakStatement(uint32_t filename, const std::wstring &source,
+JSParser::readBreakStatement(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1883,7 +1884,7 @@ JSParser::readBreakStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readContinueStatement(uint32_t filename, const std::wstring &source,
+JSParser::readContinueStatement(const std::wstring& filename, const std::wstring &source,
                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1906,7 +1907,7 @@ JSParser::readContinueStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readLabelStatement(uint32_t filename, const std::wstring &source,
+JSParser::readLabelStatement(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1934,7 +1935,7 @@ JSParser::readLabelStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
+JSParser::readIfStatement(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -1991,7 +1992,7 @@ JSParser::readIfStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
+JSParser::readSwitchStatement(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2049,7 +2050,7 @@ JSParser::readSwitchStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
+JSParser::readSwitchCaseStatement(const std::wstring& filename, const std::wstring &source,
                                   JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2110,7 +2111,7 @@ JSParser::readSwitchCaseStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readTryStatement(uint32_t filename, const std::wstring &source,
+JSParser::readTryStatement(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
 
   auto current = position;
@@ -2159,7 +2160,7 @@ JSParser::readTryStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
+JSParser::readTryCatchStatement(const std::wstring& filename, const std::wstring &source,
                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2217,7 +2218,7 @@ JSParser::readTryCatchStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readExpressionStatement(uint32_t filename, const std::wstring &source,
+JSParser::readExpressionStatement(const std::wstring& filename, const std::wstring &source,
                                   JSSourceLocation::Position &position) {
   common::AutoPtr node = new JSExpressionStatement;
   auto expr = readExpressions(filename, source, position);
@@ -2231,7 +2232,7 @@ JSParser::readExpressionStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readValue(uint32_t filename, const std::wstring &source,
+JSParser::readValue(const std::wstring& filename, const std::wstring &source,
                     JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2292,7 +2293,7 @@ JSParser::readValue(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readRValue(uint32_t filename, const std::wstring &source,
+JSParser::readRValue(const std::wstring& filename, const std::wstring &source,
                      JSSourceLocation::Position &position, int level) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2391,7 +2392,7 @@ JSParser::readRValue(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readDecorator(uint32_t filename, const std::wstring &source,
+JSParser::readDecorator(const std::wstring& filename, const std::wstring &source,
                         JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2414,7 +2415,7 @@ JSParser::readDecorator(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readExpression(uint32_t filename, const std::wstring &source,
+JSParser::readExpression(const std::wstring& filename, const std::wstring &source,
                          JSSourceLocation::Position &position) {
   auto current = position;
   auto left = readObjectPattern(filename, source, current);
@@ -2434,7 +2435,7 @@ JSParser::readExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readExpressions(uint32_t filename, const std::wstring &source,
+JSParser::readExpressions(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2469,7 +2470,7 @@ JSParser::readExpressions(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
+JSParser::readBlockStatement(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipNewLine(filename, source, current);
@@ -2504,7 +2505,7 @@ JSParser::readBlockStatement(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readInterpreterDirective(uint32_t filename,
+JSParser::readInterpreterDirective(const std::wstring& filename,
                                    const std::wstring &source,
                                    JSSourceLocation::Position &position) {
   auto current = position;
@@ -2528,7 +2529,7 @@ JSParser::readInterpreterDirective(uint32_t filename,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readDirective(uint32_t filename, const std::wstring &source,
+JSParser::readDirective(const std::wstring& filename, const std::wstring &source,
                         JSSourceLocation::Position &position) {
   auto current = position;
   skipNewLine(filename, source, current);
@@ -2548,7 +2549,7 @@ JSParser::readDirective(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readStringLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readStringLiteral(const std::wstring& filename, const std::wstring &source,
                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2567,7 +2568,7 @@ JSParser::readStringLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readTemplateLiteral(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2618,7 +2619,7 @@ JSParser::readTemplateLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readNumberLiteral(uint32_t filename, const std::wstring &src,
+JSParser::readNumberLiteral(const std::wstring& filename, const std::wstring &src,
                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, src, current);
@@ -2640,7 +2641,7 @@ JSParser::readNumberLiteral(uint32_t filename, const std::wstring &src,
   return nullptr;
 }
 common::AutoPtr<JSNode>
-JSParser::readBigIntLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readBigIntLiteral(const std::wstring& filename, const std::wstring &source,
                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2658,7 +2659,7 @@ JSParser::readBigIntLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readRegexLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readRegexLiteral(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2691,7 +2692,7 @@ JSParser::readRegexLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readBooleanLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readBooleanLiteral(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2707,7 +2708,7 @@ JSParser::readBooleanLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readUndefinedLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readUndefinedLiteral(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2722,7 +2723,7 @@ JSParser::readUndefinedLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readNullLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readNullLiteral(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2737,7 +2738,7 @@ JSParser::readNullLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readIdentifierLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readIdentifierLiteral(const std::wstring& filename, const std::wstring &source,
                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2772,7 +2773,7 @@ JSParser::readIdentifierLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readMemberLiteral(uint32_t filename, const std::wstring &source,
+JSParser::readMemberLiteral(const std::wstring& filename, const std::wstring &source,
                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2788,7 +2789,7 @@ JSParser::readMemberLiteral(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readPrivateName(uint32_t filename, const std::wstring &source,
+JSParser::readPrivateName(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2808,7 +2809,7 @@ JSParser::readPrivateName(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
+JSParser::readBinaryExpression(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   const std::vector<std::vector<std::wstring>> operators = {
       {},
@@ -2859,7 +2860,7 @@ JSParser::readBinaryExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readAssigmentExpression(uint32_t filename, const std::wstring &source,
+JSParser::readAssigmentExpression(const std::wstring& filename, const std::wstring &source,
                                   JSSourceLocation::Position &position) {
   const std::vector<std::wstring> operators = {
       {L"=", L"+=", L"-=", L"**=", L"*=", L"/=", L"%=", L">>>=", L"<<=", L">>=",
@@ -2892,7 +2893,7 @@ JSParser::readAssigmentExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
+JSParser::readConditionExpression(const std::wstring& filename, const std::wstring &source,
                                   JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2943,7 +2944,7 @@ JSParser::readConditionExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readUpdateExpression(uint32_t filename, const std::wstring &source,
+JSParser::readUpdateExpression(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -2962,7 +2963,7 @@ JSParser::readUpdateExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readUnaryExpression(uint32_t filename, const std::wstring &source,
+JSParser::readUnaryExpression(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   static std::vector<std::wstring> unarys = {L"!", L"~",  L"+",
                                              L"-", L"++", L"--"};
@@ -2991,7 +2992,7 @@ JSParser::readUnaryExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readGroupExpression(uint32_t filename, const std::wstring &source,
+JSParser::readGroupExpression(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3020,7 +3021,7 @@ JSParser::readGroupExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
+JSParser::readMemberExpression(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3126,7 +3127,7 @@ JSParser::readMemberExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readCallExpression(uint32_t filename, const std::wstring &source,
+JSParser::readCallExpression(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3177,7 +3178,7 @@ JSParser::readCallExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readRestExpression(uint32_t filename, const std::wstring &source,
+JSParser::readRestExpression(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3205,7 +3206,7 @@ JSParser::readRestExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readAwaitExpression(uint32_t filename, const std::wstring &source,
+JSParser::readAwaitExpression(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3227,7 +3228,7 @@ JSParser::readAwaitExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readTypeofExpression(uint32_t filename, const std::wstring &source,
+JSParser::readTypeofExpression(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3249,7 +3250,7 @@ JSParser::readTypeofExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readVoidExpression(uint32_t filename, const std::wstring &source,
+JSParser::readVoidExpression(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3271,7 +3272,7 @@ JSParser::readVoidExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readNewExpression(uint32_t filename, const std::wstring &source,
+JSParser::readNewExpression(const std::wstring& filename, const std::wstring &source,
                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3310,7 +3311,7 @@ JSParser::readNewExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readDeleteExpression(uint32_t filename, const std::wstring &source,
+JSParser::readDeleteExpression(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3332,7 +3333,7 @@ JSParser::readDeleteExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readInExpression(uint32_t filename, const std::wstring &source,
+JSParser::readInExpression(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3357,7 +3358,7 @@ JSParser::readInExpression(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readInstanceOfExpression(uint32_t filename,
+JSParser::readInstanceOfExpression(const std::wstring& filename,
                                    const std::wstring &source,
                                    JSSourceLocation::Position &position) {
   auto current = position;
@@ -3383,7 +3384,7 @@ JSParser::readInstanceOfExpression(uint32_t filename,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readParameter(uint32_t filename, const std::wstring &source,
+JSParser::readParameter(const std::wstring& filename, const std::wstring &source,
                         JSSourceLocation::Position &position) {
   common::AutoPtr rest = readRestPattern(filename, source, position);
   if (rest != nullptr) {
@@ -3435,7 +3436,7 @@ JSParser::readParameter(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readArrowFunctionDeclaration(uint32_t filename,
+JSParser::readArrowFunctionDeclaration(const std::wstring& filename,
                                        const std::wstring &source,
                                        JSSourceLocation::Position &position) {
   auto current = position;
@@ -3570,7 +3571,7 @@ JSParser::readArrowFunctionDeclaration(uint32_t filename,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readFunctionBody(uint32_t filename, const std::wstring &source,
+JSParser::readFunctionBody(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3606,7 +3607,7 @@ JSParser::readFunctionBody(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
+JSParser::readFunctionDeclaration(const std::wstring& filename, const std::wstring &source,
                                   JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3713,7 +3714,7 @@ JSParser::readFunctionDeclaration(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
+JSParser::readArrayDeclaration(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3774,7 +3775,7 @@ JSParser::readArrayDeclaration(uint32_t filename, const std::wstring &source,
   return nullptr;
 }
 common::AutoPtr<JSNode>
-JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
+JSParser::readObjectDeclaration(const std::wstring& filename, const std::wstring &source,
                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -3829,7 +3830,7 @@ JSParser::readObjectDeclaration(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
+JSParser::readObjectProperty(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto rest = readRestExpression(filename, source, position);
   if (rest != nullptr) {
@@ -3906,7 +3907,7 @@ JSParser::readObjectProperty(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
+JSParser::readObjectMethod(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto current = position;
   auto next = current;
@@ -4032,7 +4033,7 @@ JSParser::readObjectMethod(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
+JSParser::readObjectAccessor(const std::wstring& filename, const std::wstring &source,
                              JSSourceLocation::Position &position) {
   auto current = position;
 
@@ -4139,7 +4140,7 @@ JSParser::readObjectAccessor(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
+JSParser::readClassDeclaration(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto current = position;
   common::AutoPtr node = new JSClassDeclaration;
@@ -4249,7 +4250,7 @@ JSParser::readClassDeclaration(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readStaticBlock(uint32_t filename, const std::wstring &source,
+JSParser::readStaticBlock(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   auto current = position;
   skipNewLine(filename, source, current);
@@ -4267,7 +4268,7 @@ JSParser::readStaticBlock(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
+JSParser::readClassMethod(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   auto current = position;
   common::AutoPtr node = new JSClassMethod;
@@ -4411,7 +4412,7 @@ JSParser::readClassMethod(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
+JSParser::readClassAccessor(const std::wstring& filename, const std::wstring &source,
                             JSSourceLocation::Position &position) {
   auto current = position;
   common::AutoPtr node = new JSClassAccessor;
@@ -4533,7 +4534,7 @@ JSParser::readClassAccessor(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
+JSParser::readClassProperty(const std::wstring& filename, const std::wstring &source,
                             JSSourceLocation::Position &position) {
   auto rest = readRestExpression(filename, source, position);
   if (rest != nullptr) {
@@ -4612,7 +4613,7 @@ JSParser::readClassProperty(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
+JSParser::readVariableDeclarator(const std::wstring& filename, const std::wstring &source,
                                  JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -4653,7 +4654,7 @@ JSParser::readVariableDeclarator(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
+JSParser::readVariableDeclaration(const std::wstring& filename, const std::wstring &source,
                                   JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -4706,7 +4707,7 @@ JSParser::readVariableDeclaration(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
+JSParser::readRestPattern(const std::wstring& filename, const std::wstring &source,
                           JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -4743,7 +4744,7 @@ JSParser::readRestPattern(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
+JSParser::readObjectPatternItem(const std::wstring& filename, const std::wstring &source,
                                 JSSourceLocation::Position &position) {
   auto rest = readRestPattern(filename, source, position);
   if (rest != nullptr) {
@@ -4841,7 +4842,7 @@ JSParser::readObjectPatternItem(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readObjectPattern(uint32_t filename, const std::wstring &source,
+JSParser::readObjectPattern(const std::wstring& filename, const std::wstring &source,
                             JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -4883,7 +4884,7 @@ JSParser::readObjectPattern(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
+JSParser::readArrayPatternItem(const std::wstring& filename, const std::wstring &source,
                                JSSourceLocation::Position &position) {
   auto rest = readRestPattern(filename, source, position);
   if (rest != nullptr) {
@@ -4935,7 +4936,7 @@ JSParser::readArrayPatternItem(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
+JSParser::readArrayPattern(const std::wstring& filename, const std::wstring &source,
                            JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -4988,7 +4989,7 @@ JSParser::readArrayPattern(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readComment(uint32_t filename, const std::wstring &source,
+JSParser::readComment(const std::wstring& filename, const std::wstring &source,
                       JSSourceLocation::Position &position) {
   auto current = position;
   while (skipWhiteSpace(filename, source, current) ||
@@ -5008,7 +5009,7 @@ JSParser::readComment(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
+JSParser::readImportSpecifier(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -5048,7 +5049,7 @@ JSParser::readImportSpecifier(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readImportDefaultSpecifier(uint32_t filename,
+JSParser::readImportDefaultSpecifier(const std::wstring& filename,
                                      const std::wstring &source,
                                      JSSourceLocation::Position &position) {
   auto current = position;
@@ -5066,7 +5067,7 @@ JSParser::readImportDefaultSpecifier(uint32_t filename,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readImportNamespaceSpecifier(uint32_t filename,
+JSParser::readImportNamespaceSpecifier(const std::wstring& filename,
                                        const std::wstring &source,
                                        JSSourceLocation::Position &position) {
   auto current = position;
@@ -5097,7 +5098,7 @@ JSParser::readImportNamespaceSpecifier(uint32_t filename,
   return nullptr;
 }
 common::AutoPtr<JSNode>
-JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
+JSParser::readImportAttriabue(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -5132,7 +5133,7 @@ JSParser::readImportAttriabue(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
+JSParser::readImportDeclaration(const std::wstring& filename, const std::wstring &source,
                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -5309,7 +5310,7 @@ JSParser::readImportDeclaration(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readExportSpecifier(uint32_t filename, const std::wstring &source,
+JSParser::readExportSpecifier(const std::wstring& filename, const std::wstring &source,
                               JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -5344,7 +5345,7 @@ JSParser::readExportSpecifier(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readExportDefaultSpecifier(uint32_t filename,
+JSParser::readExportDefaultSpecifier(const std::wstring& filename,
                                      const std::wstring &source,
                                      JSSourceLocation::Position &position) {
   auto current = position;
@@ -5367,7 +5368,7 @@ JSParser::readExportDefaultSpecifier(uint32_t filename,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readExportAllSpecifier(uint32_t filename, const std::wstring &source,
+JSParser::readExportAllSpecifier(const std::wstring& filename, const std::wstring &source,
                                  JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);
@@ -5396,7 +5397,7 @@ JSParser::readExportAllSpecifier(uint32_t filename, const std::wstring &source,
 }
 
 common::AutoPtr<JSNode>
-JSParser::readExportDeclaration(uint32_t filename, const std::wstring &source,
+JSParser::readExportDeclaration(const std::wstring& filename, const std::wstring &source,
                                 JSSourceLocation::Position &position) {
   auto current = position;
   skipInvisible(filename, source, current);

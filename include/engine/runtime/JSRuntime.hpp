@@ -6,7 +6,6 @@
 #include "vm/JSVirtualMachine.hpp"
 #include <functional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace spark::engine {
@@ -19,8 +18,6 @@ public:
       const std::wstring &current, const std::wstring &next)>;
 
 private:
-  std::unordered_map<uint32_t, std::wstring> _sources;
-
   common::AutoPtr<compiler::JSParser> _parser;
 
   common::AutoPtr<compiler::JSGenerator> _generator;
@@ -38,10 +35,6 @@ public:
   JSRuntime(int argc, char **argv);
 
   ~JSRuntime() override;
-
-  const std::wstring &getSourceFilename(uint32_t index);
-
-  uint32_t setSourceFilename(const std::wstring &filename);
 
   std::wstring getCurrentPath();
 

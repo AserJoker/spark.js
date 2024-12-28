@@ -28,7 +28,7 @@ public:
     JSCallFrame() {
       parent = nullptr;
       location.funcname = L"<internal>";
-      location.filename = 0;
+      location.filename = L"";
       location.line = 0;
       location.column = 0;
     }

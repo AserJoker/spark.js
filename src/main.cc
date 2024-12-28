@@ -497,8 +497,8 @@ int spark_main(int argc, char *argv[]) {
   } catch (error::JSError &e) {
     std::cout << e.what();
     fmt::print(L"\n  at {} ({}:{}:{})", e.getLocation().funcname,
-               runtime->getSourceFilename(e.getLocation().filename),
-               e.getLocation().line + 1, e.getLocation().column + 1);
+               e.getLocation().filename, e.getLocation().line + 1,
+               e.getLocation().column + 1);
   } catch (std::exception &e) {
     std::cout << e.what() << std::endl;
   }

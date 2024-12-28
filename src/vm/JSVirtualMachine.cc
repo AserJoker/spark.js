@@ -394,7 +394,7 @@ JS_OPT(JSVirtualMachine::new_) {
   auto res = ctx->constructObject(
       func, args,
       {
-          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .filename = module->filename,
           .line = loc.line + 1,
           .column = loc.column + 1,
           .funcname = func->getName(),
@@ -669,7 +669,7 @@ JS_OPT(JSVirtualMachine::call) {
   auto res = func->apply(
       ctx, ctx->undefined(), args,
       {
-          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .filename = module->filename,
           .line = loc.line + 1,
           .column = loc.column + 1,
           .funcname = name,
@@ -714,7 +714,7 @@ JS_OPT(JSVirtualMachine::memberCall) {
   auto res = func->apply(
       ctx, self, args,
       {
-          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .filename = module->filename,
           .line = loc.line + 1,
           .column = loc.column + 1,
           .funcname = name,
@@ -762,7 +762,7 @@ JS_OPT(JSVirtualMachine::superMemberCall) {
   auto res = func->apply(
       ctx, self, args,
       {
-          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .filename = module->filename,
           .line = loc.line + 1,
           .column = loc.column + 1,
           .funcname = name,
@@ -796,7 +796,7 @@ JS_OPT(JSVirtualMachine::superCall) {
   auto res = func->apply(
       ctx, self, args,
       {
-          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .filename = module->filename,
           .line = loc.line + 1,
           .column = loc.column + 1,
           .funcname = name,
@@ -833,7 +833,7 @@ JS_OPT(JSVirtualMachine::optionalCall) {
   auto res = func->apply(
       ctx, ctx->undefined(), args,
       {
-          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .filename = module->filename,
           .line = loc.line + 1,
           .column = loc.column + 1,
           .funcname = name,
@@ -874,7 +874,7 @@ JS_OPT(JSVirtualMachine::memberOptionalCall) {
   auto res = func->apply(
       ctx, self, args,
       {
-          .filename = ctx->getRuntime()->setSourceFilename(module->filename),
+          .filename = module->filename,
           .line = loc.line + 1,
           .column = loc.column + 1,
           .funcname = name,
