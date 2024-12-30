@@ -21,6 +21,7 @@
 #include "vm/JSAsmOperator.hpp"
 #include "vm/JSErrorFrame.hpp"
 #include "vm/JSEvalContext.hpp"
+#include <_mingw_stat64.h>
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
@@ -133,7 +134,7 @@ JS_OPT(JSVirtualMachine::pushClass) {
   auto extends = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   if (!extends->isFunction()) {
-    extends = ctx->Function();
+    extends = ctx->Object();
   }
   auto store = new engine::JSStore(
       new engine::JSFunctionEntity(extends->getStore(), module));
@@ -185,6 +186,18 @@ JS_OPT(JSVirtualMachine::setField) {
   auto field = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto obj = *_ctx->stack.rbegin();
+  if (field->isFunction() && field->getProperty(ctx, L"name")->isUndefined()) {
+    std::wstring fieldname;
+    if (name->getType() == engine::JSValueType::JS_SYMBOL) {
+      fieldname = fmt::format(
+          L"{}[Symbol()]", obj->getName(),
+          name->getEntity<engine::JSSymbolEntity>()->getDescription());
+    } else {
+      fieldname =
+          fmt::format(L"{}.{}", obj->getName(), name->getString().value());
+    }
+    field->setProperty(ctx, L"name", ctx->createString(fieldname));
+  }
   _ctx->stack.push_back(obj->setProperty(ctx, name, field));
 }
 
@@ -391,14 +404,13 @@ JS_OPT(JSVirtualMachine::new_) {
   auto func = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto loc = module->sourceMap.at(offset);
-  auto res = ctx->constructObject(
-      func, args,
-      {
-          .filename = module->filename,
-          .line = loc.line + 1,
-          .column = loc.column + 1,
-          .funcname = func->getName(),
-      });
+  auto res = ctx->constructObject(func, args,
+                                  {
+                                      .filename = module->filename,
+                                      .line = loc.line + 1,
+                                      .column = loc.column + 1,
+                                      .funcname = func->getName(),
+                                  });
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
     _pc = module->codes.size();
@@ -666,14 +678,13 @@ JS_OPT(JSVirtualMachine::call) {
     loc = module->sourceMap.at(offset);
   }
   auto pc = _pc;
-  auto res = func->apply(
-      ctx, ctx->undefined(), args,
-      {
-          .filename = module->filename,
-          .line = loc.line + 1,
-          .column = loc.column + 1,
-          .funcname = name,
-      });
+  auto res = func->apply(ctx, ctx->undefined(), args,
+                         {
+                             .filename = module->filename,
+                             .line = loc.line + 1,
+                             .column = loc.column + 1,
+                             .funcname = name,
+                         });
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
     _pc = module->codes.size();
@@ -709,16 +720,16 @@ JS_OPT(JSVirtualMachine::memberCall) {
                       field->toString(ctx)->getString().value()));
     }
   }
-  auto name = func->getProperty(ctx, L"name")->getString().value();
+  auto name =
+      func->getProperty(ctx, L"name")->toString(ctx)->getString().value();
   auto pc = _pc;
-  auto res = func->apply(
-      ctx, self, args,
-      {
-          .filename = module->filename,
-          .line = loc.line + 1,
-          .column = loc.column + 1,
-          .funcname = name,
-      });
+  auto res = func->apply(ctx, self, args,
+                         {
+                             .filename = module->filename,
+                             .line = loc.line + 1,
+                             .column = loc.column + 1,
+                             .funcname = name,
+                         });
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
     _pc = module->codes.size();
@@ -759,14 +770,13 @@ JS_OPT(JSVirtualMachine::superMemberCall) {
   }
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _pc;
-  auto res = func->apply(
-      ctx, self, args,
-      {
-          .filename = module->filename,
-          .line = loc.line + 1,
-          .column = loc.column + 1,
-          .funcname = name,
-      });
+  auto res = func->apply(ctx, self, args,
+                         {
+                             .filename = module->filename,
+                             .line = loc.line + 1,
+                             .column = loc.column + 1,
+                             .funcname = name,
+                         });
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
     _pc = module->codes.size();
@@ -793,14 +803,13 @@ JS_OPT(JSVirtualMachine::superCall) {
   }
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _pc;
-  auto res = func->apply(
-      ctx, self, args,
-      {
-          .filename = module->filename,
-          .line = loc.line + 1,
-          .column = loc.column + 1,
-          .funcname = name,
-      });
+  auto res = func->apply(ctx, self, args,
+                         {
+                             .filename = module->filename,
+                             .line = loc.line + 1,
+                             .column = loc.column + 1,
+                             .funcname = name,
+                         });
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
     _pc = module->codes.size();
@@ -830,14 +839,13 @@ JS_OPT(JSVirtualMachine::optionalCall) {
     loc = module->sourceMap.at(offset);
   }
   auto pc = _pc;
-  auto res = func->apply(
-      ctx, ctx->undefined(), args,
-      {
-          .filename = module->filename,
-          .line = loc.line + 1,
-          .column = loc.column + 1,
-          .funcname = name,
-      });
+  auto res = func->apply(ctx, ctx->undefined(), args,
+                         {
+                             .filename = module->filename,
+                             .line = loc.line + 1,
+                             .column = loc.column + 1,
+                             .funcname = name,
+                         });
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
     _pc = module->codes.size();
@@ -871,14 +879,13 @@ JS_OPT(JSVirtualMachine::memberOptionalCall) {
   }
   auto name = func->getProperty(ctx, L"name")->getString().value();
   auto pc = _pc;
-  auto res = func->apply(
-      ctx, self, args,
-      {
-          .filename = module->filename,
-          .line = loc.line + 1,
-          .column = loc.column + 1,
-          .funcname = name,
-      });
+  auto res = func->apply(ctx, self, args,
+                         {
+                             .filename = module->filename,
+                             .line = loc.line + 1,
+                             .column = loc.column + 1,
+                             .funcname = name,
+                         });
   _ctx->stack.push_back(res);
   if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
     _pc = module->codes.size();
@@ -1310,6 +1317,12 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::GET_FIELD:
         getField(ctx, module);
+        break;
+      case vm::JSAsmOperator::SET_PROP:
+        setProp(ctx, module);
+        break;
+      case vm::JSAsmOperator::GET_PROP:
+        getProp(ctx, module);
         break;
       case vm::JSAsmOperator::SET_SUPER_FIELD:
         setSuperField(ctx, module);

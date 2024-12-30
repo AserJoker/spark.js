@@ -370,7 +370,12 @@ void JSGenerator::resolveLiteralTemplate(JSGeneratorContext &ctx,
       auto m = n->tag.cast<JSMemberExpression>();
       resolveMemberChian(ctx, module, m->left, offsets);
       if (!offsets.empty()) {
-        throw error::JSSyntaxError(L"Invalid optional chian for template");
+        throw error::JSSyntaxError(L"Invalid optional chian for template",
+                                   {
+                                       .filename = module->filename,
+                                       .line = node->location.start.line,
+                                       .column = node->location.start.column,
+                                   });
       }
       generate(module, vm::JSAsmOperator::LOAD_CONST,
                m->right.cast<JSIdentifierLiteral>()->value);
@@ -379,14 +384,24 @@ void JSGenerator::resolveLiteralTemplate(JSGeneratorContext &ctx,
       auto m = n->tag.cast<JSComputedMemberExpression>();
       resolveMemberChian(ctx, module, m->left, offsets);
       if (!offsets.empty()) {
-        throw error::JSSyntaxError(L"Invalid optional chian for template");
+        throw error::JSSyntaxError(L"Invalid optional chian for template",
+                                   {
+                                       .filename = module->filename,
+                                       .line = node->location.start.line,
+                                       .column = node->location.start.column,
+                                   });
       }
       resolveNode(ctx, module, m->right);
       opt = vm::JSAsmOperator::MEMBER_CALL;
     } else if (n->tag->type == JSNodeType::EXPRESSION_OPTIONAL_MEMBER ||
                n->tag->type ==
                    JSNodeType::EXPRESSION_OPTIONAL_COMPUTED_MEMBER) {
-      throw error::JSSyntaxError(L"Invalid optional chian for template");
+      throw error::JSSyntaxError(L"Invalid optional chian for template",
+                                 {
+                                     .filename = module->filename,
+                                     .line = node->location.start.line,
+                                     .column = node->location.start.column,
+                                 });
     } else {
       resolveNode(ctx, module, n->tag);
     }
@@ -452,7 +467,8 @@ void JSGenerator::resolveSuper(JSGeneratorContext &ctx,
                                common::AutoPtr<JSModule> &module,
                                const common::AutoPtr<JSNode> &node) {
   throw error::JSSyntaxError(L"Invalid super",
-                             {.line = node->location.start.line,
+                             {.filename = module->filename,
+                              .line = node->location.start.line,
                               .column = node->location.start.column,
                               .funcname = L"constructor"});
 }
@@ -585,9 +601,19 @@ void JSGenerator::resolveStatementBreak(JSGeneratorContext &ctx,
   }
   if (it == _labels.rend()) {
     if (label.empty()) {
-      throw error::JSSyntaxError(L"Illegal break statement");
+      throw error::JSSyntaxError(L"Illegal break statement",
+                                 {
+                                     .filename = module->filename,
+                                     .line = node->location.start.line,
+                                     .column = node->location.start.column,
+                                 });
     } else {
-      throw error::JSSyntaxError(fmt::format(L"Undefined label '{}'", label));
+      throw error::JSSyntaxError(fmt::format(L"Undefined label '{}'", label),
+                                 {
+                                     .filename = module->filename,
+                                     .line = node->location.start.line,
+                                     .column = node->location.start.column,
+                                 });
     }
   }
   generate(module, vm::JSAsmOperator::JMP, 0U);
@@ -614,9 +640,19 @@ void JSGenerator::resolveStatementContinue(
   }
   if (it == _labels.rend()) {
     if (label.empty()) {
-      throw error::JSSyntaxError(L"Illegal continue statement");
+      throw error::JSSyntaxError(L"Illegal continue statement",
+                                 {
+                                     .filename = module->filename,
+                                     .line = node->location.start.line,
+                                     .column = node->location.start.column,
+                                 });
     } else {
-      throw error::JSSyntaxError(fmt::format(L"Undefined label '{}'", label));
+      throw error::JSSyntaxError(fmt::format(L"Undefined label '{}'", label),
+                                 {
+                                     .filename = module->filename,
+                                     .line = node->location.start.line,
+                                     .column = node->location.start.column,
+                                 });
     }
   }
   generate(module, vm::JSAsmOperator::JMP, 0U);
@@ -697,7 +733,12 @@ void JSGenerator::resolveStatementSwitch(JSGeneratorContext &ctx,
       (uint32_t)module->codes.size();
   for (auto &[node, offset] : chunk.second) {
     if (node->type == JSNodeType::STATEMENT_CONTINUE) {
-      throw error::JSSyntaxError(L"invalid continue");
+      throw error::JSSyntaxError(L"invalid continue",
+                                 {
+                                     .filename = module->filename,
+                                     .line = node->location.start.line,
+                                     .column = node->location.start.column,
+                                 });
     } else {
       *(uint32_t *)(module->codes.data() + offset) =
           (uint32_t)module->codes.size();
@@ -1037,7 +1078,12 @@ void JSGenerator::resolveVariableIdentifier(
     } else {
       resolveMemberChian(ctx, module, n->left, offsets);
       if (!offsets.empty()) {
-        throw error::JSSyntaxError(L"Invalid left-hand side in assignment");
+        throw error::JSSyntaxError(L"Invalid left-hand side in assignment",
+                                   {
+                                       .filename = module->filename,
+                                       .line = node->location.start.line,
+                                       .column = node->location.start.column,
+                                   });
       }
       generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
       generate(module, vm::JSAsmOperator::LOAD_CONST,
@@ -1055,7 +1101,12 @@ void JSGenerator::resolveVariableIdentifier(
     } else {
       resolveMemberChian(ctx, module, n->left, offsets);
       if (!offsets.empty()) {
-        throw error::JSSyntaxError(L"Invalid left-hand side in assignment");
+        throw error::JSSyntaxError(L"Invalid left-hand side in assignment",
+                                   {
+                                       .filename = module->filename,
+                                       .line = node->location.start.line,
+                                       .column = node->location.start.column,
+                                   });
       }
       generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
       resolveNode(ctx, module, n->right);
@@ -1131,7 +1182,12 @@ void JSGenerator::resolveVariableIdentifier(
     generate(module, vm::JSAsmOperator::POP, index);
     generate(module, vm::JSAsmOperator::POP, 1U);
   } else {
-    throw error::JSSyntaxError(L"Invalid left-hand side in assignment");
+    throw error::JSSyntaxError(L"Invalid left-hand side in assignment",
+                               {
+                                   .filename = module->filename,
+                                   .line = node->location.start.line,
+                                   .column = node->location.start.column,
+                               });
   }
 }
 
@@ -1543,7 +1599,12 @@ void JSGenerator::resolveExpressionDelete(JSGeneratorContext &ctx,
   if (n->right->type == JSNodeType::LITERAL_IDENTITY) {
     throw error::JSSyntaxError(
         fmt::format(L"Cannot delete identifier: '{}'",
-                    n->right.cast<JSIdentifierLiteral>()->value));
+                    n->right.cast<JSIdentifierLiteral>()->value),
+        {
+            .filename = module->filename,
+            .line = node->location.start.line,
+            .column = node->location.start.column,
+        });
   } else if (n->right->type == JSNodeType::EXPRESSION_MEMBER) {
     auto m = n->right.cast<JSMemberExpression>();
     resolveMemberChian(ctx, module, m->left, offsets);
@@ -1721,8 +1782,7 @@ void JSGenerator::resolveClassMethod(JSGeneratorContext &ctx,
   ctx.currentScope->functionAddr[node->id] =
       module->codes.size() + sizeof(uint16_t);
   generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
-  generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
-           node->location.getSource(module->source));
+  generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE, L"");
   if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
     generate(module, vm::JSAsmOperator::LOAD_CONST,
              n->identifier.cast<JSIdentifierLiteral>()->value);
@@ -2195,7 +2255,7 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
   if (n->identifier != nullptr) {
     auto name = n->identifier.cast<JSIdentifierLiteral>()->value;
     generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
-    generate(module, vm::JSAsmOperator::CREATE_CONST, name);
+    generate(module, vm::JSAsmOperator::CREATE, name);
   }
   auto closures = resolveClosure(ctx, module, node);
   for (auto &closure : closures) {
@@ -2288,7 +2348,9 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
   popLexScope(ctx, module);
   *(uint32_t *)&module->codes[offset] = (uint32_t)module->codes.size();
   if (n->identifier != nullptr) {
-    generate(module, vm::JSAsmOperator::POP, 1U);
+    auto identifier = n->identifier.cast<JSIdentifierLiteral>()->value;
+    generate(module, vm::JSAsmOperator::STORE, identifier);
+    generate(module, vm::JSAsmOperator::LOAD, identifier);
   }
 }
 
@@ -2522,7 +2584,12 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
     resolveDeclarationClass(ctx, module, node);
     break;
   default:
-    throw error::JSSyntaxError(L"Unexcepted token");
+    throw error::JSSyntaxError(L"Unexcepted token",
+                               {
+                                   .filename = module->filename,
+                                   .line = node->location.start.line,
+                                   .column = node->location.start.column,
+                               });
   }
 }
 
