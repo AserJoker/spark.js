@@ -1318,12 +1318,6 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case vm::JSAsmOperator::GET_FIELD:
         getField(ctx, module);
         break;
-      case vm::JSAsmOperator::SET_PROP:
-        setProp(ctx, module);
-        break;
-      case vm::JSAsmOperator::GET_PROP:
-        getProp(ctx, module);
-        break;
       case vm::JSAsmOperator::SET_SUPER_FIELD:
         setSuperField(ctx, module);
         break;
