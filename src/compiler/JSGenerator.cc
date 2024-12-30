@@ -2299,7 +2299,10 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
     auto item = prop.cast<JSClassProperty>();
     if (item->value != nullptr) {
       resolveNode(ctx, module, item->value);
+    } else {
+      generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
     }
+    
     if (item->identifier->type == JSNodeType::LITERAL_IDENTITY) {
       generate(module, vm::JSAsmOperator::LOAD_CONST,
                item->identifier.cast<JSIdentifierLiteral>()->value);
