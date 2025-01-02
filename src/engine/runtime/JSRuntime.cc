@@ -87,3 +87,25 @@ common::AutoPtr<compiler::JSGenerator> &JSRuntime::getGenerator() {
 common::AutoPtr<vm::JSVirtualMachine> &JSRuntime::getVirtualMachine() {
   return _vm;
 }
+void JSRuntime::setDirectiveCallback(const std::wstring &name,
+                                     const JSHook &setup,
+                                     const JSHook &cleanup) {
+  _directives[name] = {setup, cleanup};
+}
+
+const std::unordered_map<std::wstring,
+                         std::pair<JSRuntime::JSHook, JSRuntime::JSHook>> &
+JSRuntime::getDirectives() const {
+  return _directives;
+}
+void JSRuntime::setImportAttribute(const std::wstring &key,
+                                   const std::wstring &value) {
+  _importAttributes[key] = value;
+}
+
+void JSRuntime::clearImportAttribute() { _importAttributes.clear(); }
+
+const std::unordered_map<std::wstring, std::wstring> &
+JSRuntime::getImportAttributes() const {
+  return _importAttributes;
+}

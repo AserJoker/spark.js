@@ -80,9 +80,6 @@ private:
                          const JSNodeArray &nodes);
 
 private:
-  void resolvePrivateName(JSGeneratorContext &ctx,
-                          common::AutoPtr<JSModule> &module,
-                          const common::AutoPtr<JSNode> &node);
 
   void resolveLiteralRegex(JSGeneratorContext &ctx,
                            common::AutoPtr<JSModule> &module,
@@ -228,9 +225,6 @@ private:
                                  common::AutoPtr<JSModule> &module,
                                  const common::AutoPtr<JSNode> &node);
 
-  void resolveDirective(JSGeneratorContext &ctx,
-                        common::AutoPtr<JSModule> &module,
-                        const common::AutoPtr<JSNode> &node);
   void resolveObjectProperty(JSGeneratorContext &ctx,
                              common::AutoPtr<JSModule> &module,
                              const common::AutoPtr<JSNode> &node);
@@ -397,13 +391,7 @@ private:
   void generate(common::AutoPtr<JSModule> &module, const vm::JSAsmOperator &opt,
                 uint32_t arg) {
     auto size = module->codes.size();
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
+    module->codes.resize(size + 6);
 
     auto buffer = module->codes.data() + size;
     uint16_t code = (uint16_t)opt;
@@ -415,16 +403,7 @@ private:
   void generate(common::AutoPtr<JSModule> &module, const vm::JSAsmOperator &opt,
                 double arg) {
     auto size = module->codes.size();
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
-    module->codes.push_back(0);
+    module->codes.resize(size + 10);
     auto buffer = module->codes.data() + size;
     uint16_t code = (uint16_t)opt;
     *(uint16_t *)buffer = code;
@@ -444,6 +423,18 @@ private:
   void generate(common::AutoPtr<JSModule> &module, const vm::JSAsmOperator &opt,
                 const std::wstring &source) {
     generate(module, opt, resolveConstant(module, source));
+  }
+  void generate(common::AutoPtr<JSModule> &module, const vm::JSAsmOperator &opt,
+                const std::wstring &a, const std::wstring &b) {
+    auto size = module->codes.size();
+    module->codes.resize(size + 6);
+    auto buffer = module->codes.data() + size;
+    uint16_t code = (uint16_t)opt;
+    *(uint16_t *)buffer = code;
+    buffer += sizeof(uint16_t);
+    *(uint32_t *)buffer = resolveConstant(module, a);
+    buffer += sizeof(uint32_t);
+    *(uint32_t *)buffer = resolveConstant(module, b);
   }
 
 public:

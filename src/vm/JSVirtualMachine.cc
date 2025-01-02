@@ -198,7 +198,7 @@ JS_OPT(JSVirtualMachine::setField) {
     }
     field->setProperty(ctx, L"name", ctx->createString(fieldname));
   }
-  _ctx->stack.push_back(obj->setProperty(ctx, name, field));
+  obj->setProperty(ctx, name, field);
 }
 
 JS_OPT(JSVirtualMachine::setSuperField) {
@@ -223,6 +223,19 @@ JS_OPT(JSVirtualMachine::getSuperField) {
     auto super = self->getPrototype(ctx)->getPrototype(ctx);
     _ctx->stack.push_back(super->getProperty(ctx, name, self));
   }
+}
+JS_OPT(JSVirtualMachine::setPrivateField) {
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto obj = *_ctx->stack.rbegin();
+  if (field->isFunction() && field->getProperty(ctx, L"name")->isUndefined()) {
+    std::wstring fieldname =
+        fmt::format(L"{}.{}", obj->getName(), name->getString().value());
+    field->setProperty(ctx, L"name", ctx->createString(fieldname));
+  }
+  obj->setProperty(ctx, name, field);
 }
 
 JS_OPT(JSVirtualMachine::getField) {
@@ -267,7 +280,36 @@ JS_OPT(JSVirtualMachine::setAccessor) {
     }
     prop->set = accessor->getStore();
   }
-  _ctx->stack.push_back(ctx->truly());
+}
+
+JS_OPT(JSVirtualMachine::setPrivateAccessor) {
+  auto type = argi(module);
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto accessor = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto obj = *_ctx->stack.rbegin();
+  auto prop = obj->getOwnPropertyDescriptor(ctx, name);
+  if (!prop) {
+    obj->setPropertyDescriptor(ctx, name, ctx->undefined(), true, true);
+    prop = obj->getOwnPropertyDescriptor(ctx, name);
+  }
+  if (prop->value) {
+    obj->getStore()->removeChild(prop->value);
+    prop->value = nullptr;
+  }
+  obj->getStore()->appendChild(accessor->getStore());
+  if (type) {
+    if (prop->get && prop->get != accessor->getStore()) {
+      obj->getStore()->removeChild(prop->get);
+    }
+    prop->get = accessor->getStore();
+  } else {
+    if (prop->set && prop->set != accessor->getStore()) {
+      obj->getStore()->removeChild(prop->set);
+    }
+    prop->set = accessor->getStore();
+  }
 }
 
 JS_OPT(JSVirtualMachine::merge) {
@@ -1188,12 +1230,32 @@ JS_OPT(JSVirtualMachine::importModule) {
   _ctx->stack.push_back(mod);
 }
 
+JS_OPT(JSVirtualMachine::setImportAttribute) {
+  auto value = args(module);
+  auto key = args(module);
+  ctx->getRuntime()->setImportAttribute(key, value);
+}
+
 JS_OPT(JSVirtualMachine::export_) {
   auto name = args(module);
   auto value = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto &[_, mod] = ctx->getCurrentModule();
   mod->setProperty(ctx, name, value);
+}
+JS_OPT(JSVirtualMachine::setupDirective) {
+  auto name = args(module);
+  auto &hooks = ctx->getRuntime()->getDirectives();
+  if (hooks.contains(name)) {
+    hooks.at(name).first(ctx);
+  }
+}
+JS_OPT(JSVirtualMachine::cleanupDirective) {
+  auto name = args(module);
+  auto &hooks = ctx->getRuntime()->getDirectives();
+  if (hooks.contains(name)) {
+    hooks.at(name).second(ctx);
+  }
 }
 
 void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
@@ -1324,11 +1386,17 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case vm::JSAsmOperator::GET_SUPER_FIELD:
         getSuperField(ctx, module);
         break;
+      case vm::JSAsmOperator::SET_PRIVATE_FIELD:
+        setPrivateField(ctx, module);
+        break;
       case vm::JSAsmOperator::GET_KEYS:
         getKeys(ctx, module);
         break;
       case vm::JSAsmOperator::SET_ACCESSOR:
         setAccessor(ctx, module);
+        break;
+      case vm::JSAsmOperator::SET_PRIVATE_ACCESSOR:
+        setPrivateAccessor(ctx, module);
         break;
       case vm::JSAsmOperator::MERGE:
         merge(ctx, module);
@@ -1551,6 +1619,15 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::EXPORT:
         export_(ctx, module);
+        break;
+      case vm::JSAsmOperator::SETUP_DIRECTIVE:
+        setupDirective(ctx, module);
+        break;
+      case vm::JSAsmOperator::CLEANUP_DIRECTIVE:
+        cleanupDirective(ctx, module);
+        break;
+      case vm::JSAsmOperator::SET_IMPORT_ATTRIBUTE:
+        setImportAttribute(ctx, module);
         break;
       }
     } catch (error::JSError &e) {

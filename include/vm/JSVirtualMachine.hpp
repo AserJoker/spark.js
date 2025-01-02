@@ -58,8 +58,10 @@ private:
   JS_OPT(getField);
   JS_OPT(setSuperField);
   JS_OPT(getSuperField);
+  JS_OPT(setPrivateField);
   JS_OPT(getKeys);
   JS_OPT(setAccessor);
+  JS_OPT(setPrivateAccessor);
   JS_OPT(merge);
   JS_OPT(setRegexHasIndices);
   JS_OPT(setRegexGlobal);
@@ -133,7 +135,10 @@ private:
   JS_OPT(instanceof);
   JS_OPT(import);
   JS_OPT(importModule);
+  JS_OPT(setImportAttribute);
   JS_OPT(export_);
+  JS_OPT(setupDirective);
+  JS_OPT(cleanupDirective);
 
 public:
   JSVirtualMachine();

@@ -225,9 +225,27 @@ void JSGenerator::resolveMemberChian(JSGeneratorContext &ctx,
       generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
     } else {
       resolveNode(ctx, module, n->left);
-      generate(module, vm::JSAsmOperator::LOAD_CONST,
-               n->right.cast<JSIdentifierLiteral>()->value);
-      generate(module, vm::JSAsmOperator::GET_FIELD);
+      if (n->right->type == JSNodeType::LITERAL_IDENTITY) {
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 n->right.cast<JSIdentifierLiteral>()->value);
+        generate(module, vm::JSAsmOperator::GET_FIELD);
+      } else if (n->right->type == JSNodeType::PRIVATE_NAME) {
+        auto f = n->right.cast<JSPrivateName>();
+        if (n->left->type != JSNodeType::THIS) {
+          throw error::JSSyntaxError(
+              fmt::format(L"Private field '#{}' must be declared in an "
+                          L"enclosing class",
+                          f->value),
+              {
+                  .filename = module->filename,
+                  .line = n->right->location.start.line,
+                  .column = n->right->location.start.column,
+                  .funcname = L"_.compile",
+              });
+        }
+        generate(module, vm::JSAsmOperator::LOAD_CONST, L"#" + f->value);
+        generate(module, vm::JSAsmOperator::GET_FIELD);
+      }
     }
   } else if (node->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
     if (n->left->type == JSNodeType::SUPER) {
@@ -274,12 +292,6 @@ void JSGenerator::resolveStatements(JSGeneratorContext &ctx,
       }
     }
   }
-}
-
-void JSGenerator::resolvePrivateName(JSGeneratorContext &ctx,
-                                     common::AutoPtr<JSModule> &module,
-                                     const common::AutoPtr<JSNode> &node) {
-  // TODO:
 }
 
 void JSGenerator::resolveLiteralRegex(JSGeneratorContext &ctx,
@@ -409,7 +421,6 @@ void JSGenerator::resolveLiteralTemplate(JSGeneratorContext &ctx,
       generate(module, vm::JSAsmOperator::LOAD_CONST, n->quasis[index]);
       generate(module, vm::JSAsmOperator::PUSH, (double)index);
       generate(module, vm::JSAsmOperator::SET_FIELD);
-      generate(module, vm::JSAsmOperator::POP, 1U);
     }
     generate(module, vm::JSAsmOperator::PUSH_ARRAY);
     for (size_t index = 0; index < n->quasis.size(); index++) {
@@ -428,11 +439,9 @@ void JSGenerator::resolveLiteralTemplate(JSGeneratorContext &ctx,
       generate(module, vm::JSAsmOperator::LOAD_CONST, raw);
       generate(module, vm::JSAsmOperator::PUSH, (double)index);
       generate(module, vm::JSAsmOperator::SET_FIELD);
-      generate(module, vm::JSAsmOperator::POP, 1U);
     }
     generate(module, vm::JSAsmOperator::LOAD_CONST, L"raw");
     generate(module, vm::JSAsmOperator::SET_FIELD);
-    generate(module, vm::JSAsmOperator::POP, 1U);
     for (auto &exp : n->expressions) {
       resolveNode(ctx, module, exp);
     }
@@ -477,8 +486,9 @@ void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
                                  const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSProgram>();
   pushLexScope(ctx, module, node->scope);
-  for (auto &dec : n->directives) {
-    resolveNode(ctx, module, dec);
+  for (auto &dir : n->directives) {
+    auto d = dir.cast<JSDirective>();
+    generate(module, vm::JSAsmOperator::SETUP_DIRECTIVE, d->value);
   }
   JSNodeArray body;
   for (auto &item : n->body) {
@@ -497,6 +507,10 @@ void JSGenerator::resolveProgram(JSGeneratorContext &ctx,
   }
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
+  }
+  for (auto i = n->directives.rbegin(); i != n->directives.rend(); i++) {
+    auto d = i->cast<JSDirective>();
+    generate(module, vm::JSAsmOperator::CLEANUP_DIRECTIVE, d->value);
   }
   popLexScope(ctx, module);
 }
@@ -1085,10 +1099,27 @@ void JSGenerator::resolveVariableIdentifier(
                                    });
       }
       generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
-      generate(module, vm::JSAsmOperator::LOAD_CONST,
-               n->right.cast<JSIdentifierLiteral>()->value);
-      generate(module, vm::JSAsmOperator::SET_FIELD);
-      generate(module, vm::JSAsmOperator::POP, 1U); // set_field result
+      if (n->right->type == JSNodeType::LITERAL_IDENTITY) {
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 n->right.cast<JSIdentifierLiteral>()->value);
+        generate(module, vm::JSAsmOperator::SET_FIELD);
+      } else if (n->right->type == JSNodeType::PRIVATE_NAME) {
+        auto f = n->right.cast<JSPrivateName>();
+        if (n->left->type != JSNodeType::THIS) {
+          throw error::JSSyntaxError(
+              fmt::format(L"Private field '#{}' must be declared in an "
+                          L"enclosing class",
+                          f->value),
+              {
+                  .filename = module->filename,
+                  .line = n->right->location.start.line,
+                  .column = n->right->location.start.column,
+                  .funcname = L"_.compile",
+              });
+        }
+        generate(module, vm::JSAsmOperator::LOAD_CONST, L"#" + f->value);
+        generate(module, vm::JSAsmOperator::SET_PRIVATE_FIELD);
+      }
       generate(module, vm::JSAsmOperator::POP, 1U); // self
       generate(module, vm::JSAsmOperator::POP, 1U); // raw_value
     }
@@ -1110,7 +1141,6 @@ void JSGenerator::resolveVariableIdentifier(
       generate(module, vm::JSAsmOperator::PUSH_VALUE, 2U);
       resolveNode(ctx, module, n->right);
       generate(module, vm::JSAsmOperator::SET_FIELD);
-      generate(module, vm::JSAsmOperator::POP, 1U); // set_field result
       generate(module, vm::JSAsmOperator::POP, 1U); // self
       generate(module, vm::JSAsmOperator::POP, 1U); // raw_value
     }
@@ -1190,12 +1220,6 @@ void JSGenerator::resolveVariableIdentifier(
   }
 }
 
-void JSGenerator::resolveDirective(JSGeneratorContext &ctx,
-                                   common::AutoPtr<JSModule> &module,
-                                   const common::AutoPtr<JSNode> &node) {
-  // TODO:
-}
-
 void JSGenerator::resolveObjectProperty(JSGeneratorContext &ctx,
                                         common::AutoPtr<JSModule> &module,
                                         const common::AutoPtr<JSNode> &node) {
@@ -1212,7 +1236,6 @@ void JSGenerator::resolveObjectProperty(JSGeneratorContext &ctx,
     resolveNode(ctx, module, n->identifier);
   }
   generate(module, vm::JSAsmOperator::SET_FIELD);
-  generate(module, vm::JSAsmOperator::POP, 1U);
 }
 
 void JSGenerator::resolveObjectMethod(JSGeneratorContext &ctx,
@@ -1245,7 +1268,6 @@ void JSGenerator::resolveObjectMethod(JSGeneratorContext &ctx,
     resolveNode(ctx, module, n->identifier);
   }
   generate(module, vm::JSAsmOperator::SET_FIELD);
-  generate(module, vm::JSAsmOperator::POP, 1U);
 }
 
 void JSGenerator::resolveObjectAccessor(JSGeneratorContext &ctx,
@@ -1386,9 +1408,27 @@ void JSGenerator::resolveExpressionMember(JSGeneratorContext &ctx,
     generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
   } else {
     resolveMemberChian(ctx, module, n->left, offsets);
-    generate(module, vm::JSAsmOperator::LOAD_CONST,
-             n->right.cast<JSIdentifierLiteral>()->value);
-    generate(module, vm::JSAsmOperator::GET_FIELD);
+    if (n->right->type == JSNodeType::PRIVATE_NAME) {
+      auto f = n->right.cast<JSPrivateName>();
+      if (n->left->type != JSNodeType::THIS) {
+        throw error::JSSyntaxError(
+            fmt::format(L"Private field '#{}' must be declared in an "
+                        L"enclosing class",
+                        f->value),
+            {
+                .filename = module->filename,
+                .line = n->right->location.start.line,
+                .column = n->right->location.start.column,
+                .funcname = L"_.compile",
+            });
+      }
+      generate(module, vm::JSAsmOperator::LOAD_CONST, L"#" + f->value);
+      generate(module, vm::JSAsmOperator::GET_FIELD);
+    } else {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->right.cast<JSIdentifierLiteral>()->value);
+      generate(module, vm::JSAsmOperator::GET_FIELD);
+    }
     for (auto &offset : offsets) {
       *(uint32_t *)(module->codes.data() + offset) =
           (uint32_t)(module->codes.size());
@@ -1489,8 +1529,25 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
       if (func->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
         resolveNode(ctx, module, member->right);
       } else {
-        generate(module, vm::JSAsmOperator::LOAD_CONST,
-                 member->right.cast<JSIdentifierLiteral>()->value);
+        if (member->right->type == JSNodeType::PRIVATE_NAME) {
+          auto f = member->right.cast<JSPrivateName>();
+          if (member->left->type != JSNodeType::THIS) {
+            throw error::JSSyntaxError(
+                fmt::format(L"Private field '#{}' must be declared in an "
+                            L"enclosing class",
+                            f->value),
+                {
+                    .filename = module->filename,
+                    .line = member->right->location.start.line,
+                    .column = member->right->location.start.column,
+                    .funcname = L"_.compile",
+                });
+          }
+          generate(module, vm::JSAsmOperator::LOAD_CONST, L"#" + f->value);
+        } else {
+          generate(module, vm::JSAsmOperator::LOAD_CONST,
+                   member->right.cast<JSIdentifierLiteral>()->value);
+        }
       }
       opt = vm::JSAsmOperator::MEMBER_CALL;
     }
@@ -1753,12 +1810,6 @@ void JSGenerator::resolveClassMethod(JSGeneratorContext &ctx,
                                      common::AutoPtr<JSModule> &module,
                                      const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSClassMethod>();
-  if ((n->identifier->type == JSNodeType::LITERAL_IDENTITY &&
-       n->identifier.cast<JSIdentifierLiteral>()->value == L"constructor") ||
-      (n->identifier->type == JSNodeType::LITERAL_STRING &&
-       n->identifier.cast<JSStringLiteral>()->value == L"constructor")) {
-    return;
-  }
   if (!n->static_) {
     generate(module, vm::JSAsmOperator::PUSH_VALUE, 1U);
     generate(module, vm::JSAsmOperator::LOAD_CONST, L"prototype");
@@ -1783,14 +1834,19 @@ void JSGenerator::resolveClassMethod(JSGeneratorContext &ctx,
       module->codes.size() + sizeof(uint16_t);
   generate(module, vm::JSAsmOperator::SET_FUNC_ADDRESS, 0U);
   generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE, L"[method (anonymous)]");
-  if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+  if (n->identifier->type == JSNodeType::PRIVATE_NAME) {
     generate(module, vm::JSAsmOperator::LOAD_CONST,
-             n->identifier.cast<JSIdentifierLiteral>()->value);
+             L"#" + n->identifier.cast<JSPrivateName>()->value);
+    generate(module, vm::JSAsmOperator::SET_PRIVATE_FIELD);
   } else {
-    resolveNode(ctx, module, n->identifier);
+    if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->identifier.cast<JSIdentifierLiteral>()->value);
+    } else {
+      resolveNode(ctx, module, n->identifier);
+    }
+    generate(module, vm::JSAsmOperator::SET_FIELD);
   }
-  generate(module, vm::JSAsmOperator::SET_FIELD);
-  generate(module, vm::JSAsmOperator::POP, 1U);
   if (!n->static_) {
     generate(module, vm::JSAsmOperator::POP, 1U);
   }
@@ -1806,17 +1862,22 @@ void JSGenerator::resolveClassProperty(JSGeneratorContext &ctx,
     } else {
       generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
     }
-    if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+    if (n->identifier->type == JSNodeType::PRIVATE_NAME) {
       generate(module, vm::JSAsmOperator::LOAD_CONST,
-               n->identifier.cast<JSIdentifierLiteral>()->value);
-    } else if (n->identifier->type == JSNodeType::LITERAL_STRING) {
-      generate(module, vm::JSAsmOperator::LOAD_CONST,
-               n->identifier.cast<JSStringLiteral>()->value);
+               L"#" + n->identifier.cast<JSPrivateName>()->value);
+      generate(module, vm::JSAsmOperator::SET_PRIVATE_FIELD);
     } else {
-      resolveNode(ctx, module, n->identifier);
+      if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 n->identifier.cast<JSIdentifierLiteral>()->value);
+      } else if (n->identifier->type == JSNodeType::LITERAL_STRING) {
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 n->identifier.cast<JSStringLiteral>()->value);
+      } else {
+        resolveNode(ctx, module, n->identifier);
+      }
+      generate(module, vm::JSAsmOperator::SET_FIELD);
     }
-    generate(module, vm::JSAsmOperator::SET_FIELD);
-    generate(module, vm::JSAsmOperator::POP, 1U);
   }
 }
 
@@ -1839,15 +1900,21 @@ void JSGenerator::resolveClassAccessor(JSGeneratorContext &ctx,
   generate(module, vm::JSAsmOperator::SET_FUNC_SOURCE,
            std::wstring(L"[") +
                (n->kind == JSAccessorKind::GET ? L"get" : L"set") + L"]");
-  if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+  if (n->identifier->type == JSNodeType::PRIVATE_NAME) {
     generate(module, vm::JSAsmOperator::LOAD_CONST,
-             n->identifier.cast<JSIdentifierLiteral>()->value);
+             L"#" + n->identifier.cast<JSPrivateName>()->value);
+    generate(module, vm::JSAsmOperator::SET_PRIVATE_ACCESSOR,
+             n->kind == JSAccessorKind::GET ? 1U : 0U);
   } else {
-    resolveNode(ctx, module, n->identifier);
+    if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+      generate(module, vm::JSAsmOperator::LOAD_CONST,
+               n->identifier.cast<JSIdentifierLiteral>()->value);
+    } else {
+      resolveNode(ctx, module, n->identifier);
+    }
+    generate(module, vm::JSAsmOperator::SET_ACCESSOR,
+             n->kind == JSAccessorKind::GET ? 1U : 0U);
   }
-  generate(module, vm::JSAsmOperator::SET_ACCESSOR,
-           n->kind == JSAccessorKind::GET ? 1U : 0U);
-  generate(module, vm::JSAsmOperator::POP, 1U);
   if (!n->static_) {
     generate(module, vm::JSAsmOperator::POP, 1U);
   }
@@ -1868,6 +1935,11 @@ void JSGenerator::resolveImportDeclaration(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSImportDeclaration>();
+  if (!n->attributes.empty()) {
+    for (auto &item : n->attributes) {
+      resolveNode(ctx, module, item);
+    }
+  }
   generate(module, vm::JSAsmOperator::IMPORT_MODULE,
            n->source.cast<JSStringLiteral>()->value);
   for (auto &item : n->items) {
@@ -1928,7 +2000,10 @@ void JSGenerator::resolveImportNamespace(JSGeneratorContext &ctx,
 void JSGenerator::resolveImportAttartube(JSGeneratorContext &ctx,
                                          common::AutoPtr<JSModule> &module,
                                          const common::AutoPtr<JSNode> &node) {
-  // TODO:
+  auto attr = node.cast<JSImportAttribute>();
+  auto key = attr->key.cast<JSStringLiteral>()->value;
+  auto value = attr->value.cast<JSStringLiteral>()->value;
+  generate(module, vm::JSAsmOperator::SET_IMPORT_ATTRIBUTE, key, value);
 }
 
 void JSGenerator::resolveExportDeclaration(
@@ -1936,8 +2011,14 @@ void JSGenerator::resolveExportDeclaration(
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSExportDeclaration>();
   if (n->source != nullptr) {
+    if (!n->attributes.empty()) {
+      for (auto &item : n->attributes) {
+        resolveNode(ctx, module, item);
+      }
+    }
     generate(module, vm::JSAsmOperator::IMPORT_MODULE,
              n->source.cast<JSStringLiteral>()->value);
+
     for (auto &item : n->items) {
       if (item->type == JSNodeType::EXPORT_SPECIFIER) {
         auto n = item.cast<JSExportSpecifier>();
@@ -2169,11 +2250,19 @@ void JSGenerator::resolveDeclarationFunctionBody(
     JSGeneratorContext &ctx, common::AutoPtr<JSModule> &module,
     const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSFunctionBodyDeclaration>();
+  for (auto &dir : n->directives) {
+    auto d = dir.cast<JSDirective>();
+    generate(module, vm::JSAsmOperator::SETUP_DIRECTIVE, d->value);
+  }
   resolveStatements(ctx, module, n->statements);
   generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
   generate(module, vm::JSAsmOperator::RET);
   for (auto &item : ctx.currentScope->functionDeclarations) {
     resolveDeclarationFunction(ctx, module, item);
+  }
+  for (auto it = n->directives.rbegin(); it != n->directives.rend(); it++) {
+    generate(module, vm::JSAsmOperator::CLEANUP_DIRECTIVE,
+             it->cast<JSDirective>()->value);
   }
 }
 
@@ -2223,7 +2312,6 @@ void JSGenerator::resolveDeclarationArray(JSGeneratorContext &ctx,
       resolveNode(ctx, module, n->items[index]);
       generate(module, vm::JSAsmOperator::PUSH, (double)index);
       generate(module, vm::JSAsmOperator::SET_FIELD);
-      generate(module, vm::JSAsmOperator::POP, 1U);
     }
   }
 }
@@ -2306,17 +2394,22 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
       generate(module, vm::JSAsmOperator::PUSH_UNDEFINED);
     }
 
-    if (item->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+    if (item->identifier->type == JSNodeType::PRIVATE_NAME) {
       generate(module, vm::JSAsmOperator::LOAD_CONST,
-               item->identifier.cast<JSIdentifierLiteral>()->value);
-    } else if (item->identifier->type == JSNodeType::LITERAL_STRING) {
-      generate(module, vm::JSAsmOperator::LOAD_CONST,
-               item->identifier.cast<JSStringLiteral>()->value);
+               L"#" + item->identifier.cast<JSPrivateName>()->value);
+      generate(module, vm::JSAsmOperator::SET_PRIVATE_FIELD);
     } else {
-      resolveNode(ctx, module, n->identifier);
+      if (item->identifier->type == JSNodeType::LITERAL_IDENTITY) {
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 item->identifier.cast<JSIdentifierLiteral>()->value);
+      } else if (item->identifier->type == JSNodeType::LITERAL_STRING) {
+        generate(module, vm::JSAsmOperator::LOAD_CONST,
+                 item->identifier.cast<JSStringLiteral>()->value);
+      } else {
+        resolveNode(ctx, module, n->identifier);
+      }
+      generate(module, vm::JSAsmOperator::SET_FIELD);
     }
-    generate(module, vm::JSAsmOperator::SET_FIELD);
-    generate(module, vm::JSAsmOperator::POP, 1U);
   }
   generate(module, vm::JSAsmOperator::POP, 1U);
   if (constructor != nullptr) {
@@ -2364,9 +2457,6 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
                               common::AutoPtr<JSModule> &module,
                               const common::AutoPtr<JSNode> &node) {
   switch (node->type) {
-  case JSNodeType::PRIVATE_NAME:
-    resolvePrivateName(ctx, module, node);
-    break;
   case JSNodeType::LITERAL_REGEX:
     resolveLiteralRegex(ctx, module, node);
     break;
@@ -2462,9 +2552,6 @@ void JSGenerator::resolveNode(JSGeneratorContext &ctx,
     break;
   case JSNodeType::VARIABLE_DECLARATOR:
     resolveVariableDeclarator(ctx, module, node);
-    break;
-  case JSNodeType::DIRECTIVE:
-    resolveDirective(ctx, module, node);
     break;
   case JSNodeType::OBJECT_PROPERTY:
     resolveObjectProperty(ctx, module, node);

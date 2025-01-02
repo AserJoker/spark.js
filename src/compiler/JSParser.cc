@@ -2586,6 +2586,7 @@ JSParser::readDirective(const std::wstring &filename,
       current = backup;
     }
     position = current;
+    node->value = value->location.getSource(source);
     return node;
   }
   return nullptr;
@@ -2832,7 +2833,7 @@ JSParser::readMemberLiteral(const std::wstring &filename,
   skipInvisible(filename, source, current);
   auto token = readIdentifierToken(filename, source, current, true);
   if (token == nullptr) {
-    return nullptr;
+      return nullptr;
   }
   common::AutoPtr node = new JSIdentifierLiteral();
   node->value = token->location.getSource(source);
@@ -3096,6 +3097,9 @@ JSParser::readMemberExpression(const std::wstring &filename,
     auto identifier = readIdentifierLiteral(filename, source, current);
     if (!identifier) {
       identifier = readMemberLiteral(filename, source, current);
+    }
+    if (!identifier) {
+      identifier = readPrivateName(filename, source, current);
     }
     if (!identifier) {
       throw error::JSSyntaxError(

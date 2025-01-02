@@ -456,6 +456,24 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       out << L"super_call " << *(uint32_t *)(buffer + offset);
       offset += sizeof(uint32_t);
       break;
+    case vm::JSAsmOperator::SETUP_DIRECTIVE:
+      out << L"setup_directive";
+      break;
+    case vm::JSAsmOperator::CLEANUP_DIRECTIVE:
+      out << L"cleanup_directive";
+      break;
+    case vm::JSAsmOperator::SET_IMPORT_ATTRIBUTE:
+      out << L"set_import_attribute " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      out << L" " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
+      break;
+    case vm::JSAsmOperator::SET_PRIVATE_FIELD:
+      out << L"set_private_field";
+      break;
+    case vm::JSAsmOperator::SET_PRIVATE_ACCESSOR:
+      out << L"set_private_accessor";
+      break;
     }
     out << std::endl;
   }

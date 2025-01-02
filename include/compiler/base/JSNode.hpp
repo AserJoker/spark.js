@@ -166,6 +166,7 @@ struct JSInterpreterDirective : public JSNode {
 
 struct JSDirective : public JSNode {
   JSDirective() : JSNode(JSNodeType::DIRECTIVE) {}
+  std::wstring value;
 };
 
 struct JSBlockStatement : public JSNode {
