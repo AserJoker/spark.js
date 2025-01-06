@@ -65,12 +65,6 @@ private:
   JS_OPT(setAccessor);
   JS_OPT(setPrivateAccessor);
   JS_OPT(merge);
-  JS_OPT(setRegexHasIndices);
-  JS_OPT(setRegexGlobal);
-  JS_OPT(setRegexIgnoreCases);
-  JS_OPT(setRegexMultiline);
-  JS_OPT(setRegexDotAll);
-  JS_OPT(setRegexSticky);
   JS_OPT(pop);
   JS_OPT(store);
   JS_OPT(create);

@@ -257,6 +257,8 @@ public:
 
   common::AutoPtr<JSValue> Symbol();
 
+  common::AutoPtr<JSValue> RegExp();
+
   common::AutoPtr<JSValue> Function();
 
   common::AutoPtr<JSValue> AsyncFunction();

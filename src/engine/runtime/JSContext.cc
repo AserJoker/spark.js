@@ -34,6 +34,7 @@
 #include "engine/lib/JSPromiseConstructor.hpp"
 #include "engine/lib/JSRangeErrorConstructor.hpp"
 #include "engine/lib/JSReferenceErrorConstructor.hpp"
+#include "engine/lib/JSRegexConstructor.hpp"
 #include "engine/lib/JSSymbolConstructor.hpp"
 #include "engine/lib/JSSyntaxErrorConstructor.hpp"
 #include "engine/lib/JSTypeErrorConstructor.hpp"
@@ -139,6 +140,7 @@ void JSContext::initialize() {
   _TypeError = JSTypeErrorConstructor::initialize(this);
   _URIError = JSURIErrorConstructor::initialize(this);
   _InternalError = JSInternalErrorConstructor::initialize(this);
+  _RegExp = JSRegexConstructor::initialize(this);
   subRef();
 }
 
@@ -809,6 +811,8 @@ common::AutoPtr<JSValue> JSContext::truly() { return createBoolean(true); }
 common::AutoPtr<JSValue> JSContext::falsely() { return createBoolean(false); }
 
 common::AutoPtr<JSValue> JSContext::Symbol() { return _Symbol; }
+
+common::AutoPtr<JSValue> JSContext::RegExp() { return _RegExp; }
 
 common::AutoPtr<JSValue> JSContext::Function() { return _Function; }
 

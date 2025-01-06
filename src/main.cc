@@ -16,6 +16,7 @@
 #include <fstream>
 #include <iostream>
 #include <ostream>
+// #include <regex>
 #include <string>
 
 using namespace spark;
@@ -203,24 +204,6 @@ void write(common::AutoPtr<compiler::JSModule> module) {
       break;
     case vm::JSAsmOperator::MERGE:
       out << L"merge";
-      break;
-    case vm::JSAsmOperator::SET_REGEX_HAS_INDICES:
-      out << L"set_regex_has_indices";
-      break;
-    case vm::JSAsmOperator::SET_REGEX_GLOBAL:
-      out << L"set_regex_global";
-      break;
-    case vm::JSAsmOperator::SET_REGEX_IGNORE_CASES:
-      out << L"set_regex_ignore_cases";
-      break;
-    case vm::JSAsmOperator::SET_REGEX_MULTILINE:
-      out << L"set_regex_multiline";
-      break;
-    case vm::JSAsmOperator::SET_REGEX_DOT_ALL:
-      out << L"set_regex_dot_all";
-      break;
-    case vm::JSAsmOperator::SET_REGEX_STICKY:
-      out << L"set_regex_sticky";
       break;
     case vm::JSAsmOperator::POP:
       out << L"pop " << *(uint32_t *)(buffer + offset);
@@ -534,6 +517,17 @@ int spark_main(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
+
+  // std::wstring input = L"a\nb";
+  // std::wregex pattern(L"a.b", std::regex::extended);
+
+  // if (regex_search(input, pattern)) {
+  //   std::cout << "Pattern found!" << std::endl;
+  // } else {
+  //   std::cout << "Pattern not found." << std::endl;
+  // }
+
+  // return 0;
   auto res = spark_main(argc, argv);
   return res;
 }

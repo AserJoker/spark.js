@@ -118,7 +118,13 @@ JS_OPT(JSVirtualMachine::pushBigint) {
   _ctx->stack.push_back(ctx->createBigInt(s));
 }
 
-JS_OPT(JSVirtualMachine::pushRegex) {}
+JS_OPT(JSVirtualMachine::pushRegex) {
+  auto flag = argi(module);
+  auto value = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  _ctx->stack.push_back(
+      ctx->constructObject(ctx->RegExp(), {value, ctx->createNumber(flag)}));
+}
 
 JS_OPT(JSVirtualMachine::pushValue) {
   auto offset = argi(module);
@@ -484,18 +490,6 @@ JS_OPT(JSVirtualMachine::merge) {
   }
 }
 
-JS_OPT(JSVirtualMachine::setRegexHasIndices) {}
-
-JS_OPT(JSVirtualMachine::setRegexGlobal) {}
-
-JS_OPT(JSVirtualMachine::setRegexIgnoreCases) {}
-
-JS_OPT(JSVirtualMachine::setRegexMultiline) {}
-
-JS_OPT(JSVirtualMachine::setRegexDotAll) {}
-
-JS_OPT(JSVirtualMachine::setRegexSticky) {}
-
 JS_OPT(JSVirtualMachine::pop) {
   auto size = argi(module);
   while (size > 0) {
@@ -534,7 +528,28 @@ JS_OPT(JSVirtualMachine::load) {
 
 JS_OPT(JSVirtualMachine::loadConst) {
   auto val = args(module);
-  _ctx->stack.push_back(ctx->createString(val));
+  std::wstring res;
+  for (size_t i = 0; i < val.size(); i++) {
+    if (val[i] == L'\\') {
+      i++;
+      if (val[i] == 'n') {
+        res += L'\n';
+      } else if (val[i] == 'r') {
+        res += L'\r';
+      } else if (val[i] == 'b') {
+        res += L'\b';
+      } else if (val[i] == 't') {
+        res += L'\t';
+      } else if (val[i] == '\\') {
+        res += L'\\';
+      } else {
+        res += val[i];
+      }
+    } else {
+      res += val[i];
+    }
+  }
+  _ctx->stack.push_back(ctx->createString(res));
 }
 
 JS_OPT(JSVirtualMachine::ret) { _pc = module->codes.size(); }
@@ -1633,24 +1648,6 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::MERGE:
         merge(ctx, module);
-        break;
-      case vm::JSAsmOperator::SET_REGEX_HAS_INDICES:
-        setRegexHasIndices(ctx, module);
-        break;
-      case vm::JSAsmOperator::SET_REGEX_GLOBAL:
-        setRegexGlobal(ctx, module);
-        break;
-      case vm::JSAsmOperator::SET_REGEX_IGNORE_CASES:
-        setRegexIgnoreCases(ctx, module);
-        break;
-      case vm::JSAsmOperator::SET_REGEX_MULTILINE:
-        setRegexMultiline(ctx, module);
-        break;
-      case vm::JSAsmOperator::SET_REGEX_DOT_ALL:
-        setRegexDotAll(ctx, module);
-        break;
-      case vm::JSAsmOperator::SET_REGEX_STICKY:
-        setRegexSticky(ctx, module);
         break;
       case vm::JSAsmOperator::POP:
         pop(ctx, module);

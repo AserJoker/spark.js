@@ -5,6 +5,7 @@
 #include "engine/base/JSEvalType.hpp"
 #include "error/JSSyntaxError.hpp"
 #include "vm/JSAsmOperator.hpp"
+#include "vm/JSRegExpFlag.hpp"
 #include <cstdint>
 #include <fmt/xchar.h>
 #include <string>
@@ -319,32 +320,26 @@ void JSGenerator::resolveLiteralRegex(JSGeneratorContext &ctx,
                                       common::AutoPtr<JSModule> &module,
                                       const common::AutoPtr<JSNode> &node) {
   auto n = node.cast<JSRegexLiteral>();
-  generate(module, vm::JSAsmOperator::PUSH_REGEX, n->value);
-
+  uint32_t flag = 0;
   if (n->hasIndices) {
-    generate(module, vm::JSAsmOperator::PUSH_TRUE);
-    generate(module, vm::JSAsmOperator::SET_REGEX_HAS_INDICES);
   }
   if (n->global) {
-    generate(module, vm::JSAsmOperator::PUSH_TRUE);
-    generate(module, vm::JSAsmOperator::SET_REGEX_GLOBAL);
+    flag |= vm::JSRegExpFlag::GLOBAL;
   }
   if (n->ignoreCase) {
-    generate(module, vm::JSAsmOperator::PUSH_TRUE);
-    generate(module, vm::JSAsmOperator::SET_REGEX_IGNORE_CASES);
+    flag |= vm::JSRegExpFlag::ICASE;
   }
   if (n->multiline) {
-    generate(module, vm::JSAsmOperator::PUSH_TRUE);
-    generate(module, vm::JSAsmOperator::SET_REGEX_MULTILINE);
+    flag |= vm::JSRegExpFlag::MULTILINE;
   }
   if (n->dotAll) {
-    generate(module, vm::JSAsmOperator::PUSH_TRUE);
-    generate(module, vm::JSAsmOperator::SET_REGEX_DOT_ALL);
+    flag |= vm::JSRegExpFlag::DOTALL;
   }
   if (n->sticky) {
-    generate(module, vm::JSAsmOperator::PUSH_TRUE);
-    generate(module, vm::JSAsmOperator::SET_REGEX_STICKY);
+    flag |= vm::JSRegExpFlag::STICKY;
   }
+  generate(module, vm::JSAsmOperator::LOAD_CONST, n->value);
+  generate(module, vm::JSAsmOperator::PUSH_REGEX, flag);
 }
 
 void JSGenerator::resolveLiteralNull(JSGeneratorContext &ctx,
