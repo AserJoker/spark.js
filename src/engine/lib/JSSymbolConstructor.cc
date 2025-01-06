@@ -34,7 +34,7 @@ JS_FUNC(JSSymbolConstructor::valueOf) {
     throw error::JSTypeError(
         L"Symbol.prototype.description requires that 'this' be a Symbol");
   }
-  auto symbol = self->getProperty(ctx, ctx->symbolValue());
+  auto symbol = self->getProperty(ctx, ctx->internalSymbol(L"value"));
 
   if (symbol->getType() != JSValueType::JS_SYMBOL) {
     throw error::JSTypeError(
@@ -96,7 +96,7 @@ JS_FUNC(JSSymbolConstructor::toPrimitive) {
     throw error::JSTypeError(
         L"Symbol.prototype [ @@toPrimitive ] requires that 'this' be a Symbol");
   }
-  auto symbol = self->getProperty(ctx, ctx->symbolValue());
+  auto symbol = self->getProperty(ctx, ctx->internalSymbol(L"value"));
   if (symbol->getType() != JSValueType::JS_SYMBOL) {
     throw error::JSTypeError(
         L"Symbol.prototype [ @@toPrimitive ] requires that 'this' be a Symbol");

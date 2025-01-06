@@ -116,34 +116,36 @@ public:
 
   JSObjectEntity::JSField *
   getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
-                           const std::wstring &name);
+                           const std::wstring &name, bool private_ = false);
 
   JSObjectEntity::JSField *getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
-                                                 const std::wstring &name);
+                                                 const std::wstring &name,
+                                                 bool private_ = false);
 
-  common::AutoPtr<JSValue>
-  setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
-                        const std::wstring &name,
-                        const JSObjectEntity::JSField &descriptor);
+  common::AutoPtr<JSValue> setPropertyDescriptor(
+      common::AutoPtr<JSContext> ctx, const std::wstring &name,
+      const JSObjectEntity::JSField &descriptor, bool private_ = false);
 
   common::AutoPtr<JSValue> setPropertyDescriptor(
       common::AutoPtr<JSContext> ctx, const std::wstring &name,
       const common::AutoPtr<JSValue> &value, bool configurable = true,
-      bool enumable = false, bool writable = true);
+      bool enumable = false, bool writable = true, bool private_ = false);
 
   common::AutoPtr<JSValue> setPropertyDescriptor(
       common::AutoPtr<JSContext> ctx, const std::wstring &name,
       const common::AutoPtr<JSValue> &get, const common::AutoPtr<JSValue> &set,
-      bool configurable = true, bool enumable = false);
+      bool configurable = true, bool enumable = false, bool private_ = false);
 
   common::AutoPtr<JSValue> getProperty(common::AutoPtr<JSContext> ctx,
                                        const std::wstring &name,
-                                       common::AutoPtr<JSValue> self = nullptr);
+                                       common::AutoPtr<JSValue> self = nullptr,
+                                       bool private_ = false);
 
   common::AutoPtr<JSValue> setProperty(common::AutoPtr<JSContext> ctx,
                                        const std::wstring &name,
                                        const common::AutoPtr<JSValue> &field,
-                                       common::AutoPtr<JSValue> self = nullptr);
+                                       common::AutoPtr<JSValue> self = nullptr,
+                                       bool private_ = false);
 
   common::AutoPtr<JSValue> getIndex(common::AutoPtr<JSContext> ctx,
                                     const uint32_t &name);
@@ -168,10 +170,9 @@ public:
   JSObjectEntity::JSField *getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
                                                  common::AutoPtr<JSValue> name);
 
-  common::AutoPtr<JSValue>
-  setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
-                        common::AutoPtr<JSValue> name,
-                        const JSObjectEntity::JSField &descriptor);
+  common::AutoPtr<JSValue> setPropertyDescriptor(
+      common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> name,
+      const JSObjectEntity::JSField &descriptor);
 
   common::AutoPtr<JSValue> setPropertyDescriptor(
       common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue> name,

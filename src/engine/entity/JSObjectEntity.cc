@@ -42,6 +42,16 @@ JSObjectEntity::getProperties() {
   return _fields;
 }
 
+const std::unordered_map<std::wstring, JSObjectEntity::JSField> &
+JSObjectEntity::getPrivateProperties() const {
+  return _privateFields;
+}
+
+std::unordered_map<std::wstring, JSObjectEntity::JSField> &
+JSObjectEntity::getPrivateProperties() {
+  return _privateFields;
+}
+
 std::wstring JSObjectEntity::toString(common::AutoPtr<JSContext> ctx) const {
   std::wstring str = L"Object";
   auto symbol = ctx->Symbol()->getProperty(ctx, L"toStringTag");

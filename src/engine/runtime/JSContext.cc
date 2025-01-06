@@ -114,8 +114,9 @@ void JSContext::initialize() {
   _Symbol->setPropertyDescriptor(this, L"prototype", symbolPrototype);
   symbolPrototype->setPropertyDescriptor(this, L"constructor", _Symbol);
 
-  _symbolValue = createSymbol();
-  _symbolPack = createSymbol();
+  _symbols[L"value"] = createSymbol();
+  _symbols[L"pack"] = createSymbol();
+  _symbols[L"identify"] = createSymbol();
 
   JSSymbolConstructor::initialize(this, _Symbol, symbolPrototype);
   JSObjectConstructor::initialize(this, _Object, objectPrototype);
@@ -853,9 +854,14 @@ common::AutoPtr<JSValue> JSContext::AsyncGenerator() { return _AsyncGenerator; }
 
 common::AutoPtr<JSValue> JSContext::Promise() { return _Promise; }
 
-common::AutoPtr<JSValue> JSContext::symbolValue() { return _symbolValue; }
-
-common::AutoPtr<JSValue> JSContext::symbolPack() { return _symbolPack; }
+common::AutoPtr<JSValue> JSContext::internalSymbol(const std::wstring &name) {
+  if (_symbols.contains(name)) {
+    return _symbols.at(name);
+  }
+  auto val = createSymbol(name);
+  _symbols[name] = _root->createValue(val->getStore());
+  return _symbols[name];
+}
 
 common::AutoPtr<JSValue> JSContext::uninitialized() {
   return createValue(new JSStore(new JSEntity(JSValueType::JS_UNINITIALIZED)));

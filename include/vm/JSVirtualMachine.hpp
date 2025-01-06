@@ -59,6 +59,8 @@ private:
   JS_OPT(setSuperField);
   JS_OPT(getSuperField);
   JS_OPT(setPrivateField);
+  JS_OPT(getPrivateField);
+  JS_OPT(setPrivateMethod);
   JS_OPT(getKeys);
   JS_OPT(setAccessor);
   JS_OPT(setPrivateAccessor);
@@ -93,6 +95,7 @@ private:
   JS_OPT(popScope);
   JS_OPT(call);
   JS_OPT(memberCall);
+  JS_OPT(memberPrivateCall);
   JS_OPT(superMemberCall);
   JS_OPT(superCall);
   JS_OPT(optionalCall);

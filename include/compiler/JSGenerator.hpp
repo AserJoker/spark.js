@@ -24,6 +24,7 @@ private:
     size_t scopeChain;
     engine::JSEvalType evalType;
     engine::JSEvalType lexContextType;
+    double currentClass;
     JSGeneratorContext() {
       currentScope = nullptr;
       scopeChain = 0;
@@ -80,7 +81,6 @@ private:
                          const JSNodeArray &nodes);
 
 private:
-
   void resolveLiteralRegex(JSGeneratorContext &ctx,
                            common::AutoPtr<JSModule> &module,
                            const common::AutoPtr<JSNode> &node);

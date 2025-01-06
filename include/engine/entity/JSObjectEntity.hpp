@@ -20,6 +20,7 @@ private:
   JSStore *_prototype;
   std::unordered_map<JSStore *, JSField> _symbolFields;
   std::unordered_map<std::wstring, JSField> _fields;
+  std::unordered_map<std::wstring, JSField> _privateFields;
   bool _extensible;
   bool _sealed;
   bool _frozen;
@@ -50,6 +51,10 @@ public:
   std::unordered_map<JSStore *, JSField> &getSymbolProperties();
 
   std::unordered_map<std::wstring, JSField> &getProperties();
+
+  const std::unordered_map<std::wstring, JSField> &getPrivateProperties() const;
+
+  std::unordered_map<std::wstring, JSField> &getPrivateProperties();
 
   std::wstring toString(common::AutoPtr<JSContext> ctx) const override;
 

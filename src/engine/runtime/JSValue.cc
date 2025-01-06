@@ -252,8 +252,8 @@ common::AutoPtr<JSValue> JSValue::pack(common::AutoPtr<JSContext> ctx) {
     break;
   case JSValueType::JS_SYMBOL: {
     auto val = ctx->createObject(ctx->Symbol()->getProperty(ctx, L"prototype"));
-    val->setProperty(ctx, ctx->symbolValue(), this);
-    val->setProperty(ctx, ctx->symbolPack(), ctx->Symbol());
+    val->setProperty(ctx, ctx->internalSymbol(L"value"), this);
+    val->setProperty(ctx, ctx->internalSymbol(L"pack"), ctx->Symbol());
     return val;
   } break;
   case JSValueType::JS_NULL:
@@ -561,7 +561,7 @@ std::wstring JSValue::getTypeName() {
 
 JSObjectEntity::JSField *
 JSValue::getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
-                                  const std::wstring &name) {
+                                  const std::wstring &name, bool private_) {
   if (getType() == JSValueType::JS_UNDEFINED) {
     throw error::JSTypeError(fmt::format(
         L"Cannot read properties of undefined (reading '{}')", name));
@@ -571,16 +571,23 @@ JSValue::getOwnPropertyDescriptor(common::AutoPtr<JSContext> ctx,
         fmt::format(L"Cannot read properties of null (reading '{}')", name));
   }
   auto self = pack(ctx);
-  auto &fields = self->getEntity<JSObjectEntity>()->getProperties();
-  if (fields.contains(name)) {
-    return &fields.at(name);
+  if (private_) {
+    auto &fields = self->getEntity<JSObjectEntity>()->getPrivateProperties();
+    if (fields.contains(name)) {
+      return &fields.at(name);
+    }
+  } else {
+    auto &fields = self->getEntity<JSObjectEntity>()->getProperties();
+    if (fields.contains(name)) {
+      return &fields.at(name);
+    }
   }
   return nullptr;
 }
 
 JSObjectEntity::JSField *
 JSValue::getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
-                               const std::wstring &name) {
+                               const std::wstring &name, bool private_) {
   if (getType() == JSValueType::JS_UNDEFINED) {
     throw error::JSTypeError(fmt::format(
         L"Cannot read properties of undefined (reading '{}')", name));
@@ -591,19 +598,25 @@ JSValue::getPropertyDescriptor(common::AutoPtr<JSContext> ctx,
   }
   auto entity = pack(ctx)->getEntity<JSObjectEntity>();
   while (entity != nullptr) {
-    auto &fields = entity->getProperties();
-    if (fields.contains(name)) {
-      return &fields.at(name);
+    if (!private_) {
+      auto &fields = entity->getProperties();
+      if (fields.contains(name)) {
+        return &fields.at(name);
+      }
+    } else {
+      auto &fields = entity->getPrivateProperties();
+      if (fields.contains(name)) {
+        return &fields.at(name);
+      }
     }
     entity = entity->getPrototype()->getEntity().cast<JSObjectEntity>();
   }
   return nullptr;
 }
 
-common::AutoPtr<JSValue>
-JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
-                               const std::wstring &name,
-                               const JSObjectEntity::JSField &descriptor) {
+common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
+    common::AutoPtr<JSContext> ctx, const std::wstring &name,
+    const JSObjectEntity::JSField &descriptor, bool private_) {
   if (descriptor.value && (descriptor.get || descriptor.set)) {
     throw error::JSTypeError(
         fmt::format(L"Invalid property descriptor. Cannot both specify "
@@ -612,7 +625,7 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
   auto self = pack(ctx);
   auto store = self->getStore();
   auto entity = self->getEntity<JSObjectEntity>();
-  auto old = self->getOwnPropertyDescriptor(ctx, name);
+  auto old = self->getOwnPropertyDescriptor(ctx, name, private_);
   if (old != nullptr) {
     if (!old->configurable || entity->isFrozen()) {
       throw error::JSTypeError(
@@ -663,14 +676,18 @@ JSValue::setPropertyDescriptor(common::AutoPtr<JSContext> ctx,
       store->appendChild(descriptor.value);
     }
   }
-  entity->getProperties()[name] = descriptor;
+  if (private_) {
+    entity->getPrivateProperties()[name] = descriptor;
+  } else {
+    entity->getProperties()[name] = descriptor;
+  }
   return ctx->truly();
 }
 
 common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
     common::AutoPtr<JSContext> ctx, const std::wstring &name,
     const common::AutoPtr<JSValue> &value, bool configurable, bool enumable,
-    bool writable) {
+    bool writable, bool private_) {
   return setPropertyDescriptor(ctx, name,
                                JSObjectEntity::JSField{
                                    .configurable = configurable,
@@ -679,13 +696,14 @@ common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
                                    .writable = writable,
                                    .get = nullptr,
                                    .set = nullptr,
-                               });
+                               },
+                               private_);
 }
 
 common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
     common::AutoPtr<JSContext> ctx, const std::wstring &name,
     const common::AutoPtr<JSValue> &get, const common::AutoPtr<JSValue> &set,
-    bool configurable, bool enumable) {
+    bool configurable, bool enumable, bool private_) {
   return setPropertyDescriptor(
       ctx, name,
       JSObjectEntity::JSField{
@@ -695,14 +713,16 @@ common::AutoPtr<JSValue> JSValue::setPropertyDescriptor(
           .writable = false,
           .get = get != nullptr ? (JSStore *)get->getStore() : nullptr,
           .set = set != nullptr ? (JSStore *)set->getStore() : nullptr,
-      });
+      },
+      private_);
 }
 
 common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
                                               const std::wstring &name,
-                                              common::AutoPtr<JSValue> vself) {
+                                              common::AutoPtr<JSValue> vself,
+                                              bool private_) {
   auto self = pack(ctx);
-  auto descriptor = self->getPropertyDescriptor(ctx, name);
+  auto descriptor = self->getPropertyDescriptor(ctx, name, private_);
   if (descriptor != nullptr) {
     if (descriptor->get) {
       auto getter = ctx->createValue(descriptor->get);
@@ -716,17 +736,21 @@ common::AutoPtr<JSValue> JSValue::getProperty(common::AutoPtr<JSContext> ctx,
       return ctx->createValue(descriptor->value);
     }
   }
+  if (private_) {
+    throw error::JSSyntaxError(fmt::format(
+        L"Private field '{}' must be declared in an enclosing class", name));
+  }
   return ctx->undefined();
 }
 
 common::AutoPtr<JSValue>
 JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
                      const common::AutoPtr<JSValue> &field,
-                     common::AutoPtr<JSValue> vself) {
+                     common::AutoPtr<JSValue> vself, bool private_) {
   auto self = pack(ctx);
   auto store = self->getStore();
   auto entity = self->getEntity<JSObjectEntity>();
-  auto descriptor = self->getPropertyDescriptor(ctx, name);
+  auto descriptor = self->getPropertyDescriptor(ctx, name, private_);
   if (descriptor && descriptor->value == field->getStore()) {
     return ctx->truly();
   }
@@ -766,7 +790,7 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
       store = vself->getStore();
       entity = vself->getEntity<JSObjectEntity>();
     }
-    auto ownDescriptor = self->getOwnPropertyDescriptor(ctx, name);
+    auto ownDescriptor = self->getOwnPropertyDescriptor(ctx, name, private_);
     if (ownDescriptor && ownDescriptor->value != nullptr) {
       if (descriptor->value != field->getStore()) {
         store->removeChild(descriptor->value);
@@ -775,7 +799,7 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
         descriptor->value = (JSStore *)(field->getStore());
       }
     } else {
-      entity->getProperties()[name] = JSObjectEntity::JSField{
+      auto descriptor = JSObjectEntity::JSField{
           .configurable = true,
           .enumable = true,
           .value = (JSStore *)field->getStore(),
@@ -783,6 +807,11 @@ JSValue::setProperty(common::AutoPtr<JSContext> ctx, const std::wstring &name,
           .get = nullptr,
           .set = nullptr,
       };
+      if (private_) {
+        entity->getPrivateProperties()[name] = descriptor;
+      } else {
+        entity->getProperties()[name] = descriptor;
+      }
       store->appendChild((JSStore *)field->getStore());
     }
   }

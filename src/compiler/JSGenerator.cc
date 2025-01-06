@@ -220,6 +220,16 @@ void JSGenerator::resolveMemberChian(JSGeneratorContext &ctx,
   auto n = node.cast<JSBinaryExpression>();
   if (node->type == JSNodeType::EXPRESSION_MEMBER) {
     if (n->left->type == JSNodeType::SUPER) {
+      if (n->right->type == JSNodeType::PRIVATE_NAME) {
+        throw error::JSSyntaxError(
+            L"Unexpected private field",
+            {
+                .filename = module->filename,
+                .line = n->right->location.start.line,
+                .column = n->right->location.start.column,
+                .funcname = L"_.compile",
+            });
+      }
       generate(module, vm::JSAsmOperator::LOAD_CONST,
                n->right.cast<JSIdentifierLiteral>()->value);
       generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
@@ -244,11 +254,22 @@ void JSGenerator::resolveMemberChian(JSGeneratorContext &ctx,
               });
         }
         generate(module, vm::JSAsmOperator::LOAD_CONST, L"#" + f->value);
-        generate(module, vm::JSAsmOperator::GET_FIELD);
+        generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
+        generate(module, vm::JSAsmOperator::GET_PRIVATE_FIELD);
       }
     }
   } else if (node->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
     if (n->left->type == JSNodeType::SUPER) {
+      if (n->right->type == JSNodeType::PRIVATE_NAME) {
+        throw error::JSSyntaxError(
+            L"Unexpected private field",
+            {
+                .filename = module->filename,
+                .line = n->right->location.start.line,
+                .column = n->right->location.start.column,
+                .funcname = L"_.compile",
+            });
+      }
       resolveNode(ctx, module, n->right);
       generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
     } else {
@@ -1085,6 +1106,16 @@ void JSGenerator::resolveVariableIdentifier(
   } else if (node->type == JSNodeType::EXPRESSION_MEMBER) {
     auto n = node.cast<JSMemberExpression>();
     if (n->left->type == JSNodeType::SUPER) {
+      if (n->right->type == JSNodeType::PRIVATE_NAME) {
+        throw error::JSSyntaxError(
+            L"Unexpected private field",
+            {
+                .filename = module->filename,
+                .line = n->right->location.start.line,
+                .column = n->right->location.start.column,
+                .funcname = L"_.compile",
+            });
+      }
       generate(module, vm::JSAsmOperator::LOAD_CONST,
                n->right.cast<JSIdentifierLiteral>()->value);
       generate(module, vm::JSAsmOperator::SET_SUPER_FIELD);
@@ -1118,6 +1149,7 @@ void JSGenerator::resolveVariableIdentifier(
               });
         }
         generate(module, vm::JSAsmOperator::LOAD_CONST, L"#" + f->value);
+        generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
         generate(module, vm::JSAsmOperator::SET_PRIVATE_FIELD);
       }
       generate(module, vm::JSAsmOperator::POP, 1U); // self
@@ -1126,6 +1158,16 @@ void JSGenerator::resolveVariableIdentifier(
   } else if (node->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
     auto n = node.cast<JSComputedMemberExpression>();
     if (n->left->type == JSNodeType::SUPER) {
+      if (n->right->type == JSNodeType::PRIVATE_NAME) {
+        throw error::JSSyntaxError(
+            L"Unexpected private field",
+            {
+                .filename = module->filename,
+                .line = n->right->location.start.line,
+                .column = n->right->location.start.column,
+                .funcname = L"_.compile",
+            });
+      }
       resolveNode(ctx, module, n->right);
       generate(module, vm::JSAsmOperator::SET_SUPER_FIELD);
     } else {
@@ -1403,6 +1445,15 @@ void JSGenerator::resolveExpressionMember(JSGeneratorContext &ctx,
   std::vector<size_t> offsets;
   auto n = node.cast<JSMemberExpression>();
   if (n->left->type == JSNodeType::SUPER) {
+    if (n->right->type == JSNodeType::PRIVATE_NAME) {
+      throw error::JSSyntaxError(L"Unexpected private field",
+                                 {
+                                     .filename = module->filename,
+                                     .line = n->right->location.start.line,
+                                     .column = n->right->location.start.column,
+                                     .funcname = L"_.compile",
+                                 });
+    }
     generate(module, vm::JSAsmOperator::LOAD_CONST,
              n->right.cast<JSIdentifierLiteral>()->value);
     generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
@@ -1423,7 +1474,8 @@ void JSGenerator::resolveExpressionMember(JSGeneratorContext &ctx,
             });
       }
       generate(module, vm::JSAsmOperator::LOAD_CONST, L"#" + f->value);
-      generate(module, vm::JSAsmOperator::GET_FIELD);
+      generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
+      generate(module, vm::JSAsmOperator::GET_PRIVATE_FIELD);
     } else {
       generate(module, vm::JSAsmOperator::LOAD_CONST,
                n->right.cast<JSIdentifierLiteral>()->value);
@@ -1459,6 +1511,15 @@ void JSGenerator::resolveExpressionComputedMember(
   std::vector<size_t> offsets;
   auto n = node.cast<JSComputedMemberExpression>();
   if (n->left->type == JSNodeType::SUPER) {
+    if (n->right->type == JSNodeType::PRIVATE_NAME) {
+      throw error::JSSyntaxError(L"Unexpected private field",
+                                 {
+                                     .filename = module->filename,
+                                     .line = n->right->location.start.line,
+                                     .column = n->right->location.start.column,
+                                     .funcname = L"_.compile",
+                                 });
+    }
     resolveNode(ctx, module, n->right);
     generate(module, vm::JSAsmOperator::GET_SUPER_FIELD);
   } else {
@@ -1520,6 +1581,16 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
       if (func->type == JSNodeType::EXPRESSION_COMPUTED_MEMBER) {
         resolveNode(ctx, module, member->right);
       } else {
+        if (member->right->type == JSNodeType::PRIVATE_NAME) {
+          throw error::JSSyntaxError(
+              L"Unexpected private field",
+              {
+                  .filename = module->filename,
+                  .line = member->right->location.start.line,
+                  .column = member->right->location.start.column,
+                  .funcname = L"_.compile",
+              });
+        }
         generate(module, vm::JSAsmOperator::LOAD_CONST,
                  member->right.cast<JSIdentifierLiteral>()->value);
       }
@@ -1544,12 +1615,13 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
                 });
           }
           generate(module, vm::JSAsmOperator::LOAD_CONST, L"#" + f->value);
+          opt = vm::JSAsmOperator::MEMBER_PRIVATE_CALL;
         } else {
           generate(module, vm::JSAsmOperator::LOAD_CONST,
                    member->right.cast<JSIdentifierLiteral>()->value);
+          opt = vm::JSAsmOperator::MEMBER_CALL;
         }
       }
-      opt = vm::JSAsmOperator::MEMBER_CALL;
     }
   } else if (func->type == JSNodeType::EXPRESSION_OPTIONAL_MEMBER) {
     auto member = func.cast<JSOptionalMemberExpression>();
@@ -1573,6 +1645,9 @@ void JSGenerator::resolveExpressionCall(JSGeneratorContext &ctx,
   }
   for (auto &arg : n->arguments) {
     resolveNode(ctx, module, arg);
+  }
+  if (opt == vm::JSAsmOperator::MEMBER_PRIVATE_CALL) {
+    generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
   }
   module->sourceMap[module->codes.size()] = node->location.start;
   generate(module, opt, (uint32_t)n->arguments.size());
@@ -1837,7 +1912,8 @@ void JSGenerator::resolveClassMethod(JSGeneratorContext &ctx,
   if (n->identifier->type == JSNodeType::PRIVATE_NAME) {
     generate(module, vm::JSAsmOperator::LOAD_CONST,
              L"#" + n->identifier.cast<JSPrivateName>()->value);
-    generate(module, vm::JSAsmOperator::SET_PRIVATE_FIELD);
+    generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
+    generate(module, vm::JSAsmOperator::SET_PRIVATE_METHOD);
   } else {
     if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
       generate(module, vm::JSAsmOperator::LOAD_CONST,
@@ -1865,6 +1941,7 @@ void JSGenerator::resolveClassProperty(JSGeneratorContext &ctx,
     if (n->identifier->type == JSNodeType::PRIVATE_NAME) {
       generate(module, vm::JSAsmOperator::LOAD_CONST,
                L"#" + n->identifier.cast<JSPrivateName>()->value);
+      generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
       generate(module, vm::JSAsmOperator::SET_PRIVATE_FIELD);
     } else {
       if (n->identifier->type == JSNodeType::LITERAL_IDENTITY) {
@@ -1903,6 +1980,7 @@ void JSGenerator::resolveClassAccessor(JSGeneratorContext &ctx,
   if (n->identifier->type == JSNodeType::PRIVATE_NAME) {
     generate(module, vm::JSAsmOperator::LOAD_CONST,
              L"#" + n->identifier.cast<JSPrivateName>()->value);
+    generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
     generate(module, vm::JSAsmOperator::SET_PRIVATE_ACCESSOR,
              n->kind == JSAccessorKind::GET ? 1U : 0U);
   } else {
@@ -2319,7 +2397,11 @@ void JSGenerator::resolveDeclarationArray(JSGeneratorContext &ctx,
 void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
                                           common::AutoPtr<JSModule> &module,
                                           const common::AutoPtr<JSNode> &node) {
+  static uint32_t identify = 0;
   auto n = node.cast<JSClassDeclaration>();
+  auto oldClass = ctx.currentClass;
+  ctx.currentClass = ++identify;
+  generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
   if (n->extends != nullptr) {
     resolveNode(ctx, module, n->extends);
     generate(module, vm::JSAsmOperator::PUSH_CLASS);
@@ -2397,6 +2479,7 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
     if (item->identifier->type == JSNodeType::PRIVATE_NAME) {
       generate(module, vm::JSAsmOperator::LOAD_CONST,
                L"#" + item->identifier.cast<JSPrivateName>()->value);
+      generate(module, vm::JSAsmOperator::PUSH, ctx.currentClass);
       generate(module, vm::JSAsmOperator::SET_PRIVATE_FIELD);
     } else {
       if (item->identifier->type == JSNodeType::LITERAL_IDENTITY) {
@@ -2451,6 +2534,7 @@ void JSGenerator::resolveDeclarationClass(JSGeneratorContext &ctx,
     generate(module, vm::JSAsmOperator::STORE, identifier);
     generate(module, vm::JSAsmOperator::LOAD, identifier);
   }
+  ctx.currentClass = oldClass;
 }
 
 void JSGenerator::resolveNode(JSGeneratorContext &ctx,

@@ -70,10 +70,7 @@ private:
   common::AutoPtr<JSValue> _URIError;
 
   // internal
-  std::unordered_map<std::wstring, JSStore *> _symbols;
-
-  common::AutoPtr<JSValue> _symbolValue;
-  common::AutoPtr<JSValue> _symbolPack;
+  std::unordered_map<std::wstring, common::AutoPtr<JSValue>> _symbols;
 
 private:
   common::AutoPtr<JSScope> _root;
@@ -302,9 +299,7 @@ public:
 
   common::AutoPtr<JSValue> uninitialized();
 
-  common::AutoPtr<JSValue> symbolValue();
-
-  common::AutoPtr<JSValue> symbolPack();
+  common::AutoPtr<JSValue> internalSymbol(const std::wstring &name);
 
   common::AutoPtr<JSValue> load(const std::wstring &name);
 };

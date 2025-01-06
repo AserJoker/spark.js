@@ -133,6 +133,8 @@ JS_OPT(JSVirtualMachine::pushValue) {
 JS_OPT(JSVirtualMachine::pushClass) {
   auto extends = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
+  auto identify = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   if (!extends->isFunction()) {
     extends = ctx->Object();
   }
@@ -143,6 +145,8 @@ JS_OPT(JSVirtualMachine::pushClass) {
   auto prototype = ctx->createObject(extends->getProperty(ctx, L"prototype"));
   prototype->setPropertyDescriptor(ctx, L"constructor", func);
   func->setPropertyDescriptor(ctx, L"prototype", prototype);
+  prototype->setPropertyDescriptor(ctx, ctx->internalSymbol(L"identify"),
+                                   identify);
   _ctx->stack.push_back(func);
 }
 
@@ -225,17 +229,109 @@ JS_OPT(JSVirtualMachine::getSuperField) {
   }
 }
 JS_OPT(JSVirtualMachine::setPrivateField) {
+  auto identify = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   auto name = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto field = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto obj = *_ctx->stack.rbegin();
+  if (obj->isObject()) {
+    auto prop = obj->getPrototype(ctx);
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else if (obj->isFunction()) {
+    auto prop = obj->getProperty(ctx, L"prototype");
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else {
+    throw error::JSSyntaxError(L"Unexpected private field");
+  }
   if (field->isFunction() && field->getProperty(ctx, L"name")->isUndefined()) {
     std::wstring fieldname =
         fmt::format(L"{}.{}", obj->getName(), name->getString().value());
     field->setProperty(ctx, L"name", ctx->createString(fieldname));
   }
-  obj->setProperty(ctx, name, field);
+  obj->setProperty(ctx, name->getString().value(), field, nullptr, true);
+}
+
+JS_OPT(JSVirtualMachine::setPrivateMethod) {
+  auto identify = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto obj = *_ctx->stack.rbegin();
+  if (obj->isObject()) {
+    auto prop = obj;
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else if (obj->isFunction()) {
+    auto prop = obj->getProperty(ctx, L"prototype");
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else {
+    throw error::JSSyntaxError(L"Unexpected private field");
+  }
+  if (field->isFunction() && field->getProperty(ctx, L"name")->isUndefined()) {
+    std::wstring fieldname =
+        fmt::format(L"{}.{}", obj->getName(), name->getString().value());
+    field->setProperty(ctx, L"name", ctx->createString(fieldname));
+  }
+  obj->setProperty(ctx, name->getString().value(), field, nullptr, true);
+}
+
+JS_OPT(JSVirtualMachine::getPrivateField) {
+  auto identify = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto name = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto obj = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  if (obj->isObject()) {
+    auto prop = obj->getPrototype(ctx);
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else if (obj->isFunction()) {
+    auto prop = obj->getProperty(ctx, L"prototype");
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else {
+    throw error::JSSyntaxError(L"Unexpected private field");
+  }
+  _ctx->stack.push_back(
+      obj->getProperty(ctx, name->getString().value(), nullptr, true));
 }
 
 JS_OPT(JSVirtualMachine::getField) {
@@ -284,15 +380,40 @@ JS_OPT(JSVirtualMachine::setAccessor) {
 
 JS_OPT(JSVirtualMachine::setPrivateAccessor) {
   auto type = argi(module);
+  auto identify = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
   auto name = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto accessor = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
   auto obj = *_ctx->stack.rbegin();
-  auto prop = obj->getOwnPropertyDescriptor(ctx, name);
+  if (obj->isObject()) {
+    auto prop = obj;
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else if (obj->isFunction()) {
+    auto prop = obj->getProperty(ctx, L"prototype");
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else {
+    throw error::JSSyntaxError(L"Unexpected private field");
+  }
+  auto prop =
+      obj->getOwnPropertyDescriptor(ctx, name->getString().value(), true);
   if (!prop) {
-    obj->setPropertyDescriptor(ctx, name, ctx->undefined(), true, true);
-    prop = obj->getOwnPropertyDescriptor(ctx, name);
+    obj->setPropertyDescriptor(ctx, name->getString().value(), ctx->undefined(),
+                               true, true, true, true);
+    prop = obj->getOwnPropertyDescriptor(ctx, name->getString().value(), true);
   }
   if (prop->value) {
     obj->getStore()->removeChild(prop->value);
@@ -713,8 +834,13 @@ JS_OPT(JSVirtualMachine::call) {
   }
   auto func = *_ctx->stack.rbegin();
   _ctx->stack.pop_back();
-  auto name =
-      func->getProperty(ctx, L"name")->toString(ctx)->getString().value();
+  std::wstring name = L"";
+  auto fname = func->getProperty(ctx, L"name");
+  if (fname->isUndefined() || fname->isNull()) {
+    name = L"anonymous";
+  } else {
+    name = fname->toString(ctx)->getString().value();
+  }
   compiler::JSSourceLocation::Position loc = {0, 0, 0};
   if (module->sourceMap.contains(offset)) {
     loc = module->sourceMap.at(offset);
@@ -762,8 +888,86 @@ JS_OPT(JSVirtualMachine::memberCall) {
                       field->toString(ctx)->getString().value()));
     }
   }
-  auto name =
-      func->getProperty(ctx, L"name")->toString(ctx)->getString().value();
+  std::wstring name = L"";
+  auto fname = func->getProperty(ctx, L"name");
+  if (fname->isUndefined() || fname->isNull()) {
+    name = L"anonymous";
+  } else {
+    name = fname->toString(ctx)->getString().value();
+  }
+  auto pc = _pc;
+  auto res = func->apply(ctx, self, args,
+                         {
+                             .filename = module->filename,
+                             .line = loc.line + 1,
+                             .column = loc.column + 1,
+                             .funcname = name,
+                         });
+  _ctx->stack.push_back(res);
+  if (res->getType() == engine::JSValueType::JS_EXCEPTION) {
+    _pc = module->codes.size();
+  } else {
+    _pc = pc;
+  }
+}
+
+JS_OPT(JSVirtualMachine::memberPrivateCall) {
+  auto offset = _pc - sizeof(uint16_t);
+  auto size = argi(module);
+  auto identify = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  std::vector<common::AutoPtr<engine::JSValue>> args;
+  args.resize(size, nullptr);
+  for (auto i = 0; i < size; i++) {
+    args[size - 1 - i] = *_ctx->stack.rbegin();
+    _ctx->stack.pop_back();
+  }
+  auto field = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  auto self = *_ctx->stack.rbegin();
+  _ctx->stack.pop_back();
+  if (self->isObject()) {
+    auto prop = self->getPrototype(ctx);
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else if (self->isFunction()) {
+    auto prop = self->getProperty(ctx, L"prototype");
+    auto current = prop->getProperty(ctx, ctx->internalSymbol(L"identify"));
+    if (!current->strictEqual(ctx, identify)
+             ->toBoolean(ctx)
+             ->getBoolean()
+             .value()) {
+      throw error::JSSyntaxError(L"Unexpected private field");
+    }
+  } else {
+    throw error::JSSyntaxError(L"Unexpected private field");
+  }
+  auto loc = module->sourceMap.at(offset);
+  auto func = self->getProperty(ctx, field->getString().value(), nullptr, true);
+  if (!func->isFunction()) {
+    if (field->getType() == engine::JSValueType::JS_SYMBOL) {
+      auto e = field->getEntity<engine::JSSymbolEntity>();
+      throw error::JSTypeError(fmt::format(L"{}[Symbol({})] is not a function",
+                                           self->getName(),
+                                           e->getDescription()));
+    } else {
+      throw error::JSTypeError(
+          fmt::format(L"{}['{}'] is not a function", self->getName(),
+                      field->toString(ctx)->getString().value()));
+    }
+  }
+  std::wstring name = L"";
+  auto fname = func->getProperty(ctx, L"name");
+  if (fname->isUndefined() || fname->isNull()) {
+    name = L"anonymous";
+  } else {
+    name = fname->toString(ctx)->getString().value();
+  }
   auto pc = _pc;
   auto res = func->apply(ctx, self, args,
                          {
@@ -810,7 +1014,13 @@ JS_OPT(JSVirtualMachine::superMemberCall) {
                       field->toString(ctx)->getString().value()));
     }
   }
-  auto name = func->getProperty(ctx, L"name")->getString().value();
+  std::wstring name = L"";
+  auto fname = func->getProperty(ctx, L"name");
+  if (fname->isUndefined() || fname->isNull()) {
+    name = L"anonymous";
+  } else {
+    name = fname->toString(ctx)->getString().value();
+  }
   auto pc = _pc;
   auto res = func->apply(ctx, self, args,
                          {
@@ -843,7 +1053,13 @@ JS_OPT(JSVirtualMachine::superCall) {
   if (!func->isFunction()) {
     throw error::JSSyntaxError(L"'super' keyword unexpected here");
   }
-  auto name = func->getProperty(ctx, L"name")->getString().value();
+  std::wstring name = L"";
+  auto fname = func->getProperty(ctx, L"name");
+  if (fname->isUndefined() || fname->isNull()) {
+    name = L"anonymous";
+  } else {
+    name = fname->toString(ctx)->getString().value();
+  }
   auto pc = _pc;
   auto res = func->apply(ctx, self, args,
                          {
@@ -874,8 +1090,13 @@ JS_OPT(JSVirtualMachine::optionalCall) {
     return;
   }
   _ctx->stack.pop_back();
-  auto name =
-      func->getProperty(ctx, L"name")->toString(ctx)->getString().value();
+  std::wstring name = L"";
+  auto fname = func->getProperty(ctx, L"name");
+  if (fname->isUndefined() || fname->isNull()) {
+    name = L"anonymous";
+  } else {
+    name = fname->toString(ctx)->getString().value();
+  }
   compiler::JSSourceLocation::Position loc = {0, 0, 0};
   if (module->sourceMap.contains(offset)) {
     loc = module->sourceMap.at(offset);
@@ -919,7 +1140,13 @@ JS_OPT(JSVirtualMachine::memberOptionalCall) {
     throw error::JSTypeError(
         fmt::format(L"cannot convert {} to function", func->getTypeName()));
   }
-  auto name = func->getProperty(ctx, L"name")->getString().value();
+  std::wstring name = L"";
+  auto fname = func->getProperty(ctx, L"name");
+  if (fname->isUndefined() || fname->isNull()) {
+    name = L"anonymous";
+  } else {
+    name = fname->toString(ctx)->getString().value();
+  }
   auto pc = _pc;
   auto res = func->apply(ctx, self, args,
                          {
@@ -1389,6 +1616,12 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
       case vm::JSAsmOperator::SET_PRIVATE_FIELD:
         setPrivateField(ctx, module);
         break;
+      case vm::JSAsmOperator::GET_PRIVATE_FIELD:
+        getPrivateField(ctx, module);
+        break;
+      case vm::JSAsmOperator::SET_PRIVATE_METHOD:
+        setPrivateMethod(ctx, module);
+        break;
       case vm::JSAsmOperator::GET_KEYS:
         getKeys(ctx, module);
         break;
@@ -1487,6 +1720,9 @@ void JSVirtualMachine::run(common::AutoPtr<engine::JSContext> ctx,
         break;
       case vm::JSAsmOperator::MEMBER_CALL:
         memberCall(ctx, module);
+        break;
+      case vm::JSAsmOperator::MEMBER_PRIVATE_CALL:
+        memberPrivateCall(ctx, module);
         break;
       case vm::JSAsmOperator::SUPER_MEMBER_CALL:
         superMemberCall(ctx, module);

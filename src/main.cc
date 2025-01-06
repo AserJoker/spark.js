@@ -471,8 +471,18 @@ void write(common::AutoPtr<compiler::JSModule> module) {
     case vm::JSAsmOperator::SET_PRIVATE_FIELD:
       out << L"set_private_field";
       break;
+    case vm::JSAsmOperator::SET_PRIVATE_METHOD:
+      out << L"set_private_method";
+      break;
     case vm::JSAsmOperator::SET_PRIVATE_ACCESSOR:
       out << L"set_private_accessor";
+      break;
+    case vm::JSAsmOperator::GET_PRIVATE_FIELD:
+      out << L"get_private_field";
+      break;
+    case vm::JSAsmOperator::MEMBER_PRIVATE_CALL:
+      out << L"member_private_call " << *(uint32_t *)(buffer + offset);
+      offset += sizeof(uint32_t);
       break;
     }
     out << std::endl;
