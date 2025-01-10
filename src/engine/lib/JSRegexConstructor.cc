@@ -55,7 +55,9 @@ JS_FUNC(JSRegexConstructor::exec) {
   auto result = ctx->createArray();
   result->setProperty(ctx, L"input", args[0]->toString(ctx));
   auto lastIndex =
-      (uint32_t)self->getProperty(ctx, L"lastIndex")->getNumber().value();
+      (uint32_t)self->getProperty(ctx, ctx->internalSymbol(L"lastIndex"))
+          ->getNumber()
+          .value();
 
   auto value = self->getProperty(ctx, ctx->internalSymbol(L"regex_value"))
                    ->getString()
@@ -81,14 +83,15 @@ JS_FUNC(JSRegexConstructor::exec) {
   std::wstring next(arg.begin() + lastIndex, arg.end());
   std::regex_search(next, re, pattern);
   if (re.empty()) {
-    self->setProperty(ctx, L"lastIndex", ctx->createNumber(0));
+    self->setProperty(ctx, ctx->internalSymbol(L"lastIndex"),
+                      ctx->createNumber(0));
     return ctx->null();
   }
   result->setIndex(ctx, 0, ctx->createString(re.str()));
   result->setProperty(ctx, L"index",
                       ctx->createNumber(re.position() + lastIndex));
   if (flag & vm::GLOBAL) {
-    self->setProperty(ctx, L"lastIndex",
+    self->setProperty(ctx, ctx->internalSymbol(L"lastIndex"),
                       ctx->createNumber(lastIndex + re.prefix().length() +
                                         re.str().length()));
   }
@@ -106,6 +109,64 @@ JS_FUNC(JSRegexConstructor::exec) {
   return result;
 }
 
+JS_FUNC(JSRegexConstructor::getDotAll) {
+  auto flags =
+      (uint32_t)self->getProperty(ctx, ctx->internalSymbol(L"regex_flag"))
+          ->getNumber()
+          .value();
+  return ctx->createBoolean(flags & vm::DOTALL);
+}
+
+JS_FUNC(JSRegexConstructor::getGlobal) {
+  auto flags =
+      (uint32_t)self->getProperty(ctx, ctx->internalSymbol(L"regex_flag"))
+          ->getNumber()
+          .value();
+  return ctx->createBoolean(flags & vm::GLOBAL);
+}
+
+JS_FUNC(JSRegexConstructor::getMultiline) {
+  auto flags =
+      (uint32_t)self->getProperty(ctx, ctx->internalSymbol(L"regex_flag"))
+          ->getNumber()
+          .value();
+  return ctx->createBoolean(flags & vm::MULTILINE);
+}
+
+JS_FUNC(JSRegexConstructor::getUnicode) {
+  auto flags =
+      (uint32_t)self->getProperty(ctx, ctx->internalSymbol(L"regex_flag"))
+          ->getNumber()
+          .value();
+  return ctx->createBoolean(flags & vm::UNICODE);
+}
+
+JS_FUNC(JSRegexConstructor::getSticky) {
+  auto flags =
+      (uint32_t)self->getProperty(ctx, ctx->internalSymbol(L"regex_flag"))
+          ->getNumber()
+          .value();
+  return ctx->createBoolean(flags & vm::STICKY);
+}
+
+JS_FUNC(JSRegexConstructor::getIgnoreCase) {
+  auto flags =
+      (uint32_t)self->getProperty(ctx, ctx->internalSymbol(L"regex_flag"))
+          ->getNumber()
+          .value();
+  return ctx->createBoolean(flags & vm::ICASE);
+}
+
+JS_FUNC(JSRegexConstructor::getFlags) {
+  return self->getProperty(ctx, ctx->internalSymbol(L"regex_flag"));
+}
+JS_FUNC(JSRegexConstructor::getSource) {
+  return self->getProperty(ctx, ctx->internalSymbol(L"regex_value"));
+}
+JS_FUNC(JSRegexConstructor::getLastIndex) {
+  return self->getProperty(ctx, ctx->internalSymbol(L"lastIndex"));
+}
+
 common::AutoPtr<JSValue>
 JSRegexConstructor::initialize(common::AutoPtr<JSContext> ctx) {
   auto RegExp = ctx->createNativeFunction(constructor, L"RegExp");
@@ -116,6 +177,35 @@ JSRegexConstructor::initialize(common::AutoPtr<JSContext> ctx) {
                          ctx->createNativeFunction(test, L"test"));
   prototype->setProperty(ctx, L"exec",
                          ctx->createNativeFunction(exec, L"exec"));
-  prototype->setProperty(ctx, L"lastIndex", ctx->createNumber());
+  prototype->setProperty(ctx, ctx->internalSymbol(L"lastIndex"),
+                         ctx->createNumber());
+  auto useless = ctx->createNativeFunction(
+      [](common::AutoPtr<JSContext> ctx, common::AutoPtr<JSValue>,
+         std::vector<common::AutoPtr<JSValue>>) -> common::AutoPtr<JSValue> {
+        return ctx->undefined();
+      });
+  prototype->setPropertyDescriptor(ctx, L"dotAll",
+                                   ctx->createNativeFunction(getDotAll),
+                                   useless, false, true);
+  prototype->setPropertyDescriptor(ctx, L"global",
+                                   ctx->createNativeFunction(getGlobal),
+                                   useless, false, true);
+  prototype->setPropertyDescriptor(ctx, L"unicode",
+                                   ctx->createNativeFunction(getUnicode),
+                                   useless, false, true);
+  prototype->setPropertyDescriptor(ctx, L"multiline",
+                                   ctx->createNativeFunction(getMultiline),
+                                   useless, false, true);
+  prototype->setPropertyDescriptor(ctx, L"sticky",
+                                   ctx->createNativeFunction(getSticky),
+                                   useless, false, true);
+  prototype->setPropertyDescriptor(
+      ctx, L"flags", ctx->createNativeFunction(getFlags), useless, false, true);
+  prototype->setPropertyDescriptor(ctx, L"source",
+                                   ctx->createNativeFunction(getSource),
+                                   useless, false, true);
+  prototype->setPropertyDescriptor(ctx, L"lastIndex",
+                                   ctx->createNativeFunction(getLastIndex),
+                                   useless, false, true);
   return RegExp;
 }
